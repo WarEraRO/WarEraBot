@@ -75,82 +75,136 @@ class FightStatus(commands.Cog):
             await interaction.followup.send("No fighter information available.")
             return
 
-        # build embeds with 10 players per page
-        pages: list[discord.Embed] = []
-        per_page = 10
-        total_pages = (len(infos) + per_page - 1) // per_page
-        for p in range(total_pages):
-            chunk = infos[p * per_page:(p + 1) * per_page]
-            embed = discord.Embed(title="Fighters Status", color=discord.Color.blurple())
-            lines: list[str] = []
-            for i, info in enumerate(chunk):
-                idx = p * per_page + i + 1
-                name_display = info.get('display_name') or info.get('warera_name') or f"User {info.get('userId')}"
-                # Determine status label (Buffed / Debuffed / No status)
-                buff_type = info.get('buff_type')
-                buff_active = info.get('buff_active')
-                if buff_type == 'Buff':
-                    status_label = '🟢 Buffed' if buff_active else '🟡 Buff expired'
-                elif buff_type == 'Debuff':
-                    status_label = '🔴 Debuffed' if buff_active else '🟡 Debuff expired'
-                else:
-                    status_label = '⚪ No status'
+        # Sort fighters: buffed (active) first, neutral/expired second, debuffed (active) last
+        def _sort_key(info):
+            bt = info.get('buff_type')
+            active = info.get('buff_active')
+            if bt == 'Buff' and active:
+                rank = 0
+            elif bt == 'Debuff' and active:
+                rank = 2
+            else:
+                rank = 1
+            name = (info.get('display_name') or info.get('warera_name') or "").lower()
+            return (rank, name)
 
-                level = info.get('level', 'N/A')
-                online = 'Yes' if info.get('is_active') else 'No'
-                health_curr = info.get('health_curr')
-                health_total = info.get('health_total')
-                hunger_curr = info.get('hunger_curr')
-                hunger_total = info.get('hunger_total')
+        infos.sort(key=_sort_key)
 
-                def fmt_curr(val):
-                    try:
-                        return f"{round(float(val), 1):.1f}"
-                    except Exception:
-                        return 'N/A'
-
-                health_curr_fmt = fmt_curr(health_curr)
-                hunger_curr_fmt = fmt_curr(hunger_curr)
-                health_str = f"{health_curr_fmt}/{health_total if health_total is not None else 'N/A'}"
-                hunger_str = f"{hunger_curr_fmt}/{hunger_total if hunger_total is not None else 'N/A'}"
-
-                # Build a multi-line, aesthetic player block:
-                flag = '🇷🇴'
-                line1 = f"{flag} {name_display} — Level: {level} • Online: {online}"
-                line2 = f"❤️ {health_str} • 🍔 {hunger_str}"
-                buff_text = (info.get('buff_text') or '').strip()
-                if buff_type:
-                    if buff_text and buff_text.lower() != 'no buff/debuff':
-                        status_line = f"{status_label} • 🕒 {buff_text}"
-                    else:
-                        status_line = f"{status_label}"
-                else:
-                    status_line = status_label
-
-                # combine lines; separate players with a blank line for readability
-                player_block = f"{line1}\n{line2}\n{status_line}"
-                lines.append(player_block)
-
-            # chunk into a single field value to ensure values render
-            chunk_text = "\n\n".join(lines) or "No data"
-            embed.add_field(name="Players", value=chunk_text, inline=False)
-            embed.set_footer(text=f"Page {p+1}/{total_pages}")
-            pages.append(embed)
-
-        paginator = self.FightEmbedPaginator(pages, interaction.user)
+        paginator = self.FightEmbedPaginator(infos, interaction.user, per_page=10)
         await paginator.start(interaction)
 
     class FightEmbedPaginator(discord.ui.View):
-        def __init__(self, embeds: list[discord.Embed], author, timeout: float = 120.0):
+        def __init__(self, infos: list[dict], author, per_page: int = 10, timeout: float = 120.0):
             super().__init__(timeout=timeout)
-            self.embeds = embeds
+            self.raw_infos = infos
             self.author = author
+            self.per_page = per_page
             self.index = 0
             self.message: discord.Message | None = None
+            self.embeds: list[discord.Embed] = []
+            self.current_filter: str | None = None
+            self.build_embeds()
 
         def _update_footer(self):
+            if not self.embeds:
+                return
             embed = self.embeds[self.index]
             embed.set_footer(text=f"Page {self.index+1}/{len(self.embeds)}")
+
+        def build_embeds(self, filter_mode: str | None = None):
+            # allow explicit None to clear filters
+            self.current_filter = filter_mode
+
+            def _stat_key(info):
+                try:
+                    health = float(info.get('health_curr') or 0)
+                except Exception:
+                    health = 0.0
+                try:
+                    hunger = float(info.get('hunger_curr') or 0)
+                except Exception:
+                    hunger = 0.0
+                name = (info.get('display_name') or info.get('warera_name') or "").lower()
+                return (-health, -hunger, name)
+
+            # Build filtered list and sort groups by health then hunger (desc)
+            if self.current_filter == 'buffed':
+                group = [i for i in self.raw_infos if i.get('buff_type') == 'Buff' and i.get('buff_active')]
+                filtered = sorted(group, key=_stat_key)
+            elif self.current_filter == 'debuffed':
+                group = [i for i in self.raw_infos if i.get('buff_type') == 'Debuff' and i.get('buff_active')]
+                filtered = sorted(group, key=_stat_key)
+            elif self.current_filter == 'neutral':
+                group = [i for i in self.raw_infos if not i.get('buff_type') or not i.get('buff_active')]
+                filtered = sorted(group, key=_stat_key)
+            else:
+                # 'All' view — keep buffed first, neutral second, debuffed last
+                buffed = [i for i in self.raw_infos if i.get('buff_type') == 'Buff' and i.get('buff_active')]
+                neutral = [i for i in self.raw_infos if not i.get('buff_type') or not i.get('buff_active')]
+                debuffed = [i for i in self.raw_infos if i.get('buff_type') == 'Debuff' and i.get('buff_active')]
+                buffed_sorted = sorted(buffed, key=_stat_key)
+                neutral_sorted = sorted(neutral, key=_stat_key)
+                debuffed_sorted = sorted(debuffed, key=_stat_key)
+                filtered = buffed_sorted + neutral_sorted + debuffed_sorted
+
+            pages: list[discord.Embed] = []
+            per_page = self.per_page
+            total_pages = max(1, (len(filtered) + per_page - 1) // per_page)
+
+            for p in range(total_pages):
+                chunk = filtered[p * per_page:(p + 1) * per_page]
+                embed = discord.Embed(title="Fighters Status", color=discord.Color.blurple())
+                lines: list[str] = []
+                for i, info in enumerate(chunk):
+                    name_display = info.get('display_name') or info.get('warera_name') or f"User {info.get('userId')}"
+                    buff_type = info.get('buff_type')
+                    buff_active = info.get('buff_active')
+                    if buff_type == 'Buff':
+                        status_label = '🟢 Buffed' if buff_active else '🟡 Buff expired'
+                    elif buff_type == 'Debuff':
+                        status_label = '🔴 Debuffed' if buff_active else '🟡 Debuff expired'
+                    else:
+                        status_label = '⚪ No status'
+
+                    level = info.get('level', 'N/A')
+                    online = 'Yes' if info.get('is_active') else 'No'
+                    health_curr = info.get('health_curr')
+                    health_total = info.get('health_total')
+                    hunger_curr = info.get('hunger_curr')
+                    hunger_total = info.get('hunger_total')
+
+                    def fmt_curr(val):
+                        try:
+                            return f"{round(float(val), 1):.1f}"
+                        except Exception:
+                            return 'N/A'
+
+                    health_curr_fmt = fmt_curr(health_curr)
+                    hunger_curr_fmt = fmt_curr(hunger_curr)
+                    health_str = f"{health_curr_fmt}/{health_total if health_total is not None else 'N/A'}"
+                    hunger_str = f"{hunger_curr_fmt}/{hunger_total if hunger_total is not None else 'N/A'}"
+
+                    flag = '🇷🇴'
+                    line1 = f"{flag} {name_display} — Level: {level} • Online: {online}"
+                    line2 = f"❤️ {health_str} • 🍔 {hunger_str}"
+                    buff_text = (info.get('buff_text') or '').strip()
+                    if buff_type:
+                        if buff_text and buff_text.lower() != 'no buff/debuff':
+                            status_line = f"{status_label} • 🕒 {buff_text}"
+                        else:
+                            status_line = f"{status_label}"
+                    else:
+                        status_line = status_label
+
+                    player_block = f"{line1}\n{line2}\n{status_line}"
+                    lines.append(player_block)
+
+                chunk_text = "\n\n".join(lines) or "No data"
+                embed.add_field(name="Players", value=chunk_text, inline=False)
+                embed.set_footer(text=f"Page {p+1}/{total_pages}")
+                pages.append(embed)
+
+            self.embeds = pages
 
         async def start(self, interaction: discord.Interaction):
             self._update_footer()
@@ -166,14 +220,10 @@ class FightStatus(commands.Cog):
                     raise
             return self.message
 
-        async def interaction_check(self, interaction: discord.Interaction) -> bool:  # limit to author
-            if interaction.user.id != self.author.id:
-                try:
-                    await interaction.response.send_message("This paginator isn't for you.", ephemeral=True)
-                except Exception:
-                    pass
-                return False
+        async def interaction_check(self, interaction: discord.Interaction) -> bool:
+            # allow anyone to interact with the paginator
             return True
+
         @discord.ui.button(emoji="⏮️", style=discord.ButtonStyle.secondary)
         async def first_button(self, interaction: discord.Interaction, button: discord.ui.Button):
             self.index = 0
@@ -190,7 +240,7 @@ class FightStatus(commands.Cog):
         async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
             # stop the view and remove buttons
             try:
-                super().stop()
+                self.stop()
             except Exception:
                 try:
                     discord.ui.View.stop(self)
@@ -207,6 +257,35 @@ class FightStatus(commands.Cog):
         @discord.ui.button(emoji="⏭️", style=discord.ButtonStyle.secondary)
         async def last_button(self, interaction: discord.Interaction, button: discord.ui.Button):
             self.index = len(self.embeds) - 1
+            self._update_footer()
+            await interaction.response.edit_message(embed=self.embeds[self.index], view=self)
+
+        @discord.ui.button(label="Buffed", style=discord.ButtonStyle.primary)
+        async def buffed_filter_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+            self.build_embeds(filter_mode='buffed')
+            self.index = 0
+            self._update_footer()
+            await interaction.response.edit_message(embed=self.embeds[self.index], view=self)
+
+        @discord.ui.button(label="Neutral", style=discord.ButtonStyle.secondary)
+        async def neutral_filter_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+            self.build_embeds(filter_mode='neutral')
+            self.index = 0
+            self._update_footer()
+            await interaction.response.edit_message(embed=self.embeds[self.index], view=self)
+
+        @discord.ui.button(label="Debuffed", style=discord.ButtonStyle.danger)
+        async def debuffed_filter_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+            self.build_embeds(filter_mode='debuffed')
+            self.index = 0
+            self._update_footer()
+            await interaction.response.edit_message(embed=self.embeds[self.index], view=self)
+        
+        @discord.ui.button(label="All", style=discord.ButtonStyle.secondary)
+        async def all_filter_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+            # clear any filter and rebuild pages (show all groups)
+            self.build_embeds(filter_mode=None)
+            self.index = 0
             self._update_footer()
             await interaction.response.edit_message(embed=self.embeds[self.index], view=self)
 
