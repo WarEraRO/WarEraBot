@@ -30,4 +30,8 @@ token = config["token"]
 if not token:
     raise RuntimeError("Missing DISCORD_TOKEN environment variable.")
 
+api_key = config["api"]
+if not api_key:
+    raise RuntimeError("Missing WARERA_API_KEY environment variable.")
+
 bot.run(token)
