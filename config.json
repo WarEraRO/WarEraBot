@@ -1,17 +1,34 @@
 {
-    "token": "",
-    "guild": ,
+    "guild": "1413153983295520932",
     "roles": {
-        "economy": ,
-        "fight": ,
-        "citizen": 
+        "economy": "1465428686747734073",
+        "fight": "1465429068764680345",
+        "citizen": "1413526178664546505"
     },
     "military_units": [
-        { "id" : "", "roleId": },
-        { "id" : "", "roleId": }
+        { 
+            "id" : "6873f123ad05f3637920645e", 
+            "roleId": "1413903185025695867",
+            "friendlyName": "LR"
+        }, 
+        { 
+            "id" : "6873eb31412eb47bfef58fd8", 
+            "roleId": "1413903247411777537",
+            "friendlyName": "Walla"
+        },
+        { 
+            "id" : "68740223fae6820f3c7ba0af", 
+            "roleId": "1413903312578674840",
+            "friendlyName": "PRAF"
+        },
+        {
+            "id" : "6873ed1806cf11a5f9dc3ecf",
+            "roleId": "1413903246577373194",
+            "friendlyName": "FNR"
+        }
     ],
-    "channels" : {
-        "reports" : 
+    "channels": {
+        "reports": "1465417729812074741"
     },
     "active_countries": [
         "South Africa",
