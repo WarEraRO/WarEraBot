@@ -48,7 +48,7 @@ class Jobs(commands.Cog):
         async with aiohttp.ClientSession(headers=HEADERS) as session:
             return await get_all_countries(session)
 
-    @tasks.loop(hours=24)
+    @tasks.loop(hours=1)
     async def skill_roles(self):
         """Parses all members of the server that hold the citizen role and assigns
            roles based on their assigned skills (economy or fighter)
@@ -177,7 +177,7 @@ class Jobs(commands.Cog):
     async def before_military_unit_roles(self):
         await self.bot.wait_until_ready()
 
-    @tasks.loop(hours=1)
+    @tasks.loop(hours=6)
     async def unidentified_members(self):
         """Parses all members of the server that hold the citizen role and checks
            if their server nickname matches the one from the game.
