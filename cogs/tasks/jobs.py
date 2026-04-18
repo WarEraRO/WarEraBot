@@ -133,10 +133,16 @@ class Jobs(commands.Cog):
         if guild is None:
             return
         citizen = guild.get_role(config['roles']['citizen'])
+        newbie = guild.get_role(config['roles']['newbie'])
         military_units = config.get('military_units', [])
         mu_to_role = {unit['id'] : guild.get_role(unit['roleId']) for unit in military_units}
 
-        members = citizen.members if citizen else []
+        members = set()
+        if citizen:
+            members.update(citizen.members)
+        if newbie:
+            members.update(newbie.members)
+            
         # track player display names added/removed per role
         added_members: dict = {}
         removed_members: dict = {}
@@ -184,9 +190,17 @@ class Jobs(commands.Cog):
         """
         guild = self.bot.get_guild(config['guild'])
         citizen = guild.get_role(config['roles']['citizen'])
+        newbie = guild.get_role(config['roles']['newbie'])
+
+        members = set()
+        if citizen:
+            members.update(citizen.members)
+        if newbie:
+            members.update(newbie.members)
+
         unidentified = []
         async with aiohttp.ClientSession(headers=HEADERS) as session:
-            for member in citizen.members:
+            for member in members:
                 user = await get_user(member.display_name, session)
                 if user is None:
                     # try to find api_id in local DB by display name or discord username
