@@ -20,6 +20,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.tasks.unidentified_members")
         await self.load_extension("cogs.tasks.buff_monitor")
         await self.load_extension("cogs.tasks.mercenary_contracts")
+        await self.load_extension("cogs.tasks.newbie_promotion")
         await self.load_extension("cogs.commands.fight_status")
         await self.load_extension("cogs.commands.diplomacy")
         await self.load_extension("cogs.commands.help")
