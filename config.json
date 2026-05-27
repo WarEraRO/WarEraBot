@@ -8,6 +8,14 @@
         "government": 1413526242489139240,
         "commander": 1504183257703514263
     },
+    "citizenship_countries": [
+        "Romania"
+    ],
+    "channels": {
+        "reports": 1465417729812074741,
+        "public": 1500133549515345950,
+        "contracts": 1505257373705441501
+    },
     "military_units": [
         { 
             "id" : "6873f123ad05f3637920645e", 
@@ -70,11 +78,6 @@
             "friendlyName": "F.E.R."
         }
     ],
-    "channels": {
-        "reports": 1465417729812074741,
-        "public": 1500133549515345950,
-        "contracts": 1505257373705441501
-    },
     "active_countries": [
         "South Africa",
         "Chile",
