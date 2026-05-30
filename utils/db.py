@@ -40,12 +40,14 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 discord_username TEXT,
                 display_name TEXT,
-                api_id TEXT UNIQUE
+                api_id TEXT UNIQUE,
+                discord_id TEXT
             )
             """
         )
         cur.execute("CREATE INDEX IF NOT EXISTS idx_users_discord_username ON users(discord_username)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_users_display_name ON users(display_name)")
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_discord_id ON users(discord_id)")
         # diplomacy table: one row per country, store status, description and a JSON array for diplomacy entries
         cur.execute(
             """
@@ -61,27 +63,37 @@ def init_db() -> None:
         conn.commit()
 
 
-def save_user(discord_username: str | None, display_name: str | None, api_id: str) -> None:
+def save_user(discord_username: str | None, display_name: str | None, api_id: str, discord_id: int | str | None = None) -> None:
     """Insert or update a user mapping.
 
     Keeps the latest discord/display names for a given `api_id`.
     """
     if api_id is None:
         return
+    discord_id_str = str(discord_id) if discord_id is not None else None
     with _connect() as conn:
         cur = conn.cursor()
         # Use UPSERT semantics on api_id (unique)
         cur.execute(
             """
-            INSERT INTO users (discord_username, display_name, api_id)
-            VALUES (?, ?, ?)
+            INSERT INTO users (discord_username, display_name, api_id, discord_id)
+            VALUES (?, ?, ?, ?)
             ON CONFLICT(api_id) DO UPDATE SET
                 discord_username=excluded.discord_username,
-                display_name=excluded.display_name
+                display_name=excluded.display_name,
+                discord_id=excluded.discord_id
             """,
-            (discord_username, display_name, api_id),
+            (discord_username, display_name, api_id, discord_id_str),
         )
         conn.commit()
+
+
+def find_api_id_by_discord_id(discord_id: int | str) -> Optional[str]:
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT api_id FROM users WHERE discord_id = ? LIMIT 1", (str(discord_id),))
+        row = cur.fetchone()
+        return row['api_id'] if row else None
 
 
 def find_api_id_by_display_name(display_name: str) -> Optional[str]:
@@ -103,7 +115,7 @@ def find_api_id_by_discord_username(discord_username: str) -> Optional[str]:
 def get_record_by_api_id(api_id: str) -> Optional[Dict]:
     with _connect() as conn:
         cur = conn.cursor()
-        cur.execute("SELECT discord_username, display_name, api_id FROM users WHERE api_id = ? LIMIT 1", (api_id,))
+        cur.execute("SELECT discord_username, display_name, api_id, discord_id FROM users WHERE api_id = ? LIMIT 1", (api_id,))
         row = cur.fetchone()
         return dict(row) if row else None
 

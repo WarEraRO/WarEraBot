@@ -1,6 +1,6 @@
 from discord.ext import commands, tasks
 from utils.api import get_shared_session, get_user, get_user_info
-from utils.db import init_db, save_user, find_api_id_by_display_name, find_api_id_by_discord_username
+from utils.db import init_db, save_user, find_api_id_by_display_name, find_api_id_by_discord_username, find_api_id_by_discord_id
 from config import config
 import discord
 
@@ -38,7 +38,7 @@ class UnidentifiedMembersJob(commands.Cog):
             if user is None:
                 # try to find api_id in local DB by display name or discord username
                 try:
-                    api_id = find_api_id_by_display_name(member.display_name) or find_api_id_by_discord_username(member.name)
+                    api_id = find_api_id_by_discord_id(member.id) or find_api_id_by_display_name(member.display_name) or find_api_id_by_discord_username(member.name)
                     if api_id:
                         info = await get_user_info(api_id, session)
                         if info:
@@ -52,7 +52,7 @@ class UnidentifiedMembersJob(commands.Cog):
                                     # ignore failures (permissions, hierarchy, etc.)
                                     pass
                             # update stored mapping with the current discord username and latest display name
-                            save_user(member.name, new_display or member.display_name, api_id)
+                            save_user(member.name, new_display or member.display_name, api_id, member.id)
                             continue
                 except Exception:
                     pass
@@ -61,7 +61,7 @@ class UnidentifiedMembersJob(commands.Cog):
                 try:
                     api_id = user.get('_id') if isinstance(user, dict) else None
                     if api_id:
-                        save_user(member.name, member.display_name, api_id)
+                        save_user(member.name, member.display_name, api_id, member.id)
                 except Exception as e:
                     pass
                     unidentified.append(member)
