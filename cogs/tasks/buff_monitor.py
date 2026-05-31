@@ -1,6 +1,6 @@
 from discord.ext import commands, tasks
 from utils.api import get_shared_session, get_user, get_user_info
-from utils.db import init_db, find_api_id_by_display_name, find_api_id_by_discord_username, save_user
+from utils.db import init_db, find_api_id_by_display_name, find_api_id_by_discord_username, find_api_id_by_discord_id, save_user
 from config import config
 from datetime import datetime, timezone, timedelta
 
@@ -49,7 +49,7 @@ class BuffMonitorJob(commands.Cog):
         for member in members:
                 api_id = None
                 try:
-                    api_id = find_api_id_by_display_name(member.display_name) or find_api_id_by_discord_username(member.name)
+                    api_id = find_api_id_by_discord_id(member.id) or find_api_id_by_display_name(member.display_name) or find_api_id_by_discord_username(member.name)
                 except Exception:
                     api_id = None
 
@@ -76,7 +76,7 @@ class BuffMonitorJob(commands.Cog):
                         api_id = user_obj.get('_id') or api_id
                         if api_id:
                             try:
-                                save_user(member.name, member.display_name, api_id)
+                                save_user(member.name, member.display_name, api_id, member.id)
                             except Exception:
                                 pass
 

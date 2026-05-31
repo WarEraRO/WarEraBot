@@ -1,6 +1,6 @@
 from discord.ext import commands, tasks
 from utils.api import get_shared_session, get_military_unit, get_user_info
-from utils.db import init_db, save_user, get_record_by_api_id
+from utils.db import init_db, save_user, get_record_by_api_id, find_api_id_by_discord_id
 from config import config
 import discord
 
@@ -48,7 +48,14 @@ class CommanderRolesJob(commands.Cog):
                     commander_ids.add(cid)
 
         # Build lookup maps for guild members
-        members = list(guild.members)
+        citizen = guild.get_role(config['roles']['citizen'])
+        newbie = guild.get_role(config['roles']['newbie'])
+
+        members = set()
+        if citizen:
+            members.update(citizen.members)
+        if newbie:
+            members.update(newbie.members)
         name_map = {m.name.lower(): m for m in members}
         display_map = {m.display_name.lower(): m for m in members}
 
@@ -61,29 +68,33 @@ class CommanderRolesJob(commands.Cog):
             try:
                 rec = get_record_by_api_id(api_id)
             except Exception:
-                rec = None
+                continue
 
             member = None
             if rec:
-                discord_username = (rec.get('discord_username') or '').lower() if rec.get('discord_username') else None
-                display_name = (rec.get('display_name') or '').lower() if rec.get('display_name') else None
-                if discord_username and discord_username in name_map:
-                    member = name_map[discord_username]
-                elif display_name and display_name in display_map:
-                    member = display_map[display_name]
+                discord_id = rec.get('discord_id')
+                if discord_id:
+                    member = guild.get_member(int(discord_id))
+                if member is None:
+                    discord_username = (rec.get('discord_username') or '').lower() if rec.get('discord_username') else None
+                    display_name = (rec.get('display_name') or '').lower() if rec.get('display_name') else None
+                    if discord_username and discord_username in name_map:
+                        member = name_map[discord_username]
+                    elif display_name and display_name in display_map:
+                        member = display_map[display_name]
 
             # If not found via DB, try to resolve via API username and match display_name
             if member is None:
                 try:
                     info = await get_user_info(api_id, session)
                 except Exception:
-                    info = None
+                    continue
                 if isinstance(info, dict):
                     username = (info.get('username') or '').lower()
                     if username and username in display_map:
                         member = display_map[username]
                         try:
-                            save_user(member.name, member.display_name, api_id)
+                            save_user(member.name, member.display_name, api_id, member.id)
                         except Exception:
                             pass
 
