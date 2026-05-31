@@ -48,7 +48,14 @@ class CommanderRolesJob(commands.Cog):
                     commander_ids.add(cid)
 
         # Build lookup maps for guild members
-        members = list(guild.members)
+        citizen = guild.get_role(config['roles']['citizen'])
+        newbie = guild.get_role(config['roles']['newbie'])
+
+        members = set()
+        if citizen:
+            members.update(citizen.members)
+        if newbie:
+            members.update(newbie.members)
         name_map = {m.name.lower(): m for m in members}
         display_map = {m.display_name.lower(): m for m in members}
 
@@ -61,7 +68,7 @@ class CommanderRolesJob(commands.Cog):
             try:
                 rec = get_record_by_api_id(api_id)
             except Exception:
-                rec = None
+                continue
 
             member = None
             if rec:
@@ -81,7 +88,7 @@ class CommanderRolesJob(commands.Cog):
                 try:
                     info = await get_user_info(api_id, session)
                 except Exception:
-                    info = None
+                    continue
                 if isinstance(info, dict):
                     username = (info.get('username') or '').lower()
                     if username and username in display_map:

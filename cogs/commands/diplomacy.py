@@ -48,10 +48,10 @@ class Diplomacy(commands.Cog):
         return interaction.guild or self.bot.get_guild(config.get('guild'))
 
     def _member_has_government(self, member: discord.Member) -> bool:
-        gov_id = config.get('roles', {}).get('government')
-        if not gov_id:
+        gov_ids = config.get('roles', {}).get('government', [])
+        if not gov_ids:
             return False
-        return any(r.id == gov_id for r in getattr(member, 'roles', []))
+        return any(r.id in gov_ids for r in getattr(member, 'roles', []))
 
     def _normalize_status(self, s: str) -> str:
         # Normalize to Title Case so it matches entries in STATUS_OPTIONS
