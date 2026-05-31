@@ -101,8 +101,11 @@ class CommanderRolesJob(commands.Cog):
             if member:
                 desired_members.add(member)
 
-        # Assign commander role to desired members
+        # Assign commander role to desired members (only if they have citizen or newbie role)
         for member in desired_members:
+            has_base_role = (citizen and citizen in member.roles) or (newbie and newbie in member.roles)
+            if not has_base_role:
+                continue
             if commander_role not in member.roles:
                 try:
                     await member.add_roles(commander_role, reason="Assigned commander role from MU config")
