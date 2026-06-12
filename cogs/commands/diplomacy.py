@@ -35,6 +35,17 @@ STATUS_PRIORITY = {
     'Enemy': 8,
 }
 
+EMBED_FIELD_VALUE_LIMIT = 1024
+
+
+def _embed_field_value(value: object, fallback: str) -> str:
+    text = str(value).strip() if value is not None else ""
+    if not text:
+        return fallback
+    if len(text) <= EMBED_FIELD_VALUE_LIMIT:
+        return text
+    return text[:EMBED_FIELD_VALUE_LIMIT - 3] + "..."
+
 
 class Diplomacy(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -98,16 +109,17 @@ class Diplomacy(commands.Cog):
             embed = discord.Embed(title=f"Diplomacy — {match}", color=discord.Color.green())
             status = rec.get('status') or 'Unknown'
             desc = rec.get('description') or 'No description.'
-            embed.add_field(name="Status", value=status, inline=False)
-            embed.add_field(name="Description", value=desc or 'No description.', inline=False)
+            embed.add_field(name="Status", value=_embed_field_value(status, "Unknown"), inline=False)
+            embed.add_field(
+                name="Description",
+                value=_embed_field_value(desc, "No description."),
+                inline=False,
+            )
+            view = None
             if has_gov:
                 entries = rec.get('diplomacy') or []
-                if entries:
-                    lines = [f"{i+1}. {e}" for i, e in enumerate(entries)]
-                    embed.add_field(name="Diplomacy List", value="\n".join(lines), inline=False)
-                else:
-                    embed.add_field(name="Diplomacy List", value="(empty)", inline=False)
-            await interaction.followup.send(embed=embed)
+                view = self.DiplomacyDetailsView(match, entries, interaction.user)
+            await interaction.followup.send(embed=embed, view=view)
             return
 
         # show only countries that have diplomacies created (paginated, 3 per page)
@@ -341,6 +353,161 @@ class Diplomacy(commands.Cog):
             if len(choices) >= 25:
                 break
         return choices
+
+    class DiplomacyDetailsView(discord.ui.View):
+        def __init__(self, country_name: str, entries: list, author, timeout: float = 120.0):
+            super().__init__(timeout=timeout)
+            self.country_name = country_name
+            self.entries = entries
+            self.author = author
+
+        async def interaction_check(self, interaction: discord.Interaction) -> bool:
+            if interaction.user.id == self.author.id:
+                return True
+            await interaction.response.send_message(
+                "Only the person who used this command can open the diplomacy list.",
+                ephemeral=True,
+            )
+            return False
+
+        @discord.ui.button(
+            label="Show Diplomacy Information",
+            style=discord.ButtonStyle.primary,
+        )
+        async def show_diplomacy(
+            self,
+            interaction: discord.Interaction,
+            button: discord.ui.Button,
+        ):
+            paginator = Diplomacy.DiplomacyListPaginator(
+                self.country_name,
+                self.entries,
+                self.author,
+                per_page=3,
+            )
+            paginator.message = interaction.message
+            await interaction.response.edit_message(
+                embed=paginator.embeds[0],
+                view=paginator,
+            )
+            self.stop()
+
+    class DiplomacyListPaginator(discord.ui.View):
+        def __init__(
+            self,
+            country_name: str,
+            entries: list,
+            author,
+            per_page: int = 3,
+            timeout: float = 120.0,
+        ):
+            super().__init__(timeout=timeout)
+            self.country_name = country_name
+            self.entries = entries
+            self.author = author
+            self.per_page = per_page
+            self.index = 0
+            self.message: discord.Message | None = None
+            self.embeds = self._build_embeds()
+            self._sync_buttons()
+
+        def _build_embeds(self) -> List[discord.Embed]:
+            pages = max(1, math.ceil(len(self.entries) / self.per_page))
+            embeds: List[discord.Embed] = []
+
+            for page_index in range(pages):
+                start = page_index * self.per_page
+                chunk = self.entries[start:start + self.per_page]
+                embed = discord.Embed(
+                    title=f"Diplomacy List - {self.country_name}",
+                    color=discord.Color.green(),
+                )
+                if chunk:
+                    for offset, entry in enumerate(chunk):
+                        embed.add_field(
+                            name=f"Entry {start + offset + 1}",
+                            value=_embed_field_value(entry, "(empty entry)"),
+                            inline=False,
+                        )
+                else:
+                    embed.description = "(empty)"
+                embed.set_footer(
+                    text=(
+                        f"Page {page_index + 1}/{pages} | "
+                        f"Entries: {len(self.entries)}"
+                    )
+                )
+                embeds.append(embed)
+
+            return embeds
+
+        def _sync_buttons(self):
+            last_index = len(self.embeds) - 1
+            self.first_button.disabled = self.index == 0
+            self.previous_button.disabled = self.index == 0
+            self.next_button.disabled = self.index == last_index
+            self.last_button.disabled = self.index == last_index
+
+        async def interaction_check(self, interaction: discord.Interaction) -> bool:
+            if interaction.user.id == self.author.id:
+                return True
+            await interaction.response.send_message(
+                "Only the person who used this command can change pages.",
+                ephemeral=True,
+            )
+            return False
+
+        async def _show_page(self, interaction: discord.Interaction):
+            self._sync_buttons()
+            await interaction.response.edit_message(
+                embed=self.embeds[self.index],
+                view=self,
+            )
+
+        async def on_timeout(self):
+            for item in self.children:
+                item.disabled = True
+            if self.message:
+                try:
+                    await self.message.edit(view=self)
+                except Exception:
+                    pass
+
+        @discord.ui.button(label="First", style=discord.ButtonStyle.secondary)
+        async def first_button(
+            self,
+            interaction: discord.Interaction,
+            button: discord.ui.Button,
+        ):
+            self.index = 0
+            await self._show_page(interaction)
+
+        @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary)
+        async def previous_button(
+            self,
+            interaction: discord.Interaction,
+            button: discord.ui.Button,
+        ):
+            self.index = max(0, self.index - 1)
+            await self._show_page(interaction)
+
+        @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary)
+        async def next_button(
+            self,
+            interaction: discord.Interaction,
+            button: discord.ui.Button,
+        ):
+            self.index = min(len(self.embeds) - 1, self.index + 1)
+            await self._show_page(interaction)
+
+        @discord.ui.button(label="Last", style=discord.ButtonStyle.secondary)
+        async def last_button(
+            self,
+            interaction: discord.Interaction,
+            button: discord.ui.Button,
+        ):
+            self.index = len(self.embeds) - 1
+            await self._show_page(interaction)
 
     class DiplomacyPaginator(discord.ui.View):
         def __init__(self, countries: List[dict], author, per_page: int = 3, timeout: float = 120.0):
