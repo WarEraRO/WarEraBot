@@ -17,7 +17,8 @@ _COMMANDS_DATA: List[tuple[str, str]] = [
     (
         "/update_diplomacy country_name [status] [diplomacy] [description]",
         "Government-only. Update an existing diplomacy record: set `status`, append a `diplomacy` entry, or update "
-        "`description`. Status must be one of the predefined options and autocomplete is available.",
+        "`description`. New diplomacy entries are automatically dated. Status must be one of the predefined options "
+        "and autocomplete is available.",
     ),
     (
         "/add_diplomacy country_name [status] [description]",
