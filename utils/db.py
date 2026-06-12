@@ -180,9 +180,10 @@ def update_diplomacy(country_name: str, status: str | None = None, description: 
         conn.commit()
 
 
-def add_diplomacy_entry(country_name: str, info: str) -> None:
+def add_diplomacy_entry(country_name: str, info: str, entry_date: str) -> None:
+    entry = {"text": info, "date": entry_date}
     if _USE_DYNAMO:
-        return dynamo.add_diplomacy_entry(country_name, info)
+        return dynamo.add_diplomacy_entry(country_name, info, entry_date)
     with _connect() as conn:
         cur = conn.cursor()
         cur.execute("SELECT status, description, diplomacy FROM diplomacies WHERE country_name = ? LIMIT 1", (country_name,))
@@ -221,7 +222,7 @@ def add_diplomacy_entry(country_name: str, info: str) -> None:
         else:
             entries = []
 
-        entries.append(info)
+        entries.append(entry)
         cur.execute("INSERT OR REPLACE INTO diplomacies (country_name, status, description, diplomacy) VALUES (?, ?, ?, ?)", (country_name, status_val, desc_val, json.dumps(entries)))
         conn.commit()
 

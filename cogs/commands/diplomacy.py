@@ -47,6 +47,14 @@ def _embed_field_value(value: object, fallback: str) -> str:
     return text[:EMBED_FIELD_VALUE_LIMIT - 3] + "..."
 
 
+def _diplomacy_entry_parts(entry: object) -> tuple[str, str]:
+    if isinstance(entry, dict):
+        text = entry.get("text") or entry.get("info")
+        entry_date = entry.get("date") or "Date unavailable"
+        return str(text or "").strip(), str(entry_date).strip()
+    return str(entry or "").strip(), "Date unavailable"
+
+
 class Diplomacy(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -115,11 +123,12 @@ class Diplomacy(commands.Cog):
                 value=_embed_field_value(desc, "No description."),
                 inline=False,
             )
-            view = None
             if has_gov:
                 entries = rec.get('diplomacy') or []
                 view = self.DiplomacyDetailsView(match, entries, interaction.user)
-            await interaction.followup.send(embed=embed, view=view)
+                await interaction.followup.send(embed=embed, view=view)
+            else:
+                await interaction.followup.send(embed=embed)
             return
 
         # show only countries that have diplomacies created (paginated, 3 per page)
@@ -207,12 +216,14 @@ class Diplomacy(commands.Cog):
             return
 
         # Apply updates: append diplomacy entry if provided, update status/description if provided
+        entry_date = None
         if diplomacy is not None:
             # create row if missing and then append
             existing = db.get_diplomacy(match)
             if not existing:
                 db.update_diplomacy(match, status=None, description=None)
-            db.add_diplomacy_entry(match, diplomacy)
+            entry_date = interaction.created_at.date().isoformat()
+            db.add_diplomacy_entry(match, diplomacy, entry_date)
 
         if status_n is not None or description is not None:
             db.update_diplomacy(match, status=status_n, description=description)
@@ -221,7 +232,7 @@ class Diplomacy(commands.Cog):
         if status_n is not None:
             parts.append(f"status: {status_n}")
         if diplomacy is not None:
-            parts.append("diplomacy entry added")
+            parts.append(f"diplomacy entry added ({entry_date})")
         if description is not None:
             parts.append("description updated")
 
@@ -424,9 +435,10 @@ class Diplomacy(commands.Cog):
                 )
                 if chunk:
                     for offset, entry in enumerate(chunk):
+                        entry_text, entry_date = _diplomacy_entry_parts(entry)
                         embed.add_field(
-                            name=f"Entry {start + offset + 1}",
-                            value=_embed_field_value(entry, "(empty entry)"),
+                            name=f"Entry {start + offset + 1} | {entry_date}",
+                            value=_embed_field_value(entry_text, "(empty entry)"),
                             inline=False,
                         )
                 else:

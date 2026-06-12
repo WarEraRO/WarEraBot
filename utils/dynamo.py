@@ -202,13 +202,14 @@ def update_diplomacy(
     )
 
 
-def add_diplomacy_entry(country_name: str, info: str) -> None:
+def add_diplomacy_entry(country_name: str, info: str, entry_date: str) -> None:
     """Append an entry to a country's diplomacy list, creating the record if needed."""
+    entry = {"text": info, "date": entry_date}
     _diplomacies().update_item(
         Key={"country_name": country_name},
         UpdateExpression="SET #dp = list_append(if_not_exists(#dp, :empty_list), :entry)",
         ExpressionAttributeNames={"#dp": "diplomacy"},
-        ExpressionAttributeValues={":entry": [info], ":empty_list": []},
+        ExpressionAttributeValues={":entry": [entry], ":empty_list": []},
     )
 
 
