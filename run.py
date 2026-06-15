@@ -11,6 +11,12 @@ class WarEraBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix='!', intents=intents)
 
+    async def close(self):
+        try:
+            await super().close()
+        finally:
+            await api.close_shared_session()
+
     async def setup_hook(self):
         await self.load_extension("cogs.tasks.military_unit_roles")
         await self.load_extension("cogs.tasks.commander_roles")
@@ -20,6 +26,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.tasks.unidentified_members")
         await self.load_extension("cogs.tasks.buff_monitor")
         await self.load_extension("cogs.tasks.mercenary_contracts")
+        await self.load_extension("cogs.tasks.article_mention")
         await self.load_extension("cogs.commands.fight_status")
         await self.load_extension("cogs.commands.diplomacy")
         await self.load_extension("cogs.commands.mu_stray")
@@ -27,6 +34,8 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.promotions")
         await self.load_extension("cogs.commands.country_strays")
         await self.load_extension("cogs.commands.help")
+        await self.load_extension("cogs.commands.top_user_weekly_damages")
+        await self.load_extension("cogs.commands.top_user_weekly_donations")
         guild = discord.Object(id=config["guild"])
 
         # Initialize shared aiohttp session used by API helpers
