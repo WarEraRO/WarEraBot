@@ -44,7 +44,7 @@ class TakeoverCountriesJob(commands.Cog):
         # Always send an embed reporting the results (may be empty)
         if len(empty_countries) == 0:
             return
-        channel = guild.get_channel(config["channels"]["public"]) if guild else None
+        channel = guild.get_channel(config["channels"]["reports"]) if guild else None
         if channel:
             embed = self.build_takeover_embed(empty_countries)
             await channel.send(embed=embed)
