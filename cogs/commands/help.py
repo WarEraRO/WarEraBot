@@ -56,6 +56,21 @@ _COMMANDS_DATA: List[tuple[str, str]] = [
         "Check newbie members for promotion eligibility. Shows Promotion Candidates, Fight Issues, Inactive, "
         "and Data Issues — filter buttons on the result view switch between categories.",
     ),
+    (
+        "/top_user_weekly_damages country",
+        "Show the top 10 weekly damage dealers from the selected country. The required country field supports "
+        "autocomplete using the current country list from WarEra.",
+    ),
+    (
+        "/top_user_weekly_donations country",
+        "Show the top 10 citizens by money donated since Monday at 00:00 UTC. The required country field supports "
+        "autocomplete using the current country list from WarEra.",
+    ),
+    (
+        "/get_region_upgrade_cost country",
+        "Calculate daily oil upkeep and market cost for active bunkers, military bases, and pacification centers "
+        "in regions held by the selected country. The required country field supports autocomplete.",
+    ),
 ]
 
 _JOBS_DATA: List[tuple[str, str]] = [

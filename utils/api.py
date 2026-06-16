@@ -396,3 +396,126 @@ async def get_mercenary_auctions(session, base_url="https://api2.warera.io/trpc/
     except Exception as e:
         logger.exception('get_mercenary_auctions failed: %s', e)
         return None
+    
+async def get_market_prices(session, base_url="https://api2.warera.io/trpc/itemTrading.getPrices"):
+    try:
+        data = await _get_with_retry(session, base_url)
+        if not data:
+            return None
+        return data
+    except Exception as e:
+        logger.exception('get_market_prices failed: %s', e)
+        return None
+    
+async def get_rankings(filter, session, base_url="https://api2.warera.io/trpc/ranking.getRanking"):
+    try:
+        input_data = {"rankingType": filter}
+        params = {"input": json.dumps(input_data)}
+        data = await _get_with_retry(session, base_url, params=params)
+        if not data:
+            return None
+        api_result = data.get('result', {}).get('data')
+        if not api_result:
+            return None
+        return api_result
+    except Exception as e:
+        logger.exception('get_rankings failed: %s', e)
+        return None
+    
+async def get_country_users(countryId, session, base_url="https://api2.warera.io/trpc/user.getUsersByCountry"):
+    try:
+        input_data = {"limit": 100, "countryId": countryId}
+        params = {"input": json.dumps(input_data)}
+        mus = await _get_with_retry(session, base_url, params=params)
+        if not mus:
+            return None
+
+        data = mus.get('result', {}).get('data') or {}
+        items = data.get('items') or []
+        next_cursor = data.get('nextCursor')
+
+        while next_cursor:
+            input_data['cursor'] = next_cursor
+            params = {"input": json.dumps(input_data)}
+            mus = await _get_with_retry(session, base_url, params=params)
+            if not mus:
+                break
+            data = mus.get('result', {}).get('data') or {}
+            new_items = data.get('items') or []
+            items += new_items
+            next_cursor = data.get('nextCursor')
+
+        return items
+    except Exception as e:
+        logger.exception('get_country_users failed: %s', e)
+        return None
+    
+async def get_user_transactions(userId, transactionType, session, base_url="https://api2.warera.io/trpc/transaction.getPaginatedTransactions"):
+    try:
+        input_data = {"limit": 100, "userId": userId, "transactionType": transactionType}
+        params = {"input": json.dumps(input_data)}
+        mus = await _get_with_retry(session, base_url, params=params)
+        if not mus:
+            return None
+
+        data = mus.get('result', {}).get('data') or {}
+        items = data.get('items') or []
+        next_cursor = data.get('nextCursor')
+
+        while next_cursor:
+            input_data['cursor'] = next_cursor
+            params = {"input": json.dumps(input_data)}
+            mus = await _get_with_retry(session, base_url, params=params)
+            if not mus:
+                break
+            data = mus.get('result', {}).get('data') or {}
+            new_items = data.get('items') or []
+            items += new_items
+            next_cursor = data.get('nextCursor')
+
+        return items
+    except Exception as e:
+        logger.exception('get_user_transactions failed: %s', e)
+        return None
+    
+async def get_articles(session, base_url="https://api2.warera.io/trpc/article.getArticlesPaginated"):
+    try:
+        input_data = {"limit": 100, "type": "last"}
+        params = {"input": json.dumps(input_data)}
+        mus = await _get_with_retry(session, base_url, params=params)
+        if not mus:
+            return None
+
+        data = mus.get('result', {}).get('data') or {}
+        items = data.get('items') or []
+        next_cursor = data.get('nextCursor')
+
+        while next_cursor:
+            input_data['cursor'] = next_cursor
+            params = {"input": json.dumps(input_data)}
+            mus = await _get_with_retry(session, base_url, params=params)
+            if not mus:
+                break
+            data = mus.get('result', {}).get('data') or {}
+            new_items = data.get('items') or []
+            items += new_items
+            next_cursor = data.get('nextCursor')
+
+        return items
+    except Exception as e:
+        logger.exception('get_articles failed: %s', e)
+        return None
+    
+async def get_regions_object(session, base_url="https://api2.warera.io/trpc/region.getRegionsObject"):
+    try:
+        data = await _get_with_retry(
+            session,
+            base_url,
+        )
+        api_result = (data or {}).get("result", {}).get("data")
+        if isinstance(api_result, dict):
+            return api_result
+        return None
+    except Exception as e:
+        logger.exception('get_regions_object failed: %s', e)
+        return None

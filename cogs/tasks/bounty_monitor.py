@@ -117,7 +117,7 @@ class BountyMonitorJob(commands.Cog):
         await asyncio.gather(*tasks_resolve)
 
         # For each side with a positive pool, send a single embed if it's new/changed
-        channel = guild.get_channel(config.get('channels', {}).get('public')) if guild else None
+        channel = guild.get_channel(config.get('channels', {}).get('bounties')) if guild else None
         current_keys = set()
         for entry in battles_with_bounty:
             b = entry['battle']
