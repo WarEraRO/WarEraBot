@@ -66,6 +66,11 @@ _COMMANDS_DATA: List[tuple[str, str]] = [
         "Show the top 10 citizens by money donated since Monday at 00:00 UTC. The required country field supports "
         "autocomplete using the current country list from WarEra.",
     ),
+    (
+        "/get_region_upgrade_cost country",
+        "Calculate daily oil upkeep and market cost for active bunkers, military bases, and pacification centers "
+        "in regions held by the selected country. The required country field supports autocomplete.",
+    ),
 ]
 
 _JOBS_DATA: List[tuple[str, str]] = [

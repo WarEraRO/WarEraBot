@@ -36,6 +36,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.help")
         await self.load_extension("cogs.commands.top_user_weekly_damages")
         await self.load_extension("cogs.commands.top_user_weekly_donations")
+        await self.load_extension("cogs.commands.get_region_upgrade_cost")
         guild = discord.Object(id=config["guild"])
 
         # Initialize shared aiohttp session used by API helpers
