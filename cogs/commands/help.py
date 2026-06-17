@@ -33,6 +33,11 @@ _COMMANDS_DATA: List[tuple[str, str]] = [
         "Government-only. Delete the diplomacy record for the specified country.",
     ),
     (
+        "/nap add country_a country_b | /nap remove country_a country_b | /nap list",
+        "Government-only. Manage the internal NAP list used by the hourly battle monitor. Country fields support "
+        "autocomplete from the current WarEra country list.",
+    ),
+    (
         "/fightstatus [military_unit]",
         "Fetch fight status for fighters. Without `military_unit`, operates on members with the configured 'fight' role; "
         "with `military_unit` fetches members of that unit. Results are paginated (10 per page) and include "
@@ -111,6 +116,11 @@ _JOBS_DATA: List[tuple[str, str]] = [
     (
         "mercenary_contracts — every 1 minute",
         "Checks active mercenary contract auctions and posts new or updated contracts to the public channel.",
+    ),
+    (
+        "monitor_nap - every 1 hour",
+        "Checks active battle country orders and MU-order nationalities against configured NAPs, then reports "
+        "new violations to the reports channel.",
     ),
 ]
 

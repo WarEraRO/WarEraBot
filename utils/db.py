@@ -59,6 +59,20 @@ def init_db() -> None:
             """
         )
         cur.execute("CREATE INDEX IF NOT EXISTS idx_diplomacies_status ON diplomacies(status)")
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS naps (
+                pair_key TEXT PRIMARY KEY,
+                country_a_id TEXT NOT NULL,
+                country_a_name TEXT NOT NULL,
+                country_b_id TEXT NOT NULL,
+                country_b_name TEXT NOT NULL,
+                created_at TEXT
+            )
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_naps_country_a_id ON naps(country_a_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_naps_country_b_id ON naps(country_b_id)")
         conn.commit()
 
 
@@ -287,6 +301,68 @@ def delete_diplomacy(country_name: str) -> bool:
     with _connect() as conn:
         cur = conn.cursor()
         cur.execute("DELETE FROM diplomacies WHERE country_name = ?", (country_name,))
+        deleted = cur.rowcount
+        conn.commit()
+        return deleted > 0
+
+
+def _nap_pair_key(country_a_id: str, country_b_id: str) -> str:
+    return ":".join(sorted([str(country_a_id), str(country_b_id)]))
+
+
+def get_all_naps() -> list[Dict]:
+    """Return all non-aggression pact records."""
+    if _USE_DYNAMO:
+        return dynamo.get_all_naps()
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT pair_key, country_a_id, country_a_name, country_b_id, country_b_name, created_at
+            FROM naps
+            ORDER BY country_a_name COLLATE NOCASE, country_b_name COLLATE NOCASE
+            """
+        )
+        return [dict(row) for row in cur.fetchall()]
+
+
+def add_nap(country_a: Dict, country_b: Dict, created_at: str | None = None) -> bool:
+    """Add a NAP between two countries. Returns False if it already exists."""
+    country_a_id = str(country_a["_id"])
+    country_b_id = str(country_b["_id"])
+    pair_key = _nap_pair_key(country_a_id, country_b_id)
+    if _USE_DYNAMO:
+        return dynamo.add_nap(country_a, country_b, created_at)
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT OR IGNORE INTO naps (
+                pair_key, country_a_id, country_a_name, country_b_id, country_b_name, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                pair_key,
+                country_a_id,
+                str(country_a["name"]),
+                country_b_id,
+                str(country_b["name"]),
+                created_at,
+            ),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def remove_nap(country_a_id: str, country_b_id: str) -> bool:
+    """Remove a NAP by country ids. Returns True if a row was deleted."""
+    pair_key = _nap_pair_key(country_a_id, country_b_id)
+    if _USE_DYNAMO:
+        return dynamo.remove_nap(country_a_id, country_b_id)
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM naps WHERE pair_key = ?", (pair_key,))
         deleted = cur.rowcount
         conn.commit()
         return deleted > 0
