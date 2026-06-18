@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 
 import discord
 from discord.ext import commands, tasks
@@ -12,6 +13,7 @@ from utils.db import get_all_naps, init_db
 logger = logging.getLogger(__name__)
 
 NAP_MONITOR_INTERVAL_HOURS = 1
+MU_COUNTRY_CACHE_TTL_SECONDS = 24 * 60 * 60
 
 
 class NAPMonitorJob(commands.Cog):
@@ -22,10 +24,28 @@ class NAPMonitorJob(commands.Cog):
             init_db()
         except Exception:
             pass
+        self.naps = get_all_naps()
+        self.mu_country_cache: dict[str, tuple[str | None, float]] = {}
         self.monitor_nap.start()
 
     def cog_unload(self):
         self.monitor_nap.cancel()
+
+    def refresh_naps(self):
+        self.naps = get_all_naps()
+        self.reported_violations.clear()
+
+    def remove_cached_nap(self, country_a_id: str, country_b_id: str):
+        pair = frozenset([str(country_a_id), str(country_b_id)])
+        self.naps = [
+            nap
+            for nap in self.naps
+            if frozenset([
+                str(nap.get("country_a_id") or ""),
+                str(nap.get("country_b_id") or ""),
+            ]) != pair
+        ]
+        self.reported_violations.clear()
 
     @tasks.loop(hours=NAP_MONITOR_INTERVAL_HOURS)
     async def monitor_nap(self):
@@ -34,7 +54,7 @@ class NAPMonitorJob(commands.Cog):
         if guild is None:
             return
 
-        naps = get_all_naps()
+        naps = self.naps
         if not naps:
             self.reported_violations.clear()
             return
@@ -69,18 +89,21 @@ class NAPMonitorJob(commands.Cog):
             if nap.get("country_b_id"):
                 country_names[str(nap["country_b_id"])] = str(nap.get("country_b_name") or nap["country_b_id"])
 
-        mu_country_cache: dict[str, str | None] = {}
-
         async def get_mu_country(mu_id: str) -> str | None:
-            if mu_id in mu_country_cache:
-                return mu_country_cache[mu_id]
+            now = time.monotonic()
+            cached = self.mu_country_cache.get(mu_id)
+            if cached:
+                country_id, fetched_at = cached
+                if now - fetched_at < MU_COUNTRY_CACHE_TTL_SECONDS:
+                    return country_id
+
             try:
                 mu = await get_military_unit(mu_id, session)
             except Exception:
                 logger.exception("Failed to fetch MU %s for NAP monitor", mu_id)
                 mu = None
             country_id = str(mu.get("country")) if isinstance(mu, dict) and mu.get("country") else None
-            mu_country_cache[mu_id] = country_id
+            self.mu_country_cache[mu_id] = (country_id, now)
             return country_id
 
         violations: list[dict] = []

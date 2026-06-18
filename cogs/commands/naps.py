@@ -55,6 +55,16 @@ class NAPs(commands.Cog):
             role.id in gov_ids for role in getattr(member, "roles", [])
         )
 
+    def _refresh_nap_monitor_cache(self):
+        monitor = self.bot.get_cog("NAPMonitorJob")
+        if monitor and hasattr(monitor, "refresh_naps"):
+            monitor.refresh_naps()
+
+    def _remove_from_nap_monitor_cache(self, country_a_id: str, country_b_id: str):
+        monitor = self.bot.get_cog("NAPMonitorJob")
+        if monitor and hasattr(monitor, "remove_cached_nap"):
+            monitor.remove_cached_nap(country_a_id, country_b_id)
+
     async def _countries(self) -> list[dict]:
         now = time.time()
         items = self._country_cache.get("items") or []
@@ -139,6 +149,7 @@ class NAPs(commands.Cog):
             )
             return
 
+        self._refresh_nap_monitor_cache()
         await interaction.followup.send(f"Added NAP: {first_name} - {second_name}.")
 
     @nap.command(name="remove", description="Remove a non-aggression pact.")
@@ -171,6 +182,7 @@ class NAPs(commands.Cog):
             )
             return
 
+        self._remove_from_nap_monitor_cache(first["_id"], second["_id"])
         await interaction.followup.send(f"Removed NAP: {first['name']} - {second['name']}.")
 
     @nap.command(name="list", description="List configured non-aggression pacts.")
