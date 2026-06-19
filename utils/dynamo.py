@@ -10,6 +10,7 @@ from botocore.exceptions import ClientError
 # Table name overrides via environment (useful for staging/prod separation)
 _USERS_TABLE_NAME = config.get("DYNAMO_USERS_TABLE", "users")
 _DIPLOMACIES_TABLE_NAME = config.get("DYNAMO_DIPLOMACIES_TABLE", "diplomacies")
+_NAPS_TABLE_NAME = config.get("DYNAMO_NAPS_TABLE", "naps")
 
 # Module-level cached resource to avoid re-creating sessions on every call
 _resource = None
@@ -34,6 +35,10 @@ def _users():
 
 def _diplomacies():
     return _get_resource().Table(_DIPLOMACIES_TABLE_NAME)
+
+
+def _naps():
+    return _get_resource().Table(_NAPS_TABLE_NAME)
 
 
 def _parse_diplomacy_list(raw) -> List:
@@ -246,12 +251,61 @@ def delete_diplomacy(country_name: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# NAPs CRUD
+# ---------------------------------------------------------------------------
+
+def _nap_pair_key(country_a_id: str, country_b_id: str) -> str:
+    return ":".join(sorted([str(country_a_id), str(country_b_id)]))
+
+
+def get_all_naps() -> List[Dict]:
+    resp = _naps().scan()
+    return sorted(
+        resp.get("Items", []),
+        key=lambda item: (
+            str(item.get("country_a_name", "")).lower(),
+            str(item.get("country_b_name", "")).lower(),
+        ),
+    )
+
+
+def add_nap(country_a: Dict, country_b: Dict, created_at: Optional[str] = None) -> bool:
+    country_a_id = str(country_a["_id"])
+    country_b_id = str(country_b["_id"])
+    pair_key = _nap_pair_key(country_a_id, country_b_id)
+    try:
+        _naps().put_item(
+            Item={
+                "pair_key": pair_key,
+                "country_a_id": country_a_id,
+                "country_a_name": str(country_a["name"]),
+                "country_b_id": country_b_id,
+                "country_b_name": str(country_b["name"]),
+                "created_at": created_at,
+            },
+            ConditionExpression="attribute_not_exists(pair_key)",
+        )
+        return True
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+            return False
+        raise
+
+
+def remove_nap(country_a_id: str, country_b_id: str) -> bool:
+    pair_key = _nap_pair_key(country_a_id, country_b_id)
+    resp = _naps().delete_item(Key={"pair_key": pair_key}, ReturnValues="ALL_OLD")
+    return bool(resp.get("Attributes"))
+
+
+# ---------------------------------------------------------------------------
 # Table provisioning
 # ---------------------------------------------------------------------------
 
 def ensure_tables(
     users_table: str = _USERS_TABLE_NAME,
     diplomacies_table: str = _DIPLOMACIES_TABLE_NAME,
+    naps_table: str = _NAPS_TABLE_NAME,
     region: Optional[str] = None,
 ) -> bool:
     """Ensure both users and diplomacies tables exist in DynamoDB.
@@ -350,6 +404,34 @@ def ensure_tables(
             )
             client.get_waiter("table_exists").wait(
                 TableName=diplomacies_table, WaiterConfig={"Delay": 2, "MaxAttempts": 25}
+            )
+            created_any = True
+        except ClientError as ce:
+            if ce.response.get("Error", {}).get("Code") == "ResourceInUseException":
+                created_any = True
+            else:
+                raise
+
+    # ------------------------------------------------------------------
+    # NAPs table  (hash key: pair_key)
+    # ------------------------------------------------------------------
+    try:
+        client.describe_table(TableName=naps_table)
+        created_any = True
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") != "ResourceNotFoundException":
+            raise
+        try:
+            client.create_table(
+                TableName=naps_table,
+                AttributeDefinitions=[
+                    {"AttributeName": "pair_key", "AttributeType": "S"},
+                ],
+                KeySchema=[{"AttributeName": "pair_key", "KeyType": "HASH"}],
+                BillingMode="PAY_PER_REQUEST",
+            )
+            client.get_waiter("table_exists").wait(
+                TableName=naps_table, WaiterConfig={"Delay": 2, "MaxAttempts": 25}
             )
             created_any = True
         except ClientError as ce:

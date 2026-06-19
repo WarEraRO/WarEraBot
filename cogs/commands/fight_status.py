@@ -113,12 +113,15 @@ class FightStatus(commands.Cog):
                 continue
 
             try:
-                info = await get_fight_status(str(user_id), session, None)
+                info = await get_fight_status(str(user_id), session, None, False)
             except Exception:
                 info = None
 
+            # if not info:
+            #     info = await self._fallback_info_for_remote(str(user_id), m if isinstance(m, dict) else None)
+
             if not info:
-                info = await self._fallback_info_for_remote(str(user_id), m if isinstance(m, dict) else None)
+                continue
 
             infos.append(info)
 

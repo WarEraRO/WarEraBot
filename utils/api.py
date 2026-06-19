@@ -6,6 +6,7 @@ from aiohttp import ClientError
 import discord
 import aiohttp
 from config import config
+from utils.computational import triangular
 
 PLAYER_CACHE = {}
 
@@ -177,7 +178,7 @@ async def get_country_government(counrtyId, session, base_url="https://api2.ware
         logger.exception('get_country_government failed: %s', e)
         return None
 
-async def get_fight_status(userId: str, session, member: discord.Member | None = None, base_url: str = "https://api2.warera.io/trpc/user.getUserLite") -> dict | None:
+async def get_fight_status(userId: str, session, member: discord.Member | None = None, eco=True, base_url: str = "https://api2.warera.io/trpc/user.getUserLite") -> dict | None:
     """Fetch lightweight user info and return a dict with fight-related fields.
 
     Returns a dict or None on failure. Dict keys:
@@ -188,6 +189,29 @@ async def get_fight_status(userId: str, session, member: discord.Member | None =
         api_result = await get_user_info(userId, session, base_url=base_url)
         if not api_result:
             return None
+        
+        if not eco:
+            economy_skill_points = 0
+            fight_skill_points = 0
+            for skill_name, skill_data in api_result['skills'].items():
+                level = skill_data['level']
+                if level != 0:
+                    economy = ['energy', 'companies', 'entrepreneurship', 'production']
+                    if skill_name in economy:
+                        economy_skill_points += triangular(level)
+                    else:
+                        fight_skill_points += triangular(level)
+            total_skill_points = api_result['leveling']['totalSkillPoints']
+            unspent_skill_points = api_result['leveling']['availableSkillPoints']
+
+            # division by zero, should not be possible (level 1 = 4 points already)
+            if total_skill_points == 0:
+                return None
+
+            percentage = ((economy_skill_points + unspent_skill_points) / total_skill_points) * 100
+            is_economy = percentage > 50
+            if is_economy:
+                return None
 
         leveling = api_result.get('leveling', {})
         level = leveling.get('level', 'N/A')
