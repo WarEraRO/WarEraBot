@@ -65,6 +65,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.inactive_players")
         await self.load_extension("cogs.commands.promotions")
         await self.load_extension("cogs.commands.country_strays")
+        await self.load_extension("cogs.commands.discordless")
         await self.load_extension("cogs.commands.help")
         await self.load_extension("cogs.commands.top_user_weekly_damages")
         await self.load_extension("cogs.commands.top_user_weekly_donations")

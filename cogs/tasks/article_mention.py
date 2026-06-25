@@ -57,7 +57,7 @@ class ArticleMentionJob(commands.Cog):
             embed = discord.Embed(
                 description=(
                     "Romania was mentioned in an article, you might want to "
-                    f"check it out -> [link]({article_url})"
+                    f"check it out -> [{article.get('title')}]({article_url})"
                 ),
                 color=discord.Color.blue(),
             )
