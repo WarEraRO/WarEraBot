@@ -48,6 +48,11 @@ _COMMANDS_DATA: List[tuple[str, str]] = [
         "List players whose in-game citizenship is not in the configured allowed countries. Results are paginated.",
     ),
     (
+        "/discorless",
+        "List Romania citizens from WarEra who are not present in Discord with the Citizen or Newbie role. "
+        "Results are matched against server display names and paginated.",
+    ),
+    (
         "/inactive_players",
         "List players who have been inactive for more than 3 days. Results are paginated.",
     ),
