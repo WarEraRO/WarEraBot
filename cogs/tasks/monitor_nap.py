@@ -171,7 +171,7 @@ class NAPMonitorJob(commands.Cog):
             self._prune_reported(active_battle_ids)
             return
 
-        channel = guild.get_channel(config.get("channels", {}).get("reports"))
+        channel = guild.get_channel(config.get("channels", {}).get("government"))
         if channel is None:
             return
 

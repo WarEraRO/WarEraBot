@@ -277,6 +277,7 @@ async def get_fight_status(userId: str, session, member: discord.Member | None =
             'display_name': display_name,
             'avatar_url': avatar_url,
             'level': level,
+            'last_connection_at': (api_result.get('dates') or {}).get('lastConnectionAt'),
             'is_active': is_active,
             'health_curr': health_curr,
             'health_total': health_total,

@@ -3,10 +3,29 @@ import time
 import discord
 from discord import app_commands
 from discord.ext import commands
+from datetime import datetime, timezone
 from utils.api import get_user, get_fight_status, get_military_units, get_shared_session
 from config import config
 
 HEADERS = {'X-API-Key': config['api']}
+_INACTIVE_THRESHOLD_SECONDS = 3 * 24 * 3600
+
+
+def _is_inactive_user(user: dict | None) -> bool:
+    try:
+        if not user:
+            return False
+        last_conn_str = (
+            user.get('last_connection_at')
+            or (user.get('dates') or {}).get('lastConnectionAt')
+        )
+        if not last_conn_str:
+            return False
+        last_conn = datetime.fromisoformat(last_conn_str.replace('Z', '+00:00'))
+        delta = datetime.now(timezone.utc) - last_conn
+        return delta.total_seconds() >= _INACTIVE_THRESHOLD_SECONDS
+    except Exception:
+        return False
 
 class FightStatus(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -70,6 +89,9 @@ class FightStatus(commands.Cog):
             except Exception:
                 warera_user = None
 
+            if _is_inactive_user(warera_user):
+                continue
+
             info = None
             if warera_user:
                 warera_id = warera_user.get('_id') or warera_user.get('id')
@@ -121,6 +143,9 @@ class FightStatus(commands.Cog):
             #     info = await self._fallback_info_for_remote(str(user_id), m if isinstance(m, dict) else None)
 
             if not info:
+                continue
+
+            if _is_inactive_user(info):
                 continue
 
             infos.append(info)
