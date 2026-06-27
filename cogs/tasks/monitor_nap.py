@@ -25,7 +25,7 @@ class NAPMonitorJob(commands.Cog):
         except Exception:
             pass
         self.naps = get_all_naps()
-        self.mu_country_cache: dict[str, tuple[str | None, float]] = {}
+        self.mu_cache: dict[str, tuple[str | None, str | None, float]] = {}
         self.monitor_nap.start()
 
     def cog_unload(self):
@@ -66,7 +66,7 @@ class NAPMonitorJob(commands.Cog):
             return
 
         nap_pairs: set[frozenset[str]] = set()
-        nap_names: dict[frozenset[str], tuple[str, str]] = {}
+        nap_pair_ids: dict[frozenset[str], tuple[str, str]] = {}
         for nap in naps:
             first_id = str(nap.get("country_a_id") or "")
             second_id = str(nap.get("country_b_id") or "")
@@ -74,10 +74,7 @@ class NAPMonitorJob(commands.Cog):
                 continue
             pair = frozenset([first_id, second_id])
             nap_pairs.add(pair)
-            nap_names[pair] = (
-                str(nap.get("country_a_name") or first_id),
-                str(nap.get("country_b_name") or second_id),
-            )
+            nap_pair_ids[pair] = (first_id, second_id)
 
         if not nap_pairs:
             return
@@ -89,13 +86,21 @@ class NAPMonitorJob(commands.Cog):
             if nap.get("country_b_id"):
                 country_names[str(nap["country_b_id"])] = str(nap.get("country_b_name") or nap["country_b_id"])
 
-        async def get_mu_country(mu_id: str) -> str | None:
+        def country_link(country_id: str) -> str:
+            name = country_names.get(country_id, country_id)
+            return f"[{name}](https://app.warera.io/country/{country_id})"
+
+        def mu_link(mu_id: str, mu_name: str | None = None) -> str:
+            name = mu_name or f"Military Unit {mu_id}"
+            return f"[{name}](https://app.warera.io/mu/{mu_id})"
+
+        async def get_mu_info(mu_id: str) -> tuple[str | None, str | None]:
             now = time.monotonic()
-            cached = self.mu_country_cache.get(mu_id)
+            cached = self.mu_cache.get(mu_id)
             if cached:
-                country_id, fetched_at = cached
+                country_id, mu_name, fetched_at = cached
                 if now - fetched_at < MU_COUNTRY_CACHE_TTL_SECONDS:
-                    return country_id
+                    return country_id, mu_name
 
             try:
                 mu = await get_military_unit(mu_id, session)
@@ -103,8 +108,9 @@ class NAPMonitorJob(commands.Cog):
                 logger.exception("Failed to fetch MU %s for NAP monitor", mu_id)
                 mu = None
             country_id = str(mu.get("country")) if isinstance(mu, dict) and mu.get("country") else None
-            self.mu_country_cache[mu_id] = (country_id, now)
-            return country_id
+            mu_name = str(mu.get("name")) if isinstance(mu, dict) and mu.get("name") else None
+            self.mu_cache[mu_id] = (country_id, mu_name, now)
+            return country_id, mu_name
 
         violations: list[dict] = []
         active_battle_ids: set[str] = set()
@@ -143,8 +149,8 @@ class NAPMonitorJob(commands.Cog):
                 mu_ids = [str(mu_id) for mu_id in (side.get("muOrders") or []) if mu_id]
                 if not mu_ids:
                     continue
-                mu_countries = await asyncio.gather(*(get_mu_country(mu_id) for mu_id in mu_ids))
-                for mu_id, mu_country in zip(mu_ids, mu_countries):
+                mu_infos = await asyncio.gather(*(get_mu_info(mu_id) for mu_id in mu_ids))
+                for mu_id, (mu_country, mu_name) in zip(mu_ids, mu_infos):
                     if not mu_country:
                         continue
                     pair = frozenset([str(mu_country), opponent_country])
@@ -155,6 +161,7 @@ class NAPMonitorJob(commands.Cog):
                         "side": side_name,
                         "source_type": "military unit",
                         "source_id": mu_id,
+                        "source_name": mu_name,
                         "source_country": str(mu_country),
                         "opponent_country": opponent_country,
                         "pair": pair,
@@ -193,21 +200,19 @@ class NAPMonitorJob(commands.Cog):
             )
 
             for violation in chunk:
-                source_country = country_names.get(
-                    violation["source_country"],
-                    violation["source_country"],
+                source_country = country_link(violation["source_country"])
+                opponent_country = country_link(violation["opponent_country"])
+                pair_ids = nap_pair_ids.get(
+                    violation["pair"],
+                    (violation["source_country"], violation["opponent_country"]),
                 )
-                opponent_country = country_names.get(
-                    violation["opponent_country"],
-                    violation["opponent_country"],
-                )
-                pair_names = nap_names.get(violation["pair"], (source_country, opponent_country))
+                pair_name_a, pair_name_b = (country_link(country_id) for country_id in pair_ids)
                 battle_link = f"https://app.warera.io/battle/{violation['battle_id']}"
                 source = source_country
                 if violation["source_type"] == "military unit":
-                    source = f"MU {violation['source_id']} ({source_country})"
+                    source = f"{mu_link(violation['source_id'], violation.get('source_name'))} ({source_country})"
                 embed.add_field(
-                    name=f"{pair_names[0]} - {pair_names[1]}",
+                    name=f"{pair_name_a} - {pair_name_b}",
                     value=(
                         f"{source} has {violation['side']} orders against "
                         f"{opponent_country}.\n[View battle]({battle_link})"
