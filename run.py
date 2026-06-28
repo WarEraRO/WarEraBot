@@ -56,6 +56,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.tasks.buff_monitor")
         await self.load_extension("cogs.tasks.mercenary_contracts")
         await self.load_extension("cogs.tasks.article_mention")
+        await self.load_extension("cogs.tasks.reddit_monitor")
         await self.load_extension("cogs.tasks.monitor_nap")
 
         await self.load_extension("cogs.commands.fight_status")
