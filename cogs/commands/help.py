@@ -127,6 +127,10 @@ _JOBS_DATA: List[tuple[str, str]] = [
         "Checks active battle country orders and MU-order nationalities against configured NAPs, then reports "
         "new violations to the reports channel.",
     ),
+    (
+        "reddit_monitor - every 5 minutes",
+        "Checks r/RomaniaWarEra for posts from the last 24 hours and reports newly seen posts to the reports channel.",
+    ),
 ]
 
 _COMMANDS_PER_PAGE = 3
