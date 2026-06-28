@@ -68,8 +68,8 @@ _COMMANDS_DATA: List[tuple[str, str]] = [
     ),
     (
         "/top_user_weekly_damages country",
-        "Show the top 10 weekly damage dealers from the selected country. The required country field supports "
-        "autocomplete using the current country list from WarEra.",
+        "Show the top 10 weekly damage dealers from one or more selected countries. Separate multiple countries "
+        "with commas; results are grouped by player level bracket and include each player's country.",
     ),
     (
         "/top_user_weekly_donations country",
