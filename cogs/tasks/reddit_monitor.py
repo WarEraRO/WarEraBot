@@ -30,8 +30,6 @@ REDDIT_HEADERS = {
     "Accept": "application/json,text/plain,*/*",
     "Accept-Language": "en-US,en;q=0.9",
 }
-EMBED_DESCRIPTION_LIMIT = 5000
-
 
 class RedditMonitorJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -71,13 +69,15 @@ class RedditMonitorJob(commands.Cog):
             if post_id in self.notified_posts:
                 continue
 
-            embed = self._build_post_embed(post, created_at)
+            post_link = self._build_post_link(post)
+            if not post_link:
+                continue
+
             social_role_id = config.get("roles", {}).get("social")
-            content = f"<@&{social_role_id}>" if social_role_id else None
+            content = f"<@&{social_role_id}>\n{post_link}" if social_role_id else post_link
             try:
                 await channel.send(
                     content=content,
-                    embed=embed,
                     allowed_mentions=discord.AllowedMentions(roles=True),
                 )
             except discord.DiscordException:
@@ -203,41 +203,10 @@ class RedditMonitorJob(commands.Cog):
         )
         return text.strip()
 
-    def _build_post_embed(self, post: dict, created_at: datetime) -> discord.Embed:
-        title = str(post.get("title") or "New Reddit post")
+    def _build_post_link(self, post: dict) -> str:
         permalink = str(post.get("permalink") or "")
         url = f"https://www.reddit.com{permalink}" if permalink else str(post.get("url") or "")
-        author = str(post.get("author") or "unknown")
-
-        embed = discord.Embed(
-            title=title[:256],
-            url=url or None,
-            description=f"New post in r/{SUBREDDIT}",
-            color=discord.Color.orange(),
-            timestamp=created_at,
-        )
-        embed.add_field(name="Author", value=f"{author}", inline=True)
-
-        comments_url = f"https://www.reddit.com{permalink}" if permalink else url
-        if comments_url:
-            embed.add_field(name="Link", value=f"[Open post]({comments_url})", inline=True)
-
-        selftext = self._trim_embed_description(str(post.get("selftext") or "").strip())
-        if selftext:
-            embed.description = selftext
-
-        thumbnail = str(post.get("thumbnail") or "")
-        if thumbnail.startswith("http"):
-            embed.set_thumbnail(url=thumbnail)
-
-        embed.set_footer(text=f"r/{SUBREDDIT}")
-        return embed
-
-    def _trim_embed_description(self, description: str) -> str:
-        if len(description) <= EMBED_DESCRIPTION_LIMIT:
-            return description
-
-        return f"{description[: EMBED_DESCRIPTION_LIMIT - 3]}..."
+        return f"{url}" if url else ""
 
     def _prune_notified_posts(self, cutoff: datetime):
         cutoff_timestamp = cutoff.timestamp()
