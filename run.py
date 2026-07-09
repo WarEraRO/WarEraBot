@@ -58,6 +58,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.tasks.article_mention")
         await self.load_extension("cogs.tasks.reddit_monitor")
         await self.load_extension("cogs.tasks.monitor_nap")
+        await self.load_extension("cogs.tasks.battle-order_monitor")
 
         await self.load_extension("cogs.commands.fight_status")
         await self.load_extension("cogs.commands.diplomacy")
@@ -71,6 +72,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.top_user_weekly_damages")
         await self.load_extension("cogs.commands.top_user_weekly_donations")
         await self.load_extension("cogs.commands.get_region_upgrade_cost")
+        await self.load_extension("cogs.commands.battle_orders")
 
         guild = discord.Object(id=config["guild"])
 

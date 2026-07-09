@@ -544,3 +544,20 @@ async def get_regions_object(session, base_url="https://api2.warera.io/trpc/regi
     except Exception as e:
         logger.exception('get_regions_object failed: %s', e)
         return None
+    
+async def get_region(session, region_id, base_url="https://api2.warera.io/trpc/region.getById"):
+    try:
+        input_data = {"regionId": region_id}
+        params = {"input": json.dumps(input_data)}
+        data = await _get_with_retry(
+            session,
+            base_url,
+            params=params,
+        )
+        api_result = (data or {}).get("result", {}).get("data")
+        if isinstance(api_result, dict):
+            return api_result
+        return None
+    except Exception as e:
+        logger.exception('get_region failed: %s', e)
+        return None

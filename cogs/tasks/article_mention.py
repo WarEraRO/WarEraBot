@@ -1,7 +1,9 @@
 import logging
+from turtle import title
 
 import discord
 from discord.ext import commands, tasks
+from bs4 import BeautifulSoup
 
 from config import config
 from utils.api import get_articles, get_shared_session
@@ -12,7 +14,18 @@ logger = logging.getLogger(__name__)
 ARTICLE_CHECK_INTERVAL_MINUTES = 5
 ARTICLE_LIMIT = 100
 ARTICLE_BASE_URL = "https://app.warera.io/article"
-MENTION = "romania"
+MENTIONS = (
+    "romania",
+    "românia",
+    "romaniei",
+    "româniei",
+    "român",
+    "românii",
+    "românilor",
+    "roman",
+    "romanii",
+    "romanilor",
+)
 
 class ArticleMentionJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -49,7 +62,9 @@ class ArticleMentionJob(commands.Cog):
 
             title = str(article.get("title") or "").lower()
             content = str(article.get("content") or "").lower()
-            if MENTION not in title and MENTION not in content:
+            plain_content = BeautifulSoup(content, "html.parser").get_text(" ")
+            text = f"{title} {plain_content}".lower()
+            if not any(mention in title or mention in text for mention in MENTIONS):
                 self.checked_article_ids.add(article_id)
                 continue
 
