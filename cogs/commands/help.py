@@ -38,6 +38,12 @@ _COMMANDS_DATA: List[tuple[str, str]] = [
         "autocomplete from the current WarEra country list.",
     ),
     (
+        "/priority list | /priority refresh | /priority add link description | /priority set entry_number description | /priority move entry_number_a entry_number_b | /priority remove entry_number",
+        "Manage battle order priorities from the battle order monitor cache. `list` shows active priorities with "
+        "descriptions; government-only actions can refresh Romania order checks, add an active battle manually, "
+        "set order descriptions, swap priorities, or remove a priority so it is not auto-added again unless manually added.",
+    ),
+    (
         "/fightstatus [military_unit]",
         "Fetch fight status for fighters. Without `military_unit`, operates on members with the configured 'fight' role; "
         "with `military_unit` fetches members of that unit. Results are paginated (10 per page) and include "
@@ -126,6 +132,11 @@ _JOBS_DATA: List[tuple[str, str]] = [
         "monitor_nap - every 1 hour",
         "Checks active battle country orders and MU-order nationalities against configured NAPs, then reports "
         "new violations to the reports channel.",
+    ),
+    (
+        "battle-order_monitor - every 5 minutes",
+        "Checks active battles for Romania country orders, adds new matches to the battle order priority cache, "
+        "posts alerts in the battle-orders channel, and removes priorities for battles that ended.",
     ),
     (
         "reddit_monitor - every 5 minutes",
