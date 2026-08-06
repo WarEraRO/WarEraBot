@@ -39,17 +39,22 @@
         { 
             "id" : "68740223fae6820f3c7ba0af", 
             "roleId": 1413903312578674840,
-            "friendlyName": "PRAF"
+            "friendlyName": "IOBAG DES"
         },
         { 
             "id" : "69e1e1df90bba79f8d36ea62", 
             "roleId": 1413903312578674840,
-            "friendlyName": "PRAF-Academy"
+            "friendlyName": "IOBAG RAR"
         },
         {
             "id" : "6a00e01a466b2bca6accbaae",
             "roleId": 1413903312578674840,
-            "friendlyName": "PRAF-Bootcamp"
+            "friendlyName": "IOBAG DELOC"
+        },
+        {
+            "id" : "6a747ba09c3755d359c3408d",
+            "roleId": 1413903312578674840,
+            "friendlyName": "IOBAG PRAF"
         },
         {
             "id" : "6873ed1806cf11a5f9dc3ecf",
