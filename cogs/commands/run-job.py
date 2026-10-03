@@ -1,3 +1,5 @@
+import asyncio
+import functools
 import inspect
 import logging
 import time
@@ -55,7 +57,26 @@ class RunJob(commands.Cog):
         # Loop._loop awaits self.coro(...) directly, so during an iteration the loop task's
         # coroutine is suspended on the job coroutine itself.
         awaiting = getattr(task.get_coro(), "cr_await", None)
-        return getattr(awaiting, "cr_code", None) is loop.coro.__code__
+        job_codes = {loop.coro.__code__, getattr(loop.coro, "__run_job_original__", loop.coro).__code__}
+        return getattr(awaiting, "cr_code", None) in job_codes
+
+    def _install_guard(self, name: str, loop: tasks.Loop):
+        """Make the loop's own scheduler skip an iteration that would start while a forced run is in progress."""
+        if hasattr(loop.coro, "__run_job_original__"):
+            return
+        original = loop.coro
+
+        @functools.wraps(original)
+        async def guarded(*args, **kwargs):
+            # only the loop's own task is skipped; the forced run calls through here from the interaction task
+            if name in self._forced_running and asyncio.current_task() is loop.get_task():
+                logger.info("Skipping scheduled run of job %s: a forced run is in progress", name)
+                return
+            return await original(*args, **kwargs)
+
+        guarded.__run_job_original__ = original
+        # Loop._loop looks up self.coro on every iteration, so this takes effect from the next one
+        loop.coro = guarded
 
     async def job_name_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         if not self._member_is_developer(interaction.user):
@@ -90,7 +111,8 @@ class RunJob(commands.Cog):
             await interaction.response.send_message(f"Job `{name}` is already running. Try again once it finishes.", ephemeral=True)
             return
 
-        # claim the job before the first await so concurrent invocations cannot both start it
+        # claim the job before the first await so neither another /run_job nor the scheduler can start it meanwhile
+        self._install_guard(name, loop)
         self._forced_running.add(name)
         try:
             await interaction.response.defer(ephemeral=True, thinking=True)
