@@ -87,6 +87,12 @@ _COMMANDS_DATA: List[tuple[str, str]] = [
         "Calculate daily oil upkeep and market cost for active bunkers, military bases, and pacification centers "
         "in regions held by the selected country. The required country field supports autocomplete.",
     ),
+    (
+        "/run_job job_name",
+        "Developer-only. Force a background job to run once now, without waiting for or changing its loop timer. "
+        "Refused while the job is already running; a scheduled run due during a forced run is skipped. "
+        "The job field supports autocomplete.",
+    ),
 ]
 
 _JOBS_DATA: List[tuple[str, str]] = [
@@ -127,6 +133,11 @@ _JOBS_DATA: List[tuple[str, str]] = [
     (
         "mercenary_contracts — every 1 minute",
         "Checks active mercenary contract auctions and posts new or updated contracts to the public channel.",
+    ),
+    (
+        "mu_contract_monitor — every 5 minutes",
+        "Posts an embed in a military unit's channel when that MU wins a mercenary contract: battle, minimum damage, "
+        "pay per 1k damage, total payout, estimated time left and score. Only MUs with a channelId in the config.",
     ),
     (
         "monitor_nap - every 1 hour",

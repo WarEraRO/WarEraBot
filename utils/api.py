@@ -422,6 +422,71 @@ async def get_mercenary_auctions(session, base_url="https://api2.warera.io/trpc/
         logger.exception('get_mercenary_auctions failed: %s', e)
         return None
     
+async def get_won_mercenary_auctions(session, created_after: str, base_url="https://api2.warera.io/trpc/mercenaryContractAuction.getPaginatedAuctions"):
+    """Won mercenary contracts created at or after `created_after` (ISO string), newest first.
+
+    The list is sorted by createdAt descending, so paging stops at the first older item.
+    """
+    try:
+        input_data = {"status": "won", "limit": 50}
+        items = []
+        while True:
+            params = {"input": json.dumps(input_data)}
+            data = await _get_with_retry(session, base_url, params=params)
+            if not data:
+                # a partial list could hide contracts from the startup seed, so fail the whole scan
+                return None
+            page = data.get('result', {}).get('data') or {}
+            for item in page.get('items') or []:
+                if str(item.get('createdAt') or '') < created_after:
+                    return items
+                items.append(item)
+            next_cursor = page.get('nextCursor')
+            if not next_cursor:
+                return items
+            input_data['cursor'] = next_cursor
+    except Exception as e:
+        logger.exception('get_won_mercenary_auctions failed: %s', e)
+        return None
+
+async def get_battle(battleId, session, base_url="https://api2.warera.io/trpc/battle.getById"):
+    try:
+        input_data = {"battleId": battleId}
+        params = {"input": json.dumps(input_data)}
+        data = await _get_with_retry(session, base_url, params=params)
+        api_result = (data or {}).get("result", {}).get("data")
+        if isinstance(api_result, dict):
+            return api_result
+        return None
+    except Exception as e:
+        logger.exception('get_battle failed: %s', e)
+        return None
+
+async def get_round(roundId, session, base_url="https://api2.warera.io/trpc/round.getById"):
+    try:
+        input_data = {"roundId": roundId}
+        params = {"input": json.dumps(input_data)}
+        data = await _get_with_retry(session, base_url, params=params)
+        api_result = (data or {}).get("result", {}).get("data")
+        if isinstance(api_result, dict):
+            return api_result
+        return None
+    except Exception as e:
+        logger.exception('get_round failed: %s', e)
+        return None
+
+async def get_game_config(session, base_url="https://api2.warera.io/trpc/gameConfig.getGameConfig"):
+    try:
+        params = {"input": json.dumps({})}
+        data = await _get_with_retry(session, base_url, params=params)
+        api_result = (data or {}).get("result", {}).get("data")
+        if isinstance(api_result, dict):
+            return api_result
+        return None
+    except Exception as e:
+        logger.exception('get_game_config failed: %s', e)
+        return None
+
 async def get_market_prices(session, base_url="https://api2.warera.io/trpc/itemTrading.getPrices"):
     try:
         data = await _get_with_retry(session, base_url)
@@ -560,4 +625,32 @@ async def get_region(session, region_id, base_url="https://api2.warera.io/trpc/r
         return None
     except Exception as e:
         logger.exception('get_region failed: %s', e)
+        return None
+
+# tournament.getById and tournamentTeam.getById are not in the public OpenAPI spec (0.17.4-beta);
+# they are what the game client uses and may change without notice.
+async def get_tournament(tournamentId, session, base_url="https://api2.warera.io/trpc/tournament.getById"):
+    try:
+        input_data = {"tournamentId": tournamentId}
+        params = {"input": json.dumps(input_data)}
+        data = await _get_with_retry(session, base_url, params=params)
+        api_result = (data or {}).get("result", {}).get("data")
+        if isinstance(api_result, dict):
+            return api_result
+        return None
+    except Exception as e:
+        logger.exception('get_tournament failed: %s', e)
+        return None
+
+async def get_tournament_team(tournamentTeamId, session, base_url="https://api2.warera.io/trpc/tournamentTeam.getById"):
+    try:
+        input_data = {"tournamentTeamId": tournamentTeamId}
+        params = {"input": json.dumps(input_data)}
+        data = await _get_with_retry(session, base_url, params=params)
+        api_result = (data or {}).get("result", {}).get("data")
+        if isinstance(api_result, dict):
+            return api_result
+        return None
+    except Exception as e:
+        logger.exception('get_tournament_team failed: %s', e)
         return None

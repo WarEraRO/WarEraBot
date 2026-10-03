@@ -145,7 +145,10 @@ def _region_active_upkeep(
         pct = UPKEEP_PCTS.get(upgrade_key, {}).get(level)
         if pct is None:
             continue
-        active.append((display_name, level, average_development * pct * 24))
+        if upgrade_key == "pacificationCenter" and level > 0:
+            active.append((display_name, level, region['development'] * pct * 24))
+        else:
+            active.append((display_name, level, average_development * pct * 24))
     return active
 
 

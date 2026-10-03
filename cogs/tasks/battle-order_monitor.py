@@ -13,8 +13,10 @@ from utils.api import (
     get_country,
     get_shared_session,
     get_region,
+    get_tournament,
+    get_tournament_team,
 )
-from utils.common import country_with_flag
+from utils.common import country_flag, country_with_flag
 
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,11 @@ BATTLE_ORDER_MONITOR_INTERVAL_MINUTES = 5
 ROMANIA_NAME = "Romania"
 BATTLE_LINK_RE = re.compile(r"https?://app\.warera\.io/battle/([A-Za-z0-9]+)")
 REGION_CACHE_TTL_SECONDS = 60 * 60
+TOURNAMENT_CACHE_TTL_SECONDS = 60 * 60
+# battle.type of tournament battles; they have no region or side country, only a tournamentTeam per side
+TOURNAMENT_BATTLE_TYPE = "tournament"
+# tournament.type of country tournaments ("mu" tournaments are not reported)
+COUNTRY_TOURNAMENT_TYPE = "country"
 
 
 class BattleOrderMonitorJob(commands.Cog):
@@ -33,6 +40,8 @@ class BattleOrderMonitorJob(commands.Cog):
         self._country_cache: dict[str, str] = {}
         self._country_id_cache: dict[str, tuple[str | None, float]] = {}
         self._regions_cache: dict[str, tuple[str, float]] = {}
+        self._tournaments_cache: dict[str, tuple[dict, float]] = {}
+        self._tournament_teams_cache: dict[str, tuple[dict, float]] = {}
         self._lock = asyncio.Lock()
         self.battle_order_monitor.start()
 
@@ -95,6 +104,11 @@ class BattleOrderMonitorJob(commands.Cog):
                 if exists:
                     continue
 
+                tournament = await self._tournament_context(battle, session)
+                if tournament is not None and tournament["type"] != COUNTRY_TOURNAMENT_TYPE:
+                    # MU tournaments are not reported; a failed tournament lookup is retried next cycle
+                    continue
+
                 entry = await self._build_entry(
                     battle,
                     side_name,
@@ -104,6 +118,7 @@ class BattleOrderMonitorJob(commands.Cog):
                     source="romania",
                     description="",
                     session=session,
+                    tournament=tournament,
                 )
                 new_entries.append(entry)
 
@@ -142,8 +157,14 @@ class BattleOrderMonitorJob(commands.Cog):
         if not battle:
             return False, "Battle is not active or could not be found.", None
 
+        tournament = await self._tournament_context(battle, session)
+        if tournament is not None and tournament["type"] != COUNTRY_TOURNAMENT_TYPE:
+            if tournament["type"] is None:
+                return False, "Could not fetch the tournament for this battle.", None
+            return False, "Only country tournament battles can be added as priorities.", None
+
         await self._get_country_id(ROMANIA_NAME, session)
-        side_name, side, opponent_side_name, opponent = self._preferred_side_for_manual_entry(battle)
+        side_name, side, opponent_side_name, opponent = self._preferred_side_for_manual_entry(battle, tournament)
         token = self._entry_token(battle_id, side_name, "manual")
 
         entry = await self._build_entry(
@@ -155,6 +176,7 @@ class BattleOrderMonitorJob(commands.Cog):
             source="manual",
             description=description,
             session=session,
+            tournament=tournament,
         )
         entry["token"] = token
 
@@ -237,7 +259,8 @@ class BattleOrderMonitorJob(commands.Cog):
         message = (
             f"A new priority was added: {self.format_priority_title(entry)} "
             f"in [{entry.get('region_name')}]({entry.get('battle_link')})\n"
-            f"Order Description: {description}"
+            f"Order Description: {description}\n"
+            f"Battle Link: {entry.get('battle_link')}"
         )
 
         await self._send_priority_message(channel, message)
@@ -253,6 +276,12 @@ class BattleOrderMonitorJob(commands.Cog):
             logger.exception("Failed to send battle order priority alert")
 
     def format_priority_message(self, entry: dict) -> str:
+        if entry.get("tournament_name"):
+            return (
+                f"{country_with_flag(ROMANIA_NAME, left=True)} put an order in the "
+                f"[tournament]({entry.get('battle_link')}) against "
+                f"{self._format_team(entry.get('opponent_team_names'))}"
+            )
         side_country = country_with_flag(entry.get("side_country_name"), left=True)
         opponent_country = country_with_flag(entry.get("opponent_country_name"), left=False)
         return (
@@ -263,6 +292,13 @@ class BattleOrderMonitorJob(commands.Cog):
         )
 
     def format_priority_title(self, entry: dict) -> str:
+        if entry.get("tournament_name"):
+            return (
+                f"Tournament: {entry.get('side_name').capitalize()} "
+                f"{self._format_team(entry.get('side_team_names'), compact=True)} - "
+                f"{self._format_team(entry.get('opponent_team_names'), compact=True)} "
+                f"{entry.get('opponent_side_name').capitalize()}"
+            )
         side_country = country_with_flag(entry.get("side_country_name"), left=True)
         opponent_country = country_with_flag(entry.get("opponent_country_name"), left=False)
         return (
@@ -280,8 +316,29 @@ class BattleOrderMonitorJob(commands.Cog):
         source: str,
         description: str,
         session,
+        tournament: dict | None = None,
     ) -> dict:
         battle_id = self._battle_id(battle) or "unknown"
+        if tournament is not None:
+            side_team_names, opponent_team_names = await asyncio.gather(
+                self._country_names(tournament["teams"].get(side_name, []), session),
+                self._country_names(tournament["teams"].get(opponent_side_name, []), session),
+            )
+            return {
+                "token": self._entry_token(battle_id, side_name, source),
+                "source": source,
+                "battle_id": battle_id,
+                "battle_link": f"https://app.warera.io/battle/{battle_id}",
+                "side_name": side_name,
+                "opponent_side_name": opponent_side_name,
+                "side_team_names": side_team_names,
+                "opponent_team_names": opponent_team_names,
+                "tournament_name": tournament["name"],
+                # read by the manual-priority message ("... in [region](link)")
+                "region_name": tournament["name"],
+                "description": description or "",
+            }
+
         side_country_id = str(side.get("country") or "")
         opponent_country_id = str(opponent.get("country") or "")
         side_country_name, opponent_country_name = await asyncio.gather(
@@ -305,7 +362,9 @@ class BattleOrderMonitorJob(commands.Cog):
             "description": description or "",
         }
 
-    def _preferred_side_for_manual_entry(self, battle: dict) -> tuple[str, dict, str, dict]:
+    def _preferred_side_for_manual_entry(
+        self, battle: dict, tournament: dict | None = None
+    ) -> tuple[str, dict, str, dict]:
         attacker = battle.get("attacker") or {}
         defender = battle.get("defender") or {}
         romania_id = next(
@@ -316,11 +375,72 @@ class BattleOrderMonitorJob(commands.Cog):
             ),
             None,
         )
+        if tournament is not None:
+            # in a country tournament Romania fights as one country of a team
+            teams = tournament["teams"]
+            if romania_id and str(romania_id) in teams.get("defender", []):
+                return "defender", defender, "attacker", attacker
+            return "attacker", attacker, "defender", defender
         if romania_id and str(romania_id) == str(attacker.get("country") or ""):
             return "attacker", attacker, "defender", defender
         if romania_id and str(romania_id) == str(defender.get("country") or ""):
             return "defender", defender, "attacker", attacker
         return "attacker", attacker, "defender", defender
+
+    async def _tournament_context(self, battle: dict, session) -> dict | None:
+        """None for regular battles. For tournament battles: {"type", "name", "teams": {side: [country ids]}};
+        "type" is None when the tournament could not be fetched."""
+        if battle.get("type") != TOURNAMENT_BATTLE_TYPE:
+            return None
+        context = {"type": None, "name": "Tournament", "teams": {}}
+        tournament = await self._cached_lookup(
+            self._tournaments_cache, str(battle.get("tournament") or ""), get_tournament, session
+        )
+        if tournament is None:
+            return context
+        context["type"] = tournament.get("type")
+        context["name"] = str(tournament.get("name") or "Tournament")
+        if context["type"] != COUNTRY_TOURNAMENT_TYPE:
+            return context
+
+        side_names = ("attacker", "defender")
+        teams = await asyncio.gather(
+            *(
+                self._cached_lookup(
+                    self._tournament_teams_cache,
+                    str((battle.get(side_name) or {}).get("tournamentTeam") or ""),
+                    get_tournament_team,
+                    session,
+                )
+                for side_name in side_names
+            )
+        )
+        for side_name, team in zip(side_names, teams):
+            context["teams"][side_name] = [str(country_id) for country_id in (team or {}).get("countries") or []]
+        return context
+
+    async def _cached_lookup(self, cache: dict[str, tuple[dict, float]], key: str, fetch, session) -> dict | None:
+        if not key:
+            return None
+        now = time.monotonic()
+        cached = cache.get(key)
+        if cached and now - cached[1] < TOURNAMENT_CACHE_TTL_SECONDS:
+            return cached[0]
+        value = await fetch(key, session)
+        # failures are not cached so the next cycle retries
+        if value is not None:
+            cache[key] = (value, now)
+        return value
+
+    async def _country_names(self, country_ids: list[str], session) -> list[str]:
+        return list(await asyncio.gather(*(self._country_name(country_id, session) for country_id in country_ids)))
+
+    def _format_team(self, country_names: list[str] | None, compact: bool = False) -> str:
+        if not country_names:
+            return "unknown"
+        if compact:
+            return ", ".join(country_flag(name) or name for name in country_names)
+        return ", ".join(country_with_flag(name, left=True) for name in country_names)
 
     async def _get_country_id(self, country_name: str, session) -> str | None:
         now = time.monotonic()

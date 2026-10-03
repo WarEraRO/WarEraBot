@@ -11,7 +11,8 @@
             1413526391382737038
         ],
         "commander": 1504183257703514263,
-        "social": 1491501287504740362
+        "social": 1491501287504740362,
+        "developer": 1541160622710984866
     },
     "citizenship_countries": [
         "Romania"
@@ -34,6 +35,7 @@
         { 
             "id" : "6873eb31412eb47bfef58fd8", 
             "roleId": 1413903247411777537,
+            "channelId": 1413530594419282066,
             "friendlyName": "Walla"
         },
         { 
@@ -64,6 +66,7 @@
         {
             "id" : "697f917064b9c8386b918a92",
             "roleId": 1490292311303782562,
+            "channelId": 1413530594419282066,
             "friendlyName": "SIAS"
         },
         {
@@ -74,11 +77,13 @@
         {
             "id" : "699ea3e01ee17a2f8ede8fa9",
             "roleId": 1494963377884237905,
+            "channelId": 1413530594419282066,
             "friendlyName": "WolvesOfDacia"
         },
         {
             "id" : "69f1f280104e9a5760e1a3db",
             "roleId": 1499804311398383799,
+            "channelId": 1413530594419282066,
             "friendlyName": "Structura"
         },
         {
@@ -89,6 +94,7 @@
         {
             "id" : "6a0d89d1bd3cc7006eb60908",
             "roleId": 1507744121752784936,
+            "channelId": 1413530594419282066,
             "friendlyName": "F.E.R."
         }
     ],
