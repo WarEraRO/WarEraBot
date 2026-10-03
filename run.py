@@ -73,6 +73,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.top_user_weekly_donations")
         await self.load_extension("cogs.commands.get_region_upgrade_cost")
         await self.load_extension("cogs.commands.battle_orders")
+        await self.load_extension("cogs.commands.run-job")
 
         guild = discord.Object(id=config["guild"])
 

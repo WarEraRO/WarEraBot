@@ -215,3 +215,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# claude (nobody is going to see the secret sauce)
+.claude

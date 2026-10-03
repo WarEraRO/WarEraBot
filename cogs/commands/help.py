@@ -87,6 +87,11 @@ _COMMANDS_DATA: List[tuple[str, str]] = [
         "Calculate daily oil upkeep and market cost for active bunkers, military bases, and pacification centers "
         "in regions held by the selected country. The required country field supports autocomplete.",
     ),
+    (
+        "/run_job job_name",
+        "Developer-only. Force a background job to run once now, without waiting for or changing its loop timer. "
+        "Refused while the job is already running. The job field supports autocomplete.",
+    ),
 ]
 
 _JOBS_DATA: List[tuple[str, str]] = [

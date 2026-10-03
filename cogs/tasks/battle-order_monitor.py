@@ -237,7 +237,8 @@ class BattleOrderMonitorJob(commands.Cog):
         message = (
             f"A new priority was added: {self.format_priority_title(entry)} "
             f"in [{entry.get('region_name')}]({entry.get('battle_link')})\n"
-            f"Order Description: {description}"
+            f"Order Description: {description}\n"
+            f"Battle Link: {entry.get('battle_link')}"
         )
 
         await self._send_priority_message(channel, message)
