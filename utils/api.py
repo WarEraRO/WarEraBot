@@ -654,3 +654,109 @@ async def get_tournament_team(tournamentTeamId, session, base_url="https://api2.
     except Exception as e:
         logger.exception('get_tournament_team failed: %s', e)
         return None
+
+async def get_ended_battles(session, created_after: str, base_url="https://api2.warera.io/trpc/battle.getBattles"):
+    """Ended battles created at or after `created_after` (ISO string), newest first.
+
+    The list is sorted by createdAt descending, so paging stops at the first older item.
+    """
+    try:
+        input_data = {"isActive": False, "limit": 100}
+        items = []
+        while True:
+            params = {"input": json.dumps(input_data)}
+            data = await _get_with_retry(session, base_url, params=params)
+            if not data:
+                # a partial list would silently undercount battles
+                return None
+            page = data.get('result', {}).get('data') or {}
+            for item in page.get('items') or []:
+                if str(item.get('createdAt') or '') < created_after:
+                    return items
+                items.append(item)
+            next_cursor = page.get('nextCursor')
+            if not next_cursor:
+                return items
+            input_data['cursor'] = next_cursor
+    except Exception as e:
+        logger.exception('get_ended_battles failed: %s', e)
+        return None
+
+async def get_battle_ranking(battleId, dataType, rankingType, side, session, base_url="https://api2.warera.io/trpc/battleRanking.getRanking"):
+    """Every entry of a battle leaderboard (dataType: damage|points|money, rankingType: user|country|mu,
+    side: attacker|defender|merged). None if any page fails."""
+    try:
+        input_data = {"battleId": battleId, "dataType": dataType, "type": rankingType, "side": side, "limit": 100}
+        items = []
+        while True:
+            params = {"input": json.dumps(input_data)}
+            data = await _get_with_retry(session, base_url, params=params)
+            if not data:
+                return None
+            page = data.get('result', {}).get('data') or {}
+            items += page.get('items') or []
+            next_cursor = page.get('nextCursor')
+            if not next_cursor:
+                return items
+            input_data['cursor'] = next_cursor
+    except Exception as e:
+        logger.exception('get_battle_ranking failed: %s', e)
+        return None
+
+# muMember.getByMu is not in the public OpenAPI spec (0.17.4-beta); it is documented by the community
+# explorer (warera.realmarijn.nl) and may change without notice.
+async def get_mu_members(muId, session, base_url="https://api2.warera.io/trpc/muMember.getByMu"):
+    """One record per MU member with weekly/monthly/total damage and help counters."""
+    try:
+        input_data = {"muId": muId}
+        params = {"input": json.dumps(input_data)}
+        data = await _get_with_retry(session, base_url, params=params)
+        api_result = (data or {}).get("result", {}).get("data")
+        if isinstance(api_result, list):
+            return api_result
+        return None
+    except Exception as e:
+        logger.exception('get_mu_members failed: %s', e)
+        return None
+
+async def get_mu_transactions(muId, transactionType, created_after: str, session, base_url="https://api2.warera.io/trpc/transaction.getPaginatedTransactions"):
+    """An MU's transactions of one type (or a list of types) created at or after `created_after` (ISO string), newest first.
+
+    Requires an API key. The list is sorted by createdAt descending, so paging stops at the first older item.
+    """
+    try:
+        input_data = {"muId": muId, "transactionType": transactionType, "limit": 100}
+        items = []
+        while True:
+            params = {"input": json.dumps(input_data)}
+            data = await _get_with_retry(session, base_url, params=params)
+            if not data:
+                return None
+            page = data.get('result', {}).get('data') or {}
+            for item in page.get('items') or []:
+                if str(item.get('createdAt') or '') < created_after:
+                    return items
+                items.append(item)
+            next_cursor = page.get('nextCursor')
+            if not next_cursor:
+                return items
+            input_data['cursor'] = next_cursor
+    except Exception as e:
+        logger.exception('get_mu_transactions failed: %s', e)
+        return None
+
+# tradingOrder.getPublicOrdersByOwner is not in the public OpenAPI spec (0.17.4-beta); it is documented by the
+# community explorer (warera.realmarijn.nl) and may change without notice.
+async def get_mu_public_orders(muId, session, base_url="https://api2.warera.io/trpc/tradingOrder.getPublicOrdersByOwner"):
+    """An MU's open market orders: {buyOrders, sellOrders, allOrders, totalBuyMoneyInvested, totalSellMoneyExpected, …}."""
+    try:
+        input_data = {"muId": muId}
+        params = {"input": json.dumps(input_data)}
+        data = await _get_with_retry(session, base_url, params=params)
+        api_result = (data or {}).get("result", {}).get("data")
+        if isinstance(api_result, dict):
+            return api_result
+        return None
+    except Exception as e:
+        logger.exception('get_mu_public_orders failed: %s', e)
+        return None

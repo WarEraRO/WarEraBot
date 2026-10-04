@@ -60,6 +60,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.tasks.monitor_nap")
         await self.load_extension("cogs.tasks.battle-order_monitor")
         await self.load_extension("cogs.tasks.military_unit_contract_monitor")
+        await self.load_extension("cogs.tasks.military_unit_weekly_report")
 
         await self.load_extension("cogs.commands.fight_status")
         await self.load_extension("cogs.commands.diplomacy")
