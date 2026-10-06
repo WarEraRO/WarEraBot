@@ -1,11 +1,9 @@
 from discord.ext import commands, tasks
 from utils.api import get_user, get_all_countries, get_shared_session
 from utils.db import init_db
-from utils.computational import triangular
+from utils.computational import is_economy_build
 from config import config
 import discord
-
-ECONOMY_SKILLS = ['energy', 'companies', 'entrepreneurship', 'production']
 
 class SkillRolesJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -50,24 +48,10 @@ class SkillRolesJob(commands.Cog):
             user = await get_user(member.display_name, session)
             if user is None:
                 continue
-            economy_skill_points = 0
-            fight_skill_points = 0
-            for skill_name, skill_data in user['skills'].items():
-                level = skill_data['level']
-                if level != 0:
-                    if skill_name in ECONOMY_SKILLS:
-                        economy_skill_points += triangular(level)
-                    else:
-                        fight_skill_points += triangular(level)
-            total_skill_points = user['leveling']['totalSkillPoints']
-            unspent_skill_points = user['leveling']['availableSkillPoints']
-
-            # division by zero, should not be possible (level 1 = 4 points already)
-            if total_skill_points == 0:
+            is_economy = is_economy_build(user)
+            # no skill points, should not be possible (level 1 = 4 points already)
+            if is_economy is None:
                 continue
-
-            percentage = ((economy_skill_points + unspent_skill_points) / total_skill_points) * 100
-            is_economy = percentage > 50
             previous = self.cached_members.get(member.id)
             if previous is not None and previous == is_economy:
                 continue
