@@ -30,71 +30,84 @@
         { 
             "id" : "6873f123ad05f3637920645e", 
             "roleId": 1413903185025695867,
+            "channelId": 1413530561540259880,
             "friendlyName": "LR"
         }, 
         { 
             "id" : "6873eb31412eb47bfef58fd8", 
             "roleId": 1413903247411777537,
             "channelId": 1413530594419282066,
+            "leaderId": 711121837274300466,
             "friendlyName": "Walla"
         },
         { 
             "id" : "6a747ba09c3755d359c3408d", 
             "roleId": 1547272982953467954,
+            "channelId": 1413530644880949329,
             "friendlyName": "IOBAG ECO"
         },
         { 
             "id" : "69e1e1df90bba79f8d36ea62", 
             "roleId": 1547273022967128105,
+            "channelId": 1413530644880949329,
             "friendlyName": "IOBAG RAR"
         },
         {
             "id" : "6a00e01a466b2bca6accbaae",
             "roleId": 1547273001630961814,
+            "channelId": 1413530644880949329,
             "friendlyName": "IOBAG DELOC"
         },
         {
             "id" : "68740223fae6820f3c7ba0af",
             "roleId": 1413903312578674840,
+            "channelId": 1413530644880949329,
             "friendlyName": "IOBAG PRAF"
         },
         {
             "id" : "6873ed1806cf11a5f9dc3ecf",
             "roleId": 1413903246577373194,
+            "channelId": 1413530619023196220,
             "friendlyName": "FNR"
         },
         {
             "id" : "697f917064b9c8386b918a92",
             "roleId": 1490292311303782562,
             "channelId": 1413530594419282066,
+            "leaderId": 711121837274300466,
             "friendlyName": "SIAS"
         },
         {
             "id" : "69976c2fdcd6dac676a8f1ff",
             "roleId": 1494963502874366022,
+            "channelId": 1494963795846627451,
             "friendlyName": "WolfPack"
         },
         {
             "id" : "699ea3e01ee17a2f8ede8fa9",
             "roleId": 1494963377884237905,
             "channelId": 1413530594419282066,
+            "leaderId": 711121837274300466,
             "friendlyName": "WolvesOfDacia"
         },
         {
             "id" : "69f1f280104e9a5760e1a3db",
             "roleId": 1499804311398383799,
             "channelId": 1413530594419282066,
+            "leaderId": 711121837274300466,
             "friendlyName": "Structura"
         },
         {
             "id" : "69e6c2aa78af10c96278b691",
             "roleId": 1500138830403993811,
+            "channelId": 1500139105852325989,
             "friendlyName": "Vael Thuun"
         },
         {
             "id" : "6a0d89d1bd3cc7006eb60908",
             "roleId": 1507744121752784936,
             "channelId": 1413530594419282066,
+            "leaderId": 711121837274300466,
             "friendlyName": "F.E.R."
         }
     ],
