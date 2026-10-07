@@ -136,8 +136,8 @@ _JOBS_DATA: List[tuple[str, str]] = [
     ),
     (
         "mu_contract_monitor — every 5 minutes",
-        "Posts an embed in a military unit's channel when that MU wins a mercenary contract: battle, minimum damage, "
-        "pay per 1k damage, total payout, estimated time left and score. Only MUs with a channelId in the config.",
+        "Posts an embed in a military unit's contracts thread (threadIds.contractsId) or channel when that MU wins a "
+        "mercenary contract: battle, minimum damage, pay per 1k damage, total payout, estimated time left and score.",
     ),
     (
         "monitor_nap - every 1 hour",

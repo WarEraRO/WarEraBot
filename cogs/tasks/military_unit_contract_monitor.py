@@ -17,7 +17,7 @@ from utils.api import (
     get_shared_session,
     get_won_mercenary_auctions,
 )
-from utils.common import country_flag
+from utils.common import country_flag, get_mu_destination
 
 logger = logging.getLogger(__name__)
 
@@ -102,11 +102,11 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
         if guild is None:
             return
 
-        # only MUs with a channelId get contract embeds, posted in that channel
+        # only MUs with a channelId or a contracts thread get contract embeds, posted in the thread when set
         units = {
             str(unit["id"]): unit
             for unit in config.get("military_units", [])
-            if unit.get("id") and unit.get("channelId")
+            if unit.get("id") and (unit.get("channelId") or (unit.get("threadIds") or {}).get("contractsId"))
         }
         if not units:
             return
@@ -136,9 +136,9 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
             if contract_id in self._posted:
                 continue
             unit = units[str(contract["currentWinner"])]
-            channel = guild.get_channel(unit["channelId"])
+            channel = await get_mu_destination(guild, unit, "contractsId")
             if channel is None:
-                logger.warning("Channel %s for MU %s not found", unit["channelId"], unit.get("friendlyName"))
+                logger.warning("Contracts channel/thread for MU %s not found", unit.get("friendlyName"))
                 continue
             try:
                 embed = await self._build_embed(contract, unit, session)

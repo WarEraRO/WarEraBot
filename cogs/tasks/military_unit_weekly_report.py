@@ -19,7 +19,7 @@ from utils.api import (
     get_user_info,
     get_won_mercenary_auctions,
 )
-from utils.common import country_with_flag
+from utils.common import country_with_flag, get_mu_destination
 
 logger = logging.getLogger(__name__)
 
@@ -215,8 +215,11 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
         guild = self.bot.get_guild(config["guild"])
         if guild is None:
             return
-        # only MUs with a channelId get a report, posted in that channel
-        units = {mu_id: unit for mu_id, unit in self._units().items() if unit.get("channelId")}
+        # only MUs with a channelId or a weekly report thread get a report, posted in the thread when set
+        units = {
+            mu_id: unit for mu_id, unit in self._units().items()
+            if unit.get("channelId") or (unit.get("threadIds") or {}).get("weeklyReportId")
+        }
         if not units:
             return
 
@@ -233,15 +236,15 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
 
         names: dict[str, str] = {}
         for mu_id, unit in units.items():
-            channel = guild.get_channel(unit["channelId"])
-            if channel is None:
-                logger.warning("Channel %s for MU %s not found", unit["channelId"], unit.get("friendlyName"))
-                continue
             try:
                 embed = await self._build_embed(
                     mu_id, unit, session, week_start, now, contracts, battles_complete, names, country_names
                 )
                 if embed is None:
+                    continue
+                channel = await get_mu_destination(guild, unit, "weeklyReportId")
+                if channel is None:
+                    logger.warning("Weekly report channel/thread for MU %s not found", unit.get("friendlyName"))
                     continue
                 await channel.send(embed=embed)
             except discord.DiscordException:

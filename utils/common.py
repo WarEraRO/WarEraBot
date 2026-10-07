@@ -1,3 +1,6 @@
+import discord
+
+
 COUNTRY_FLAGS: dict[str, str] = {
     "afghanistan": ":flag_af:",
     "albania": ":flag_al:",
@@ -198,3 +201,21 @@ def country_with_flag(country_name: str | None, left: bool) -> str:
         return f"{flag} {name}"
     else:
         return f"{name} {flag}"
+
+
+async def get_mu_destination(guild: discord.Guild, unit: dict, thread_key: str):
+    """Where an MU's posts go: the thread in threadIds[thread_key] when set, otherwise the MU's channelId.
+
+    Archived threads are not in the cache, so they are fetched; sending to an archived thread that
+    is not locked unarchives it.
+    """
+    target_id = (unit.get("threadIds") or {}).get(thread_key) or unit.get("channelId")
+    if not target_id:
+        return None
+    target = guild.get_channel_or_thread(int(target_id))
+    if target is None:
+        try:
+            target = await guild.fetch_channel(int(target_id))
+        except discord.HTTPException:
+            return None
+    return target
