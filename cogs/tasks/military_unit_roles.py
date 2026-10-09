@@ -1,5 +1,5 @@
 from discord.ext import commands, tasks
-from utils.api import get_user, get_shared_session, get_military_unit
+from utils.api import get_shared_session, get_military_units_by_ids, get_user_ids_by_name
 from utils.db import init_db
 from utils.i18n import Translator, get_translator
 from config import config
@@ -30,36 +30,34 @@ class MilitaryUnitRolesJob(commands.Cog):
         military_units = config.get('military_units', [])
         mu_to_role = {unit['id'] : guild.get_role(unit['roleId']) for unit in military_units}
 
-        # Build a mapping of manager_api_id -> set of MU ids they manage.
-        # We need an active session to call the API.
+        # One batched request for every configured MU. Each MU carries its `members`
+        # (user ids, matches each user's `mu` field) and `roles.managers`, so no
+        # per-member user fetch is needed.
         session = await get_shared_session()
         tr = await get_translator(guild)
-        owners: dict = {}
-        for unit in military_units:
-            try:
-                mu_data = await get_military_unit(unit['id'], session)
-            except Exception:
-                mu_data = None
-            if not mu_data:
-                continue
-            # The API returns role.managers as an array of api user ids
-            managers = []
-            try:
-                managers = (mu_data.get('roles') or {}).get('managers') or []
-            except Exception:
-                managers = []
-            for mgr in managers:
-                # map manager api id to a set of unit ids (support multiple)
-                if mgr in owners:
-                    owners[mgr].add(unit['id'])
-                else:
-                    owners[mgr] = {unit['id']}
+        mu_data_by_id = await get_military_units_by_ids(mu_to_role.keys(), session)
+
+        # An MU that failed to load is left alone this run: without its member list
+        # we would otherwise strip its role from all of its members.
+        mu_to_role = {mu_id: role for mu_id, role in mu_to_role.items() if role and mu_id in mu_data_by_id}
+        managed_roles = set(mu_to_role.values())
+
+        member_mu: dict = {}  # user id -> MU id they belong to
+        owners: dict = {}     # manager user id -> set of MU ids they manage
+        for mu_id, mu_data in mu_data_by_id.items():
+            for user_id in mu_data.get('members') or []:
+                member_mu[user_id] = mu_id
+            for mgr in (mu_data.get('roles') or {}).get('managers') or []:
+                owners.setdefault(mgr, set()).add(mu_id)
 
         members = set()
         if citizen:
             members.update(citizen.members)
         if newbie:
             members.update(newbie.members)
+
+        # Discord display name -> API user id (cached names cost no request)
+        user_ids = await get_user_ids_by_name([m.display_name for m in members], session)
 
         # track player display names added/removed per role
         added_members: dict = {}
@@ -68,34 +66,26 @@ class MilitaryUnitRolesJob(commands.Cog):
         # For each member, determine the desired MU-related roles (their current MU
         # plus any MU(s) they own/manage) then add/remove server roles to match.
         for member in members:
-            try:
-                user = await get_user(member.display_name, session)
-            except Exception:
-                user = None
-            if user is None:
+            api_id = user_ids.get(member.display_name)
+            if api_id is None:
                 continue
-
-            api_id = user.get('_id') if isinstance(user, dict) else None
 
             # Desired roles set (discord.Role objects)
             desired_roles = set()
 
             # 1) Current MU role (if the user belongs to one)
-            mu_id = user.get('mu')
-            if mu_id:
-                r = mu_to_role.get(mu_id)
+            r = mu_to_role.get(member_mu.get(api_id))
+            if r:
+                desired_roles.add(r)
+
+            # 2) Owner/manager MU roles (if the user's api id is a manager)
+            for owned_mu in owners.get(api_id, set()):
+                r = mu_to_role.get(owned_mu)
                 if r:
                     desired_roles.add(r)
 
-            # 2) Owner/manager MU roles (if the user's api id is a manager)
-            if api_id and api_id in owners:
-                for owned_mu in owners.get(api_id, set()):
-                    r = mu_to_role.get(owned_mu)
-                    if r:
-                        desired_roles.add(r)
-
             # Roles currently on the member that are MU roles we manage
-            current_mu_roles = {r for r in mu_to_role.values() if r and r in member.roles}
+            current_mu_roles = {r for r in member.roles if r in managed_roles}
 
             # Add roles that are desired but missing
             to_add = [r for r in desired_roles if r not in member.roles]

@@ -1,5 +1,5 @@
 from discord.ext import commands, tasks
-from utils.api import get_user, get_all_countries, get_shared_session
+from utils.api import get_users_by_name, get_all_countries, get_shared_session
 from utils.db import init_db
 from utils.computational import is_economy_build
 from utils.i18n import Translator, get_translator
@@ -46,8 +46,10 @@ class SkillRolesJob(commands.Cog):
             'fight_removed': [],
         }
         session = await get_shared_session()
+        # One batched fetch for all members instead of one request per member
+        users = await get_users_by_name([m.display_name for m in members], session)
         for member in members:
-            user = await get_user(member.display_name, session)
+            user = users.get(member.display_name)
             if user is None:
                 continue
             is_economy = is_economy_build(user)

@@ -140,6 +140,96 @@ async def get_user_info(userId, session, base_url="https://api2.warera.io/trpc/u
         logger.exception('get_user_info failed: %s', e)
         return None
 
+# tRPC httpBatchLink: N calls of one procedure in a single GET. A batch counts as one request
+# against the rate limit [observed 2026-10-09: 5, 25, 50 and 100 calls each cost 1].
+# 50 calls per chunk keeps the URL around 4.5 KB.
+BATCH_CHUNK_SIZE = 50
+
+async def _get_batch(session, procedure, inputs, chunk_size=BATCH_CHUNK_SIZE, base_url="https://api2.warera.io/trpc"):
+    """Run `procedure` once per item of `inputs` using tRPC batching.
+
+    Returns a list aligned with `inputs`: each item's `result.data`, or None when that call
+    errored or its chunk failed. Never raises.
+    """
+    results = []
+    for start in range(0, len(inputs), chunk_size):
+        chunk = inputs[start:start + chunk_size]
+        try:
+            url = f"{base_url}/{','.join([procedure] * len(chunk))}"
+            params = {"batch": "1", "input": json.dumps({str(i): inp for i, inp in enumerate(chunk)})}
+            data = await _get_with_retry(session, url, params=params)
+            if not isinstance(data, list) or len(data) != len(chunk):
+                results.extend([None] * len(chunk))
+                continue
+            for envelope in data:
+                results.append(((envelope or {}).get('result') or {}).get('data') or None)
+        except Exception as e:
+            logger.exception('_get_batch %s failed: %s', procedure, e)
+            results.extend([None] * len(chunk))
+    return results
+
+async def get_users_info(user_ids, session):
+    """Batched user.getUserLite: {userId: user} for the ids that resolved."""
+    ids = list(dict.fromkeys(user_ids))
+    users = await _get_batch(session, 'user.getUserLite', [{'userId': uid} for uid in ids])
+    return {uid: user for uid, user in zip(ids, users) if user}
+
+async def get_military_units_by_ids(mu_ids, session):
+    """Batched mu.getById: {muId: mu} for the ids that resolved."""
+    ids = list(dict.fromkeys(mu_ids))
+    mus = await _get_batch(session, 'mu.getById', [{'muId': mu_id} for mu_id in ids])
+    return {mu_id: mu for mu_id, mu in zip(ids, mus) if mu}
+
+async def _search_users_by_name(usernames, session):
+    """Resolve uncached usernames with batched search + getUserLite; exact matches go into PLAYER_CACHE."""
+    names = list(dict.fromkeys(usernames))
+    searches = await _get_batch(session, 'search.searchAnything', [{'searchText': name} for name in names])
+    candidate_ids = []
+    for search in searches:
+        if search and search.get('hasData') is not False:
+            candidate_ids.extend(search.get('userIds') or [])
+    candidates = await get_users_info(candidate_ids, session)
+    by_username = {user.get('username'): user for user in candidates.values()}
+    found = {}
+    for name in names:
+        user = by_username.get(name)
+        if user is not None:
+            PLAYER_CACHE[name] = user.get('_id')
+            found[name] = user
+    return found
+
+async def get_users_by_name(usernames, session):
+    """Batched get_user(): {username: user} for the usernames that resolved.
+
+    Like get_user, a cached id is fetched without re-checking the username.
+    """
+    try:
+        names = list(dict.fromkeys(usernames))
+        cached = {name: PLAYER_CACHE[name] for name in names if name in PLAYER_CACHE}
+        users_by_id = await get_users_info(cached.values(), session)
+        found = {name: users_by_id[uid] for name, uid in cached.items() if uid in users_by_id}
+        missing = [name for name in names if name not in cached]
+        if missing:
+            found.update(await _search_users_by_name(missing, session))
+        return found
+    except Exception as e:
+        logger.exception('get_users_by_name failed: %s', e)
+        return {}
+
+async def get_user_ids_by_name(usernames, session):
+    """{username: userId}; cached names cost no request, only the rest are searched."""
+    try:
+        names = list(dict.fromkeys(usernames))
+        found = {name: PLAYER_CACHE[name] for name in names if name in PLAYER_CACHE}
+        missing = [name for name in names if name not in found]
+        if missing:
+            for name, user in (await _search_users_by_name(missing, session)).items():
+                found[name] = user.get('_id')
+        return found
+    except Exception as e:
+        logger.exception('get_user_ids_by_name failed: %s', e)
+        return {}
+
 async def get_all_countries(session, base_url="https://api2.warera.io/trpc/country.getAllCountries"):
     try:
         data = await _get_with_retry(session, base_url)
