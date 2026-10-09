@@ -67,6 +67,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.diplomacy")
         await self.load_extension("cogs.commands.naps")
         await self.load_extension("cogs.commands.mu_stray")
+        await self.load_extension("cogs.commands.pills")
         await self.load_extension("cogs.commands.inactive_players")
         await self.load_extension("cogs.commands.promotions")
         await self.load_extension("cogs.commands.country_strays")

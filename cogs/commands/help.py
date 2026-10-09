@@ -68,6 +68,12 @@ _COMMANDS_DATA: List[tuple[str, str]] = [
         "Filter buttons on the result view switch between categories.",
     ),
     (
+        "/pills military_unit",
+        "Pill status of a configured military unit (autocomplete): who is pilled, grouped by the hour they pilled, "
+        "who is in debuff, grouped by the hour it ends (both with time left), and fighters not pilled. "
+        "Hours are shown in the configured timezone.",
+    ),
+    (
         "/promotions",
         "Check newbie members for promotion eligibility. Shows Promotion Candidates, Fight Issues, Inactive, "
         "and Data Issues — filter buttons on the result view switch between categories.",
