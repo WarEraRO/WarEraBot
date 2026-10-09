@@ -1,4 +1,13 @@
+import logging
+from datetime import datetime, timezone, tzinfo
+from functools import cache
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 import discord
+
+from config import config
+
+logger = logging.getLogger(__name__)
 
 
 COUNTRY_FLAGS: dict[str, str] = {
@@ -219,3 +228,22 @@ async def get_mu_destination(guild: discord.Guild, unit: dict, thread_key: str):
         except discord.HTTPException:
             return None
     return target
+
+
+@cache
+def local_timezone() -> tzinfo:
+    """The timezone report times are shown in: config.json "timezone", an IANA name such as Europe/Bucharest,
+    so daylight saving time is applied. Falls back to UTC when unset or unknown."""
+    name = config.get("timezone")
+    if not name:
+        return timezone.utc
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        logger.warning("Unknown timezone %r in config.json, using UTC", name)
+        return timezone.utc
+
+
+def to_local(value: datetime) -> datetime:
+    """An aware datetime converted to local_timezone()."""
+    return value.astimezone(local_timezone())

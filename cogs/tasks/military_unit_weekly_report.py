@@ -19,12 +19,13 @@ from utils.api import (
     get_user_info,
     get_won_mercenary_auctions,
 )
-from utils.common import country_with_flag, get_mu_destination
+from utils.common import country_with_flag, get_mu_destination, to_local
 
 logger = logging.getLogger(__name__)
 
 MU_BATTLE_TRACKER_INTERVAL_MINUTES = 60
-# the game week (and the MU weekly damage ranking) resets on Monday 00:00 UTC, so the report runs just before
+# the game week (and the MU weekly damage ranking) resets on Monday 00:00 UTC, so the report runs just before;
+# the schedule and week boundaries stay in UTC, only the times shown are converted to config.json "timezone"
 REPORT_TIME = dt_time(hour=23, minute=30, tzinfo=timezone.utc)
 SUNDAY = 6
 # battles last at most ~1 day and are listed newest-created first, so a battle that ended this week
@@ -363,8 +364,13 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
 
         # Discord does not allow a wider embed, so the avatar goes in the author line instead of a thumbnail
         # (which takes a column from every field row) and lines in the 3-column rows stay ~22 characters
+        # the game week runs over UTC dates; its reset is shown in local time
+        next_reset = to_local(week_start + timedelta(days=7))
         embed = discord.Embed(
-            description=f"Game week **{week_start:%b %d} – {now:%b %d}** (resets Monday 00:00 UTC)",
+            description=(
+                f"Game week **{week_start:%b %d} – {now:%b %d}** "
+                f"(resets {next_reset:%A %H:%M %Z})"
+            ),
             color=discord.Color.gold(),
             timestamp=now,
         )

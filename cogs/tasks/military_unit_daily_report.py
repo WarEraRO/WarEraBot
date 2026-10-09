@@ -17,12 +17,13 @@ from utils.api import (
     get_shared_session,
     get_user_info,
 )
-from utils.common import country_with_flag
+from utils.common import country_with_flag, to_local
 from utils.computational import is_economy_build
 
 logger = logging.getLogger(__name__)
 
-# the game day and the daily missions reset at 00:00 UTC (gameConfig.getDates.nextDayAt), so the report runs just before
+# the game day and the daily missions reset at 00:00 UTC (gameConfig.getDates.nextDayAt), so the report runs just before;
+# the schedule and day boundaries stay in UTC, only the times shown are converted to config.json "timezone"
 REPORT_TIME = dt_time(hour=23, minute=30, tzinfo=timezone.utc)
 # MUs with less weekly damage than this get no report
 MIN_REPORT_DAMAGE = 5_000_000
@@ -79,12 +80,13 @@ def _truncate(text: str) -> str:
 
 
 def _hour_buckets(times: list[datetime], now: datetime | None = None) -> str:
-    """`07h ×2 · 18h ×5`, sorted by time; times not after `now` are grouped as `now`, the first hour after
-    `now`'s day is marked `tmrw`."""
+    """`07h ×2 · 18h ×5` in local time, sorted by time; times not after `now` are grouped as `now`, the first
+    hour after `now`'s local day is marked `tmrw`."""
     ready_now = sum(1 for value in times if now is not None and value <= now)
     buckets = Counter(
-        value.replace(minute=0, second=0, microsecond=0) for value in times if now is None or value > now
+        to_local(value).replace(minute=0, second=0, microsecond=0) for value in times if now is None or value > now
     )
+    now = to_local(now) if now is not None else None
     parts = [f"now ×{ready_now}"] if ready_now else []
     marked = False
     for hour, count in sorted(buckets.items()):
@@ -287,6 +289,9 @@ class MilitaryUnitDailyReportJob(commands.Cog):
         offline = [row for row in rows if row["last_seen_at"] and now - row["last_seen_at"] >= OFFLINE_AFTER]
         no_damage = [row for row in fighters if not row["weekly"] and row not in offline]
 
+        # EET or EEST for Europe/Bucharest, depending on daylight saving time
+        tz_name = to_local(now).tzname()
+
         # topics in report order; each is a list of (name, value, inline) fields that stays in one embed when it fits
         pills_text = (
             f"🔥 **{len(buffed)}** buffed now\n"
@@ -303,15 +308,15 @@ class MilitaryUnitDailyReportJob(commands.Cog):
                 False,
             ))
         if pilled_today:
-            pills.append(("🕒 Pill times today (UTC)", _hour_buckets([row["pill"]["pilled_at"] for row in pilled_today]), True))
+            pills.append((f"🕒 Pill times today ({tz_name})", _hour_buckets([row["pill"]["pilled_at"] for row in pilled_today]), True))
         if fighters:
-            pills.append(("📅 Next pill ready (UTC)", _hour_buckets([row["pill"]["ready_at"] for row in fighters], now), True))
+            pills.append((f"📅 Next pill ready ({tz_name})", _hour_buckets([row["pill"]["ready_at"] for row in fighters], now), True))
 
         orders_and_skills = [("📌 MU orders now", self._orders_text(orders, battles, country_names), False)]
         if reskilled:
             lines = [
                 f"{row['name']} → {'Economy' if row['economy'] else 'Fight'} · "
-                f"next reset {row['last_reset_at'] + settings['reset_cooldown']:%b %d %H:%M}"
+                f"next reset {to_local(row['last_reset_at'] + settings['reset_cooldown']):%b %d %H:%M}"
                 for row in reskilled
             ]
             orders_and_skills.append((f"🔄 Skill resets, last 24h ({len(reskilled)})", self._name_list(lines, separator="\n"), False))
@@ -334,7 +339,12 @@ class MilitaryUnitDailyReportJob(commands.Cog):
             readiness.append((f"💤 Quiet ({len(quiet)})", self._name_list(quiet), False))
 
         days = (now - _week_start(now)).days + 1
-        description = f"Game day **{now:%a %b %d}** · resets 00:00 UTC\n⚔️ Week **{_fmt_short(weekly_damage)}**"
+        # the game day is the UTC date; its reset is shown in local time
+        next_reset = to_local(day_start + timedelta(days=1))
+        description = (
+            f"Game day **{now:%a %b %d}** · resets {next_reset:%H:%M} {tz_name}\n"
+            f"⚔️ Week **{_fmt_short(weekly_damage)}**"
+        )
         if weekly.get("rank"):
             description += f" · rank #{weekly['rank']}"
         description += (
@@ -468,11 +478,12 @@ class MilitaryUnitDailyReportJob(commands.Cog):
             needed = math.ceil(len(ready) * SHARED_WINDOW_PERCENT / 100)
             ready_at = ready[needed - 1]
             if ready_at > now:
+                ready_at = to_local(ready_at)
                 start = ready_at.replace(minute=0, second=0, microsecond=0)
                 if start < ready_at:
                     start += timedelta(hours=1)
                 tips.append(
-                    f"{needed}/{len(ready)} fighters can pill by {start:%H}:00 UTC; "
+                    f"{needed}/{len(ready)} fighters can pill by {start:%H}:00 {start.tzname()}; "
                     "agree on a shared pill time from then."
                 )
             spread = {row["pill"]["pilled_at"].hour for row in pilled_today}
@@ -481,7 +492,7 @@ class MilitaryUnitDailyReportJob(commands.Cog):
         to_economy = [row for row in reskilled if row["economy"]]
         if to_economy:
             back_at = min(row["last_reset_at"] for row in to_economy) + settings["reset_cooldown"]
-            tips.append(f"{len(to_economy)} member(s) reset to economy; they can't reset back to fight before {back_at:%b %d}.")
+            tips.append(f"{len(to_economy)} member(s) reset to economy; they can't reset back to fight before {to_local(back_at):%b %d}.")
         if no_help:
             tips.append(f"{len(no_help)} fighter(s) asked for no MU help today; that's free health, best used while pilled.")
         return tips
