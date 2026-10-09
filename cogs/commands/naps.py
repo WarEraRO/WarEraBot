@@ -9,6 +9,7 @@ from discord.ext import commands
 from config import config
 from utils import db
 from utils.api import get_all_countries, get_shared_session
+from utils.i18n import get_translator
 
 
 class NAPs(commands.Cog):
@@ -118,9 +119,10 @@ class NAPs(commands.Cog):
         country_a: str,
         country_b: str,
     ):
+        tr = await get_translator(interaction.guild_id)
         if not self._member_has_government(interaction.user):
             await interaction.response.send_message(
-                "You are not authorized to use this command.",
+                tr("common.not_authorized"),
                 ephemeral=True,
             )
             return
@@ -130,13 +132,13 @@ class NAPs(commands.Cog):
         second = await self._find_country(country_b)
 
         if not first:
-            await interaction.followup.send(f"Country '{country_a}' was not found.")
+            await interaction.followup.send(tr("naps.country_not_found", country=country_a))
             return
         if not second:
-            await interaction.followup.send(f"Country '{country_b}' was not found.")
+            await interaction.followup.send(tr("naps.country_not_found", country=country_b))
             return
         if first.get("_id") == second.get("_id"):
-            await interaction.followup.send("A NAP needs two different countries.")
+            await interaction.followup.send(tr("naps.same_country"))
             return
 
         created_at = interaction.created_at.date().isoformat()
@@ -145,12 +147,12 @@ class NAPs(commands.Cog):
         second_name = second.get("name")
         if not added:
             await interaction.followup.send(
-                f"A NAP between {first_name} and {second_name} already exists."
+                tr("naps.already_exists", first=first_name, second=second_name)
             )
             return
 
         self._refresh_nap_monitor_cache()
-        await interaction.followup.send(f"Added NAP: {first_name} - {second_name}.")
+        await interaction.followup.send(tr("naps.added", first=first_name, second=second_name))
 
     @nap.command(name="remove", description="Remove a non-aggression pact.")
     @app_commands.describe(country_a="First country", country_b="Second country")
@@ -160,9 +162,10 @@ class NAPs(commands.Cog):
         country_a: str,
         country_b: str,
     ):
+        tr = await get_translator(interaction.guild_id)
         if not self._member_has_government(interaction.user):
             await interaction.response.send_message(
-                "You are not authorized to use this command.",
+                tr("common.not_authorized"),
                 ephemeral=True,
             )
             return
@@ -172,33 +175,34 @@ class NAPs(commands.Cog):
         second = await self._find_country(country_b)
 
         if not first or not second:
-            await interaction.followup.send("One or both countries were not found.")
+            await interaction.followup.send(tr("naps.countries_not_found"))
             return
 
         removed = db.remove_nap(first["_id"], second["_id"])
         if not removed:
             await interaction.followup.send(
-                f"No NAP exists between {first['name']} and {second['name']}."
+                tr("naps.not_exists", first=first["name"], second=second["name"])
             )
             return
 
         self._remove_from_nap_monitor_cache(first["_id"], second["_id"])
-        await interaction.followup.send(f"Removed NAP: {first['name']} - {second['name']}.")
+        await interaction.followup.send(tr("naps.removed", first=first["name"], second=second["name"]))
 
     @nap.command(name="list", description="List configured non-aggression pacts.")
     async def list_naps(self, interaction: discord.Interaction):
+        tr = await get_translator(interaction.guild_id)
         if not self._member_has_government(interaction.user):
             await interaction.response.send_message(
-                "You are not authorized to use this command.",
+                tr("common.not_authorized"),
                 ephemeral=True,
             )
             return
 
         await interaction.response.defer(ephemeral=True)
         naps = db.get_all_naps()
-        embed = discord.Embed(title="Configured NAPs", color=discord.Color.blue())
+        embed = discord.Embed(title=tr("naps.list_title"), color=discord.Color.blue())
         if not naps:
-            embed.description = "No NAPs configured."
+            embed.description = tr("naps.list_empty")
         else:
             lines = []
             for index, nap in enumerate(naps, start=1):

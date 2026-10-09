@@ -14,6 +14,7 @@ from utils.api import (
     get_user_info,
     get_user_transactions,
 )
+from utils.i18n import Translator, get_translator
 
 
 logger = logging.getLogger(__name__)
@@ -122,31 +123,27 @@ def _build_embed(
     donors: list[tuple[dict, float]],
     start: datetime,
     end: datetime,
+    tr: Translator,
 ) -> discord.Embed:
     embed = discord.Embed(
-        title=f"Weekly Player Donations - {country_name}",
+        title=tr("weekly_donations.title", country=country_name),
         color=discord.Color.gold(),
     )
 
     if not donors:
-        embed.description = "*No player donations found for this country this week.*"
+        embed.description = tr("weekly_donations.none_found")
     else:
         lines = []
         for position, (user, total) in enumerate(donors, start=1):
             user_id = user.get("_id") or user.get("userId") or user.get("id")
-            username = user.get("username") or f"Unknown user ({user_id})"
+            username = user.get("username") or tr("common.unknown_user", id=user_id)
             lines.append(
                 f"**{position}. [{username}](https://app.warera.io/user/{user_id})**"
-                f" - {_format_money(float(total))} money"
+                " - " + tr("weekly_donations.money", amount=_format_money(float(total)))
             )
         embed.description = "\n".join(lines)
 
-    embed.set_footer(
-        text=(
-            f"{start:%Y-%m-%d} to {end:%Y-%m-%d} UTC"
-            " | Top 10"
-        )
-    )
+    embed.set_footer(text=tr("weekly_donations.footer", start=f"{start:%Y-%m-%d}", end=f"{end:%Y-%m-%d}"))
     return embed
 
 
@@ -248,11 +245,12 @@ class TopUserWeeklyDonations(commands.Cog):
         country: str,
     ) -> None:
         await interaction.response.defer(thinking=True)
+        tr = await get_translator(interaction.guild_id)
 
         countries = await self._get_countries()
         if not countries:
             await interaction.followup.send(
-                "Could not load the country list. Please try again later.",
+                tr("common.country_list_unavailable"),
                 ephemeral=True,
             )
             return
@@ -260,7 +258,7 @@ class TopUserWeeklyDonations(commands.Cog):
         selected_country = _find_country(countries, country)
         if selected_country is None:
             await interaction.followup.send(
-                f"Country `{country}` was not found. Please select a country from autocomplete.",
+                tr("common.country_not_found_autocomplete", country=country),
                 ephemeral=True,
             )
             return
@@ -269,7 +267,7 @@ class TopUserWeeklyDonations(commands.Cog):
         users = await get_country_users(selected_country["_id"], session)
         if users is None:
             await interaction.followup.send(
-                "Could not load the country's citizens. Please try again later.",
+                tr("weekly_donations.citizens_unavailable"),
                 ephemeral=True,
             )
             return
@@ -315,6 +313,7 @@ class TopUserWeeklyDonations(commands.Cog):
             resolved_donors,
             start,
             now,
+            tr,
         )
         await interaction.followup.send(embed=embed)
 

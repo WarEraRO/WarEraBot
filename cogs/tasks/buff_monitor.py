@@ -1,6 +1,7 @@
 from discord.ext import commands, tasks
 from utils.api import get_shared_session, get_user, get_user_info
 from utils.db import init_db, find_api_id_by_display_name, find_api_id_by_discord_username, find_api_id_by_discord_id, save_user
+from utils.i18n import get_translator
 from config import config
 from datetime import datetime, timezone, timedelta
 
@@ -46,6 +47,8 @@ class BuffMonitorJob(commands.Cog):
         members = fight_role.members if fight_role else []
         seen_api_ids = set()
         session = await get_shared_session()
+        # DMs are sent in the language of the server that triggers them
+        tr = await get_translator(guild)
         for member in members:
                 api_id = None
                 try:
@@ -154,7 +157,7 @@ class BuffMonitorJob(commands.Cog):
                     # already notified for this buff end timestamp.
                     if should_notify and notified_token != buff_end_at:
                         minutes = max(1, int(remaining_seconds // 60))
-                        text = f"Hi {member.display_name}, your pill buff expires in about {minutes} minute{'s' if minutes != 1 else ''}. Please empty into a fight if possible."
+                        text = tr.plural("buff_monitor.expiring", minutes, name=member.display_name)
                         try:
                             await member.send(text)
                         except Exception:

@@ -14,16 +14,14 @@ from utils.api import (
     get_country,
     get_regions_object,
 )
+from utils.i18n import Translator, get_translator
 
 
 logger = logging.getLogger(__name__)
 
 COUNTRY_CACHE_TTL = 300.0
-UPKEEP_UPGRADES = {
-    "bunker": "Bunker",
-    "base": "Military Base",
-    "pacificationCenter": "Pacification Center",
-}
+# upgrade keys with a daily oil upkeep; display names are region_upkeep.upgrades.<key>
+UPKEEP_UPGRADES = ("bunker", "base", "pacificationCenter")
 UPKEEP_PCTS = {
     "bunker": {1: 0.04, 2: 0.08, 3: 0.16, 4: 0.32, 5: 0.64},
     "base": {1: 0.04, 2: 0.08, 3: 0.16, 4: 0.32, 5: 0.64},
@@ -63,9 +61,9 @@ def _format_number(value: float, suffix: str = "") -> str:
     return f"{value:,.2f}{suffix}"
 
 
-def _format_money(value: float | None) -> str:
+def _format_money(value: float | None, tr: Translator) -> str:
     if value is None:
-        return "Unavailable"
+        return tr("region_upkeep.unavailable")
     return _format_number(value)
 
 def _number_or_none(value: object) -> float | None:
@@ -131,12 +129,14 @@ def _iter_country_regions(regions_object: dict, country_id: str) -> list[dict]:
 def _region_active_upkeep(
     region: dict,
     average_development: float,
+    tr: Translator,
 ) -> list[tuple[str, int, float]]:
     upgrades = (
         region.get("activeUpgradeLevels") or {}
     )
     active = []
-    for upgrade_key, display_name in UPKEEP_UPGRADES.items():
+    for upgrade_key in UPKEEP_UPGRADES:
+        display_name = tr(f"region_upkeep.upgrades.{upgrade_key}")
         try:
             level = int(upgrades.get(upgrade_key, 0))
         except (TypeError, ValueError):
@@ -158,35 +158,39 @@ def _build_embed(
     region_count: int,
     active_entries: list[tuple[str, str, int, float]],
     oil_price: float | None,
+    tr: Translator,
 ) -> discord.Embed:
     total_oil = sum(entry[3] for entry in active_entries)
     total_cost = total_oil * oil_price if oil_price is not None else None
+    oil_suffix = " " + tr("region_upkeep.oil_unit")
 
     embed = discord.Embed(
-        title=f"Region Upgrade Upkeep - {country_name}",
+        title=tr("region_upkeep.title", country=country_name),
         color=discord.Color.dark_gold(),
     )
     embed.add_field(
-        name="Summary",
-        value=(
-            f"Regions held: **{region_count:,}**\n"
-            f"Average development: **{_format_number(average_development)}**\n"
-            f"Active paid upgrades: **{len(active_entries):,}**"
+        name=tr("region_upkeep.summary"),
+        value=tr(
+            "region_upkeep.summary_value",
+            regions=f"{region_count:,}",
+            development=_format_number(average_development),
+            upgrades=f"{len(active_entries):,}",
         ),
         inline=False,
     )
     embed.add_field(
-        name="Oil",
-        value=(
-            f"Daily oil upkeep: **{_format_number(total_oil, ' oil')}**\n"
-            f"Market oil price: **{_format_money(oil_price)}**\n"
-            f"Daily market cost: **{_format_money(total_cost)}**"
+        name=tr("region_upkeep.oil"),
+        value=tr(
+            "region_upkeep.oil_value",
+            upkeep=_format_number(total_oil, oil_suffix),
+            price=_format_money(oil_price, tr),
+            cost=_format_money(total_cost, tr),
         ),
         inline=False,
     )
 
     if not active_entries:
-        embed.description = "*No active bunkers, military bases, or pacification centers found.*"
+        embed.description = tr("region_upkeep.none_active")
         return embed
 
     field_lines = []
@@ -194,9 +198,12 @@ def _build_embed(
     lines = []
     hidden_count = 0
     for region_name, upgrade_name, level, oil_amount in active_entries:
-        line = (
-            f"**{region_name}** - {upgrade_name} lvl {level}: "
-            f"{_format_number(oil_amount, ' oil')}"
+        line = tr(
+            "region_upkeep.upgrade_line",
+            region=region_name,
+            upgrade=upgrade_name,
+            level=level,
+            oil=_format_number(oil_amount, oil_suffix),
         )
         extra_chars = len(line) + (1 if field_lines else 0)
         if used_chars + extra_chars > 950:
@@ -206,14 +213,14 @@ def _build_embed(
         used_chars += extra_chars
 
     if hidden_count:
-        lines.append(f"...and {hidden_count:,} more active upgrades.")
+        lines.append(tr("region_upkeep.more_upgrades", count=f"{hidden_count:,}"))
 
     embed.add_field(
-        name="Active Upgrades",
+        name=tr("region_upkeep.active_upgrades"),
         value="\n".join(field_lines + lines),
         inline=False,
     )
-    embed.set_footer(text="Daily upkeep estimate uses active upgrades only.")
+    embed.set_footer(text=tr("region_upkeep.footer"))
     return embed
 
 
@@ -285,11 +292,12 @@ class GetRegionUpgradeCost(commands.Cog):
         country: str,
     ) -> None:
         await interaction.response.defer(thinking=True)
+        tr = await get_translator(interaction.guild_id)
 
         countries = await self._get_countries()
         if not countries:
             await interaction.followup.send(
-                "Could not load the country list. Please try again later.",
+                tr("common.country_list_unavailable"),
                 ephemeral=True,
             )
             return
@@ -297,7 +305,7 @@ class GetRegionUpgradeCost(commands.Cog):
         selected_country = _find_country(countries, country)
         if selected_country is None:
             await interaction.followup.send(
-                f"Country `{country}` was not found. Please select a country from autocomplete.",
+                tr("common.country_not_found_autocomplete", country=country),
                 ephemeral=True,
             )
             return
@@ -312,13 +320,13 @@ class GetRegionUpgradeCost(commands.Cog):
 
         if not regions_object:
             await interaction.followup.send(
-                "Could not load region data. Please try again later.",
+                tr("region_upkeep.regions_unavailable"),
                 ephemeral=True,
             )
             return
         if not country_info:
             await interaction.followup.send(
-                "Could not load country development data. Please try again later.",
+                tr("region_upkeep.development_unavailable"),
                 ephemeral=True,
             )
             return
@@ -327,7 +335,7 @@ class GetRegionUpgradeCost(commands.Cog):
             average_development = float(country_info.get("averageDevelopment"))
         except (TypeError, ValueError):
             await interaction.followup.send(
-                "Country average development is unavailable.",
+                tr("region_upkeep.average_unavailable"),
                 ephemeral=True,
             )
             return
@@ -335,10 +343,11 @@ class GetRegionUpgradeCost(commands.Cog):
         regions = _iter_country_regions(regions_object, country_id)
         active_entries = []
         for region in regions:
-            region_name = str(region.get("name") or region.get("_id") or "Unknown region")
+            region_name = str(region.get("name") or region.get("_id") or tr("region_upkeep.unknown_region"))
             for upgrade_name, level, oil_amount in _region_active_upkeep(
                 region,
                 average_development,
+                tr,
             ):
                 active_entries.append((region_name, upgrade_name, level, oil_amount))
 
@@ -349,6 +358,7 @@ class GetRegionUpgradeCost(commands.Cog):
             len(regions),
             active_entries,
             oil_price,
+            tr,
         )
         await interaction.followup.send(embed=embed)
 

@@ -5,6 +5,7 @@ from discord.ext import commands
 
 from config import config
 from utils.api import get_all_countries, get_country_users, get_shared_session, get_user_info
+from utils.i18n import Translator, get_translator
 
 
 COUNTRY_NAME = "Romania"
@@ -32,16 +33,16 @@ def _find_country(countries: list[dict], name: str) -> dict | None:
     return None
 
 
-def _build_pages(users: list[dict], discord_count: int, country_total: int) -> list[discord.Embed]:
-    title = f"{COUNTRY_NAME} Users Not In Discord"
+def _build_pages(users: list[dict], discord_count: int, country_total: int, tr: Translator) -> list[discord.Embed]:
+    title = tr("discordless.title", country=COUNTRY_NAME)
     if not users:
         embed = discord.Embed(
             title=title,
-            description="*All Romania citizens were found in Discord.*",
+            description=tr("discordless.all_found", country=COUNTRY_NAME),
             color=discord.Color.green(),
         )
         embed.set_footer(
-            text=f"Page 1 of 1 - Missing: 0 - Discord checked: {discord_count} - Country users: {country_total}"
+            text=tr("discordless.footer", page=1, pages=1, missing=0, checked=discord_count, country_total=country_total)
         )
         return [embed]
 
@@ -53,12 +54,10 @@ def _build_pages(users: list[dict], discord_count: int, country_total: int) -> l
         chunk = users[i : i + PAGE_SIZE]
         lines = []
         for user in chunk:
-            username = _username(user)
+            username = str(user.get("username") or user.get("name") or tr("common.unknown_title"))
             user_id = _user_id(user)
-            if user_id:
-                lines.append(f"- [{username}](https://app.warera.io/user/{user_id}) - Level: {user['leveling']['level']}")
-            else:
-                lines.append(f"- {username} - Level: {user['leveling']['level']}")
+            name = f"[{username}](https://app.warera.io/user/{user_id})" if user_id else username
+            lines.append(tr("discordless.line", name=name, level=user['leveling']['level']))
 
         embed = discord.Embed(
             title=title,
@@ -66,9 +65,13 @@ def _build_pages(users: list[dict], discord_count: int, country_total: int) -> l
             color=discord.Color.orange(),
         )
         embed.set_footer(
-            text=(
-                f"Page {i // PAGE_SIZE + 1} of {total_pages} - Missing: {total} - "
-                f"Discord checked: {discord_count} - Country users: {country_total}"
+            text=tr(
+                "discordless.footer",
+                page=i // PAGE_SIZE + 1,
+                pages=total_pages,
+                missing=total,
+                checked=discord_count,
+                country_total=country_total,
             )
         )
         pages.append(embed)
@@ -77,11 +80,13 @@ def _build_pages(users: list[dict], discord_count: int, country_total: int) -> l
 
 
 class _Paginator(discord.ui.View):
-    def __init__(self, pages: list[discord.Embed], timeout: int = 180):
+    def __init__(self, pages: list[discord.Embed], tr: Translator, timeout: int = 180):
         super().__init__(timeout=timeout)
         self.pages = pages
         self.current = 0
         self.message: discord.Message | None = None
+        self.prev_btn.label = tr("common.prev_plain")
+        self.next_btn.label = tr("common.next_plain")
         self._sync()
 
     def _sync(self) -> None:
@@ -140,10 +145,11 @@ class Discordless(commands.Cog):
     )
     async def discorless(self, interaction: discord.Interaction):
         await interaction.response.defer(thinking=True)
+        tr = await get_translator(interaction.guild_id)
 
         guild = interaction.guild or self.bot.get_guild(config["guild"])
         if guild is None:
-            await interaction.followup.send("Guild not found.", ephemeral=True)
+            await interaction.followup.send(tr("common.guild_not_found"), ephemeral=True)
             return
 
         citizen_role = guild.get_role(config["roles"].get("citizen"))
@@ -165,7 +171,7 @@ class Discordless(commands.Cog):
         countries = await get_all_countries(session)
         if not countries:
             await interaction.followup.send(
-                "Could not load the country list. Please try again later.",
+                tr("common.country_list_unavailable"),
                 ephemeral=True,
             )
             return
@@ -173,7 +179,7 @@ class Discordless(commands.Cog):
         country = _find_country(countries, COUNTRY_NAME)
         if country is None:
             await interaction.followup.send(
-                f"Could not find `{COUNTRY_NAME}` in the WarEra country list.",
+                tr("discordless.country_missing", country=COUNTRY_NAME),
                 ephemeral=True,
             )
             return
@@ -181,7 +187,7 @@ class Discordless(commands.Cog):
         user_refs = await get_country_users(country["_id"], session)
         if user_refs is None:
             await interaction.followup.send(
-                f"Could not load {COUNTRY_NAME} users. Please try again later.",
+                tr("discordless.users_unavailable", country=COUNTRY_NAME),
                 ephemeral=True,
             )
             return
@@ -202,11 +208,11 @@ class Discordless(commands.Cog):
         ]
         missing.sort(key=lambda user: _normalize_name(_username(user)))
 
-        pages = _build_pages(missing, len(discord_names), len(user_refs))
+        pages = _build_pages(missing, len(discord_names), len(user_refs), tr)
         if len(pages) == 1:
             await interaction.followup.send(embed=pages[0])
         else:
-            view = _Paginator(pages)
+            view = _Paginator(pages, tr)
             msg = await interaction.followup.send(embed=pages[0], view=view, wait=True)
             view.message = msg
 

@@ -3,162 +3,48 @@ from discord import app_commands
 from discord.ext import commands
 from typing import List
 
+from utils.i18n import Translator, get_translator
+
 # ---------------------------------------------------------------------------
-# Static data: (field_name, field_value) for each entry
+# Static data: help.commands.<id> and help.jobs.<id> in the locale files hold
+# the field name ("name") and field value ("desc") of each entry, in this order
 # ---------------------------------------------------------------------------
 
-_COMMANDS_DATA: List[tuple[str, str]] = [
-    (
-        "/diplomacy [country_name]",
-        "Show diplomacy info for countries. If `country_name` is provided, shows details for that country; "
-        "otherwise shows a paginated list of countries with diplomacy records (3 per page). Government-only fields "
-        "(diplomacy list) are shown when you have the government role.",
-    ),
-    (
-        "/update_diplomacy country_name [status] [diplomacy] [description]",
-        "Government-only. Update an existing diplomacy record: set `status`, append a `diplomacy` entry, or update "
-        "`description`. New diplomacy entries are automatically dated. Status must be one of the predefined options "
-        "and autocomplete is available.",
-    ),
-    (
-        "/add_diplomacy country_name [status] [description]",
-        "Government-only. Create a new diplomacy record for a country. If a record already exists, use `/update_diplomacy`.",
-    ),
-    (
-        "/remove_diplomacy country_name position",
-        "Government-only. Remove the diplomacy list entry at the provided 1-based `position`.",
-    ),
-    (
-        "/delete_diplomacy country_name",
-        "Government-only. Delete the diplomacy record for the specified country.",
-    ),
-    (
-        "/nap add country_a country_b | /nap remove country_a country_b | /nap list",
-        "Government-only. Manage the internal NAP list used by the hourly battle monitor. Country fields support "
-        "autocomplete from the current WarEra country list.",
-    ),
-    (
-        "/priority list | /priority refresh | /priority add link description | /priority set entry_number description | /priority move entry_number_a entry_number_b | /priority remove entry_number",
-        "Manage battle order priorities from the battle order monitor cache. `list` shows active priorities with "
-        "descriptions; government-only actions can refresh Romania order checks, add an active battle manually, "
-        "set order descriptions, swap priorities, or remove a priority so it is not auto-added again unless manually added.",
-    ),
-    (
-        "/fightstatus [military_unit]",
-        "Fetch fight status for fighters. Without `military_unit`, operates on members with the configured 'fight' role; "
-        "with `military_unit` fetches members of that unit. Results are paginated (10 per page) and include "
-        "buff/debuff status, health/hunger, level, and online state. Filters for Buffed/Neutral/Debuffed available.",
-    ),
-    (
-        "/country_strays",
-        "List players whose in-game citizenship is not in the configured allowed countries. Results are paginated.",
-    ),
-    (
-        "/discorless",
-        "List Romania citizens from WarEra who are not present in Discord with the Citizen or Newbie role. "
-        "Results are matched against server display names and paginated.",
-    ),
-    (
-        "/inactive_players",
-        "List players who have been inactive for more than 3 days. Results are paginated.",
-    ),
-    (
-        "/mu_stray",
-        "List MU strays categorised as Wrong MU, No MU, or Inactive Strays. "
-        "Filter buttons on the result view switch between categories.",
-    ),
-    (
-        "/pills military_unit",
-        "Pill status of a configured military unit (autocomplete): who is pilled, grouped by the hour they pilled, "
-        "who is in debuff, grouped by the hour it ends (both with time left), and fighters not pilled. "
-        "Hours are shown in the configured timezone.",
-    ),
-    (
-        "/promotions",
-        "Check newbie members for promotion eligibility. Shows Promotion Candidates, Fight Issues, Inactive, "
-        "and Data Issues — filter buttons on the result view switch between categories.",
-    ),
-    (
-        "/top_user_weekly_damages country",
-        "Show the top 10 weekly damage dealers from one or more selected countries. Separate multiple countries "
-        "with commas; results are grouped by player level bracket and include each player's country.",
-    ),
-    (
-        "/top_user_weekly_donations country",
-        "Show the top 10 citizens by money donated since Monday at 00:00 UTC. The required country field supports "
-        "autocomplete using the current country list from WarEra.",
-    ),
-    (
-        "/get_region_upgrade_cost country",
-        "Calculate daily oil upkeep and market cost for active bunkers, military bases, and pacification centers "
-        "in regions held by the selected country. The required country field supports autocomplete.",
-    ),
-    (
-        "/run_job job_name",
-        "Developer-only. Force a background job to run once now, without waiting for or changing its loop timer. "
-        "Refused while the job is already running; a scheduled run due during a forced run is skipped. "
-        "The job field supports autocomplete.",
-    ),
+_COMMAND_IDS: List[str] = [
+    "diplomacy",
+    "update_diplomacy",
+    "add_diplomacy",
+    "remove_diplomacy",
+    "delete_diplomacy",
+    "nap",
+    "priority",
+    "fightstatus",
+    "country_strays",
+    "discorless",
+    "inactive_players",
+    "mu_stray",
+    "pills",
+    "promotions",
+    "top_user_weekly_damages",
+    "top_user_weekly_donations",
+    "get_region_upgrade_cost",
+    "run_job",
+    "setlang",
 ]
 
-_JOBS_DATA: List[tuple[str, str]] = [
-    (
-        "skill_roles — every 1 hour",
-        "Scans server members with the Citizen role and assigns/removes Economy or Fighter roles based on their "
-        "in-game skill distribution. Sends a summary to the reports channel when changes occur.",
-    ),
-    (
-        "military_unit_roles — every 3 hours",
-        "Assigns Military Unit roles to members based on their in-game MU membership and removes conflicting MU roles. "
-        "Sends a summary to the reports channel when changes occur.",
-    ),
-    (
-        "commander_roles — every 3 hours",
-        "Syncs the Discord commander role with the commanders configured across all military units.",
-    ),
-    (
-        "unidentified_members — every 6 hours",
-        "Checks Citizen/Newbie members to see if their nickname maps to a known game user. Records mappings when "
-        "found and reports unidentified players to the reports channel.",
-    ),
-    (
-        "takeover_countries — every 5 minutes",
-        "Scans countries and reports those that appear empty (no government/congress members), posting takeover "
-        "opportunities to the public channel.",
-    ),
-    (
-        "buff_monitor — every 10 minutes",
-        "Monitors fighter buffs and notifies users when their active pill buff is nearing expiration "
-        "(uses an internal cache to avoid repeated notifications).",
-    ),
-    (
-        "bounty_monitor — configurable interval",
-        "Checks active battles for money pools/bounties and posts a summary to the public channel when relevant "
-        "(interval set by `BOUNTY_MONITOR_INTERVAL_MINUTES` in config).",
-    ),
-    (
-        "mercenary_contracts — every 1 minute",
-        "Checks active mercenary contract auctions and posts new or updated contracts to the public channel.",
-    ),
-    (
-        "mu_contract_monitor — every 5 minutes",
-        "Posts an embed in a military unit's contracts thread (threadIds.contractsId) or channel when that MU wins a "
-        "mercenary contract: battle, minimum damage, pay per 1k damage, total payout, estimated time left and score.",
-    ),
-    (
-        "monitor_nap - every 1 hour",
-        "Checks active battle country orders and MU-order nationalities against configured NAPs, then reports "
-        "new violations to the reports channel.",
-    ),
-    (
-        "battle-order_monitor - every 5 minutes",
-        "Checks active battles for Romania country orders, adds new matches to the battle order priority cache, "
-        "posts alerts in the battle-orders channel, and removes priorities for battles that ended.",
-    ),
-    (
-        "reddit_monitor - every 5 minutes",
-        "Checks r/RomaniaWarEra for posts from the last 24 hours and reports newly seen posts to the reports channel.",
-    ),
+_JOB_IDS: List[str] = [
+    "skill_roles",
+    "military_unit_roles",
+    "commander_roles",
+    "unidentified_members",
+    "takeover_countries",
+    "buff_monitor",
+    "bounty_monitor",
+    "mercenary_contracts",
+    "mu_contract_monitor",
+    "monitor_nap",
+    "battle_order_monitor",
+    "reddit_monitor",
 ]
 
 _COMMANDS_PER_PAGE = 3
@@ -169,32 +55,32 @@ _JOBS_PER_PAGE = 4
 # Page builders
 # ---------------------------------------------------------------------------
 
-def _build_command_pages() -> List[discord.Embed]:
+def _build_command_pages(tr: Translator) -> List[discord.Embed]:
     pages: List[discord.Embed] = []
-    total = len(_COMMANDS_DATA)
+    total = len(_COMMAND_IDS)
     total_pages = max(1, (total - 1) // _COMMANDS_PER_PAGE + 1)
     for i in range(0, total, _COMMANDS_PER_PAGE):
-        chunk = _COMMANDS_DATA[i : i + _COMMANDS_PER_PAGE]
-        embed = discord.Embed(title="Bot Commands", color=discord.Color.blurple())
-        embed.description = "Use the slash commands below. Autocomplete is available where applicable."
-        for name, desc in chunk:
-            embed.add_field(name=name, value=desc, inline=False)
-        embed.set_footer(text=f"Commands — Page {i // _COMMANDS_PER_PAGE + 1} of {total_pages}")
+        chunk = _COMMAND_IDS[i : i + _COMMANDS_PER_PAGE]
+        embed = discord.Embed(title=tr("help.commands_title"), color=discord.Color.blurple())
+        embed.description = tr("help.commands_description")
+        for command_id in chunk:
+            embed.add_field(name=tr(f"help.commands.{command_id}.name"), value=tr(f"help.commands.{command_id}.desc"), inline=False)
+        embed.set_footer(text=tr("help.commands_footer", page=i // _COMMANDS_PER_PAGE + 1, pages=total_pages))
         pages.append(embed)
     return pages
 
 
-def _build_job_pages() -> List[discord.Embed]:
+def _build_job_pages(tr: Translator) -> List[discord.Embed]:
     pages: List[discord.Embed] = []
-    total = len(_JOBS_DATA)
+    total = len(_JOB_IDS)
     total_pages = max(1, (total - 1) // _JOBS_PER_PAGE + 1)
     for i in range(0, total, _JOBS_PER_PAGE):
-        chunk = _JOBS_DATA[i : i + _JOBS_PER_PAGE]
-        embed = discord.Embed(title="Background Jobs / Tasks", color=discord.Color.dark_gold())
-        embed.description = "Active background tasks and how often they run."
-        for name, desc in chunk:
-            embed.add_field(name=name, value=desc, inline=False)
-        embed.set_footer(text=f"Jobs — Page {i // _JOBS_PER_PAGE + 1} of {total_pages}")
+        chunk = _JOB_IDS[i : i + _JOBS_PER_PAGE]
+        embed = discord.Embed(title=tr("help.jobs_title"), color=discord.Color.dark_gold())
+        embed.description = tr("help.jobs_description")
+        for job_id in chunk:
+            embed.add_field(name=tr(f"help.jobs.{job_id}.name"), value=tr(f"help.jobs.{job_id}.desc"), inline=False)
+        embed.set_footer(text=tr("help.jobs_footer", page=i // _JOBS_PER_PAGE + 1, pages=total_pages))
         pages.append(embed)
     return pages
 
@@ -204,13 +90,17 @@ def _build_job_pages() -> List[discord.Embed]:
 # ---------------------------------------------------------------------------
 
 class _HelpPaginator(discord.ui.View):
-    def __init__(self, timeout: float = 180.0):
+    def __init__(self, tr: Translator, timeout: float = 180.0):
         super().__init__(timeout=timeout)
-        self._commands_pages = _build_command_pages()
-        self._jobs_pages = _build_job_pages()
+        self._commands_pages = _build_command_pages(tr)
+        self._jobs_pages = _build_job_pages(tr)
         self.active_section: str = "commands"  # "commands" | "jobs"
         self.page_index: dict[str, int] = {"commands": 0, "jobs": 0}
         self.message: discord.Message | None = None
+        self.prev_btn.label = tr("common.prev")
+        self.next_btn.label = tr("common.next")
+        self.btn_commands.label = tr("help.commands_button")
+        self.btn_jobs.label = tr("help.jobs_button")
         self._sync()
 
     # ------------------------------------------------------------------ helpers
@@ -291,7 +181,8 @@ class Help(commands.Cog):
     @app_commands.command(name="help", description="Show bot commands and background jobs (paginated).")
     async def help(self, interaction: discord.Interaction):
         await interaction.response.defer()
-        view = _HelpPaginator()
+        tr = await get_translator(interaction.guild_id)
+        view = _HelpPaginator(tr)
         embed = view._current_pages[view._current_page]
         try:
             msg = await interaction.followup.send(embed=embed, view=view, wait=True)
@@ -302,7 +193,7 @@ class Help(commands.Cog):
                 msg = await channel.send(embed=embed, view=view)
                 view.message = msg
             else:
-                await interaction.followup.send("Unable to display help at this time.")
+                await interaction.followup.send(tr("help.unavailable"))
 
 
 async def setup(bot: commands.Bot):

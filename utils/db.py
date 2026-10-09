@@ -73,6 +73,14 @@ def init_db() -> None:
         )
         cur.execute("CREATE INDEX IF NOT EXISTS idx_naps_country_a_id ON naps(country_a_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_naps_country_b_id ON naps(country_b_id)")
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS guild_settings (
+                guild_id TEXT PRIMARY KEY,
+                language TEXT
+            )
+            """
+        )
         conn.commit()
 
 
@@ -366,3 +374,31 @@ def remove_nap(country_a_id: str, country_b_id: str) -> bool:
         deleted = cur.rowcount
         conn.commit()
         return deleted > 0
+
+
+def get_guild_language(guild_id: int | str) -> Optional[str]:
+    """The language code saved for a guild with /setlang, or None when none was saved."""
+    if _USE_DYNAMO:
+        return dynamo.get_guild_language(guild_id)
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT language FROM guild_settings WHERE guild_id = ? LIMIT 1", (str(guild_id),))
+        row = cur.fetchone()
+        return row['language'] if row else None
+
+
+def set_guild_language(guild_id: int | str, language: str) -> None:
+    """Insert or update a guild's language code."""
+    if _USE_DYNAMO:
+        return dynamo.set_guild_language(guild_id, language)
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO guild_settings (guild_id, language)
+            VALUES (?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET language=excluded.language
+            """,
+            (str(guild_id), language),
+        )
+        conn.commit()

@@ -4,13 +4,15 @@ from discord.ext import commands
 from datetime import datetime, timezone
 from config import config
 from utils.api import get_user, get_shared_session
+from utils.i18n import Translator, get_translator
 
 _INACTIVE_THRESHOLD_SECONDS = 3 * 24 * 3600
 
+# (key, color); labels are mu_stray.filter_<key>
 _FILTERS = [
-    ("wrong_mu",  "Wrong MU",        discord.Color.orange()),
-    ("no_mu",     "No MU",           discord.Color.red()),
-    ("inactive",  "Inactive Strays", discord.Color.dark_grey()),
+    ("wrong_mu",  discord.Color.orange()),
+    ("no_mu",     discord.Color.red()),
+    ("inactive",  discord.Color.dark_grey()),
 ]
 _PAGE_SIZE = 15
 
@@ -27,10 +29,10 @@ def _is_inactive(user: dict) -> bool:
         return False
 
 
-def _build_pages(names: list[str], title: str, color: discord.Color) -> list[discord.Embed]:
+def _build_pages(names: list[str], title: str, color: discord.Color, tr: Translator) -> list[discord.Embed]:
     if not names:
-        embed = discord.Embed(title=title, description="*No players in this category.*", color=color)
-        embed.set_footer(text="Page 1 of 1 — Total: 0")
+        embed = discord.Embed(title=title, description=tr("mu_stray.empty_category"), color=color)
+        embed.set_footer(text=tr("common.page_total", page=1, pages=1, total=0))
         return [embed]
     total = len(names)
     total_pages = max(1, (total - 1) // _PAGE_SIZE + 1)
@@ -39,22 +41,27 @@ def _build_pages(names: list[str], title: str, color: discord.Color) -> list[dis
         chunk = names[i : i + _PAGE_SIZE]
         embed = discord.Embed(title=title, color=color)
         embed.description = "\n".join(f"• {n}" for n in chunk)
-        embed.set_footer(text=f"Page {i // _PAGE_SIZE + 1} of {total_pages} — Total: {total}")
+        embed.set_footer(text=tr("common.page_total", page=i // _PAGE_SIZE + 1, pages=total_pages, total=total))
         pages.append(embed)
     return pages
 
 
 class _StrayView(discord.ui.View):
-    def __init__(self, data: dict[str, list[str]], timeout: int = 180):
+    def __init__(self, data: dict[str, list[str]], tr: Translator, timeout: int = 180):
         super().__init__(timeout=timeout)
         self.message: discord.Message | None = None
         self.data = data                # key -> sorted list of names
         self.active_filter: str = "wrong_mu"
         self.page_index: dict[str, int] = {key: 0 for key, *_ in _FILTERS}
         self._pages: dict[str, list[discord.Embed]] = {
-            key: _build_pages(data[key], label, color)
-            for key, label, color in _FILTERS
+            key: _build_pages(data[key], tr(f"mu_stray.filter_{key}"), color, tr)
+            for key, color in _FILTERS
         }
+        self.prev_btn.label = tr("common.prev")
+        self.next_btn.label = tr("common.next")
+        self.btn_wrong_mu.label = tr("mu_stray.filter_wrong_mu")
+        self.btn_no_mu.label = tr("mu_stray.filter_no_mu")
+        self.btn_inactive.label = tr("mu_stray.filter_inactive")
         self._sync_buttons()
 
     # ------------------------------------------------------------------ helpers
@@ -139,10 +146,11 @@ class MuStray(commands.Cog):
     )
     async def mu_stray(self, interaction: discord.Interaction):
         await interaction.response.defer()
+        tr = await get_translator(interaction.guild_id)
 
         guild = interaction.guild or self.bot.get_guild(config["guild"])
         if guild is None:
-            await interaction.followup.send("Guild not found.", ephemeral=True)
+            await interaction.followup.send(tr("common.guild_not_found"), ephemeral=True)
             return
 
         citizen = guild.get_role(config["roles"]["citizen"])
@@ -187,15 +195,15 @@ class MuStray(commands.Cog):
         if not wrong_mu and not no_mu and not inactive:
             await interaction.followup.send(
                 embed=discord.Embed(
-                    title="Military Unit Strays",
-                    description="No stray players found.",
+                    title=tr("mu_stray.title"),
+                    description=tr("mu_stray.none_found"),
                     color=discord.Color.green(),
                 )
             )
             return
 
         data = {"wrong_mu": wrong_mu, "no_mu": no_mu, "inactive": inactive}
-        view = _StrayView(data)
+        view = _StrayView(data, tr)
         msg = await interaction.followup.send(
             embed=view._current_pages[0], view=view, wait=True
         )

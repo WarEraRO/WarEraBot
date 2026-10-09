@@ -12,6 +12,7 @@ from utils.api import (
     get_user_info,
     get_rankings
 )
+from utils.i18n import Translator, get_translator
 
 
 logger = logging.getLogger(__name__)
@@ -101,11 +102,11 @@ def _country_choices(
     ]
 
 
-def _format_country_title(countries: list[dict]) -> str:
+def _format_country_title(countries: list[dict], tr: Translator) -> str:
     names = [country["name"] for country in countries if country.get("name")]
     if len(names) <= 3:
         return ", ".join(names)
-    return f"{', '.join(names[:3])} + {len(names) - 3} more"
+    return tr("weekly_damages.more_countries", names=", ".join(names[:3]), count=len(names) - 3)
 
 
 def _level_from_user(user: dict | None) -> int | None:
@@ -119,8 +120,8 @@ def _level_from_user(user: dict | None) -> int | None:
     return None
 
 
-def _bracket_title(start: int, end: int) -> str:
-    return f"Level [{start}-{end})"
+def _bracket_title(start: int, end: int, tr: Translator) -> str:
+    return tr("weekly_damages.bracket_title", start=start, end=end)
 
 
 def _bracket_entries(
@@ -166,15 +167,16 @@ def _fit_field_lines(lines: list[str]) -> str:
 def _build_embeds(
     countries: list[dict],
     entries: list[tuple[dict, dict | None]],
+    tr: Translator,
 ) -> list[discord.Embed]:
-    title = f"Weekly User Damages - {_format_country_title(countries)}"
+    title = tr("weekly_damages.title", countries=_format_country_title(countries, tr))
     embed = discord.Embed(
         title=title,
         color=discord.Color.red(),
     )
 
     if not entries:
-        embed.description = "*No weekly damage entries found for the selected countries.*"
+        embed.description = tr("weekly_damages.no_entries")
         return [embed]
 
     countries_by_id = {
@@ -193,12 +195,12 @@ def _build_embeds(
         lines = []
         for position, (item, user) in enumerate(bracket_items, start=1):
             user_id = item["user"]
-            username = (user or {}).get("username") or f"Unknown user ({user_id})"
-            country_name = countries_by_id.get(item.get("country"), "Unknown country")
+            username = (user or {}).get("username") or tr("common.unknown_user", id=user_id)
+            country_name = countries_by_id.get(item.get("country"), tr("common.unknown_country"))
             damage = item.get("value") or 0
             lines.append(
                 f"**{position}. [{username}](https://app.warera.io/user/{user_id})**"
-                f" ({country_name}) - {damage:,} damage"
+                f" ({country_name}) - " + tr("weekly_damages.damage", damage=f"{damage:,}")
             )
 
         embed = discord.Embed(
@@ -206,7 +208,7 @@ def _build_embeds(
             color=discord.Color.red(),
         )
         embed.add_field(
-            name=_bracket_title(*bracket),
+            name=_bracket_title(*bracket, tr),
             value=_fit_field_lines(lines),
             inline=False,
         )
@@ -217,18 +219,21 @@ def _build_embeds(
             title=title,
             color=discord.Color.red(),
         )
-        embed.description = "*No weekly damage entries found in the configured level brackets.*"
+        embed.description = tr("weekly_damages.no_bracket_entries")
         embeds.append(embed)
 
     return embeds
 
 
 class _BracketPaginator(discord.ui.View):
-    def __init__(self, embeds: list[discord.Embed], timeout: float = 180.0):
+    def __init__(self, embeds: list[discord.Embed], tr: Translator, timeout: float = 180.0):
         super().__init__(timeout=timeout)
         self.embeds = embeds
         self.current = 0
         self.message: discord.Message | None = None
+        self.tr = tr
+        self.prev_btn.label = tr("common.prev_plain")
+        self.next_btn.label = tr("common.next_plain")
         self._sync()
 
     def _sync(self) -> None:
@@ -236,10 +241,7 @@ class _BracketPaginator(discord.ui.View):
         self.next_btn.disabled = self.current == len(self.embeds) - 1
         for index, embed in enumerate(self.embeds, start=1):
             embed.set_footer(
-                text=(
-                    f"Bracket {index}/{len(self.embeds)}"
-                    " | Weekly ranking | Top 10 per bracket"
-                )
+                text=self.tr("weekly_damages.bracket_footer", index=index, total=len(self.embeds))
             )
 
     async def on_timeout(self) -> None:
@@ -347,11 +349,12 @@ class TopUserWeeklyDamages(commands.Cog):
         country: str,
     ) -> None:
         await interaction.response.defer(thinking=True)
+        tr = await get_translator(interaction.guild_id)
 
         countries = await self._get_countries()
         if not countries:
             await interaction.followup.send(
-                "Could not load the country list. Please try again later.",
+                tr("common.country_list_unavailable"),
                 ephemeral=True,
             )
             return
@@ -359,17 +362,13 @@ class TopUserWeeklyDamages(commands.Cog):
         selected_countries, missing_countries = _find_countries(countries, country)
         if missing_countries:
             await interaction.followup.send(
-                (
-                    "Could not find: "
-                    + ", ".join(f"`{name}`" for name in missing_countries)
-                    + ". Please select countries from autocomplete."
-                ),
+                tr("weekly_damages.countries_not_found", countries=", ".join(f"`{name}`" for name in missing_countries)),
                 ephemeral=True,
             )
             return
         if not selected_countries:
             await interaction.followup.send(
-                "Please provide at least one country.",
+                tr("weekly_damages.no_country"),
                 ephemeral=True,
             )
             return
@@ -396,13 +395,14 @@ class TopUserWeeklyDamages(commands.Cog):
         embeds = _build_embeds(
             selected_countries,
             list(zip(country_items, users)),
+            tr,
         )
         if len(embeds) == 1:
-            embeds[0].set_footer(text="Weekly ranking | Top 10 per bracket")
+            embeds[0].set_footer(text=tr("weekly_damages.footer"))
             await interaction.followup.send(embed=embeds[0])
             return
 
-        view = _BracketPaginator(embeds)
+        view = _BracketPaginator(embeds, tr)
         message = await interaction.followup.send(
             embed=embeds[0],
             view=view,

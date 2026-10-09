@@ -8,15 +8,15 @@ from typing import List
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-from config import config
+from utils.common import is_developer
+from utils.i18n import Translator, get_translator
 
 logger = logging.getLogger(__name__)
 
 TASKS_MODULE_PREFIX = "cogs.tasks."
-DEVELOPER_ROLE_ID = config.get("roles", {}).get("developer")
 
 
-def _format_interval(loop: tasks.Loop) -> str:
+def _format_interval(loop: tasks.Loop, tr: Translator) -> str:
     parts = []
     if loop.hours:
         parts.append(f"{loop.hours:g}h")
@@ -24,7 +24,7 @@ def _format_interval(loop: tasks.Loop) -> str:
         parts.append(f"{loop.minutes:g}m")
     if loop.seconds:
         parts.append(f"{loop.seconds:g}s")
-    return " ".join(parts) or "scheduled"
+    return tr("run_job.every", interval=" ".join(parts)) if parts else tr("run_job.scheduled")
 
 
 class RunJob(commands.Cog):
@@ -34,7 +34,7 @@ class RunJob(commands.Cog):
         self._forced_running: set[str] = set()
 
     def _member_is_developer(self, member: discord.abc.User) -> bool:
-        return any(r.id == DEVELOPER_ROLE_ID for r in getattr(member, "roles", []))
+        return is_developer(member)
 
     def _get_jobs(self) -> dict[str, tasks.Loop]:
         """Collect every tasks.Loop exposed by the cogs loaded from cogs/tasks/*.py, keyed by job name."""
@@ -81,12 +81,13 @@ class RunJob(commands.Cog):
     async def job_name_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
         if not self._member_is_developer(interaction.user):
             return []
+        tr = await get_translator(interaction.guild_id)
         lower = (current or "").lower()
         choices = []
         for name, loop in sorted(self._get_jobs().items()):
             if lower and lower not in name.lower():
                 continue
-            choices.append(app_commands.Choice(name=f"{name} (every {_format_interval(loop)})", value=name))
+            choices.append(app_commands.Choice(name=f"{name} ({_format_interval(loop, tr)})", value=name))
             if len(choices) >= 25:
                 break
         return choices
@@ -95,20 +96,21 @@ class RunJob(commands.Cog):
     @app_commands.describe(job_name="Background job to execute")
     @app_commands.autocomplete(job_name=job_name_autocomplete)
     async def run_job(self, interaction: discord.Interaction, job_name: str):
+        tr = await get_translator(interaction.guild_id)
         if not self._member_is_developer(interaction.user):
-            await interaction.response.send_message("You are not authorized to use this command.", ephemeral=True)
+            await interaction.response.send_message(tr("common.not_authorized"), ephemeral=True)
             return
 
         jobs = self._get_jobs()
         loop = jobs.get(job_name.strip())
         if loop is None:
-            available = ", ".join(f"`{name}`" for name in sorted(jobs)) or "none"
-            await interaction.response.send_message(f"Unknown job `{job_name}`. Available jobs: {available}", ephemeral=True)
+            available = ", ".join(f"`{name}`" for name in sorted(jobs)) or tr("run_job.no_jobs")
+            await interaction.response.send_message(tr("run_job.unknown", job=job_name, available=available), ephemeral=True)
             return
 
         name = loop.coro.__name__
         if name in self._forced_running or self._is_scheduled_iteration_running(loop):
-            await interaction.response.send_message(f"Job `{name}` is already running. Try again once it finishes.", ephemeral=True)
+            await interaction.response.send_message(tr("run_job.already_running", job=name), ephemeral=True)
             return
 
         # claim the job before the first await so neither another /run_job nor the scheduler can start it meanwhile
@@ -123,9 +125,12 @@ class RunJob(commands.Cog):
                 await loop()
             except Exception as exc:
                 logger.exception("Forced run of job %s failed", name)
-                await self._safe_followup(interaction, f"Job `{name}` failed after {time.monotonic() - started:.1f}s: `{type(exc).__name__}: {exc}`")
+                await self._safe_followup(
+                    interaction,
+                    tr("run_job.failed", job=name, seconds=f"{time.monotonic() - started:.1f}", error=f"{type(exc).__name__}: {exc}"),
+                )
                 return
-            await self._safe_followup(interaction, f"Job `{name}` finished in {time.monotonic() - started:.1f}s.")
+            await self._safe_followup(interaction, tr("run_job.finished", job=name, seconds=f"{time.monotonic() - started:.1f}"))
         finally:
             self._forced_running.discard(name)
 

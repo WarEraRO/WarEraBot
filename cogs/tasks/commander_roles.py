@@ -1,6 +1,7 @@
 from discord.ext import commands, tasks
 from utils.api import get_shared_session, get_military_unit, get_user_info
 from utils.db import init_db, save_user, get_record_by_api_id, find_api_id_by_discord_id
+from utils.i18n import Translator, get_translator
 from config import config
 import discord
 
@@ -28,6 +29,7 @@ class CommanderRolesJob(commands.Cog):
             return
 
         session = await get_shared_session()
+        tr = await get_translator(guild)
         military_units = config.get('military_units', [])
         commander_ids = set()
 
@@ -108,7 +110,7 @@ class CommanderRolesJob(commands.Cog):
                 continue
             if commander_role not in member.roles:
                 try:
-                    await member.add_roles(commander_role, reason="Assigned commander role from MU config")
+                    await member.add_roles(commander_role, reason=tr("commander_roles.reason_added"))
                     added.append(member.display_name)
                 except Exception:
                     pass
@@ -118,7 +120,7 @@ class CommanderRolesJob(commands.Cog):
         for member in current_with_role:
             if member not in desired_members:
                 try:
-                    await member.remove_roles(commander_role, reason="Removed commander role (no longer MU commander)")
+                    await member.remove_roles(commander_role, reason=tr("commander_roles.reason_removed"))
                     removed.append(member.display_name)
                 except Exception:
                     pass
@@ -126,7 +128,7 @@ class CommanderRolesJob(commands.Cog):
         # Send a summary if there were any changes
         channel = guild.get_channel(config.get('channels', {}).get('reports')) if guild else None
         if channel and (len(added) > 0 or len(removed) > 0):
-            embed = self.build_commander_embed(added, removed)
+            embed = self.build_commander_embed(added, removed, tr)
             if embed:
                 try:
                     await channel.send(embed=embed)
@@ -137,18 +139,18 @@ class CommanderRolesJob(commands.Cog):
     async def before_commander_roles(self):
         await self.bot.wait_until_ready()
 
-    def build_commander_embed(self, added: list, removed: list) -> discord.Embed:
+    def build_commander_embed(self, added: list, removed: list, tr: Translator) -> discord.Embed:
         total = len(added) + len(removed)
         if total == 0:
             return None
         embed = discord.Embed(
-            title="Commander Roles Updated",
-            description="Summary of commander role synchronization:",
+            title=tr("commander_roles.title"),
+            description=tr("commander_roles.description"),
             color=discord.Color.orange()
         )
         def fmt(lst: list) -> str:
             if not lst:
-                return "None"
+                return tr("common.none")
             lines = [f"* {n}" for n in lst]
             cur = ""
             count = 0
@@ -160,12 +162,12 @@ class CommanderRolesJob(commands.Cog):
             remaining = len(lines) - count
             if remaining > 0:
                 cur = cur.rstrip("\n")
-                cur += f"\n... and {remaining} more"
+                cur += "\n" + tr("common.and_more", count=remaining)
             return cur
 
-        embed.add_field(name="Added", value=fmt(added), inline=False)
-        embed.add_field(name="Removed", value=fmt(removed), inline=False)
-        embed.set_footer(text=f"Total changes: {total}")
+        embed.add_field(name=tr("common.added"), value=fmt(added), inline=False)
+        embed.add_field(name=tr("common.removed"), value=fmt(removed), inline=False)
+        embed.set_footer(text=tr("common.total_changes", total=total))
         return embed
 
 async def setup(bot: commands.Bot):

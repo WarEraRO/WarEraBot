@@ -8,9 +8,10 @@ from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
 
 # Table name overrides via environment (useful for staging/prod separation)
-_USERS_TABLE_NAME = config.get("DYNAMO_USERS_TABLE", "users")
-_DIPLOMACIES_TABLE_NAME = config.get("DYNAMO_DIPLOMACIES_TABLE", "diplomacies")
-_NAPS_TABLE_NAME = config.get("DYNAMO_NAPS_TABLE", "naps")
+_USERS_TABLE_NAME = config.get("DYNAMO_USERS_TABLE", "warera-ro-discordbot_prod_users")
+_DIPLOMACIES_TABLE_NAME = config.get("DYNAMO_DIPLOMACIES_TABLE", "warera-ro-discordbot_prod_diplomacies")
+_NAPS_TABLE_NAME = config.get("DYNAMO_NAPS_TABLE", "warera-ro-discordbot_prod_naps")
+_GUILD_SETTINGS_TABLE_NAME = config.get("DYNAMO_GUILD_SETTINGS_TABLE", "warera-ro-discordbot_prod_guild_settings")
 
 # Module-level cached resource to avoid re-creating sessions on every call
 _resource = None
@@ -39,6 +40,10 @@ def _diplomacies():
 
 def _naps():
     return _get_resource().Table(_NAPS_TABLE_NAME)
+
+
+def _guild_settings():
+    return _get_resource().Table(_GUILD_SETTINGS_TABLE_NAME)
 
 
 def _parse_diplomacy_list(raw) -> List:
@@ -299,6 +304,29 @@ def remove_nap(country_a_id: str, country_b_id: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Guild settings
+# ---------------------------------------------------------------------------
+
+def get_guild_language(guild_id) -> Optional[str]:
+    resp = _guild_settings().get_item(
+        Key={"guild_id": str(guild_id)},
+        ProjectionExpression="#l",
+        ExpressionAttributeNames={"#l": "language"},
+    )
+    item = resp.get("Item")
+    return item.get("language") if item else None
+
+
+def set_guild_language(guild_id, language: str) -> None:
+    _guild_settings().update_item(
+        Key={"guild_id": str(guild_id)},
+        UpdateExpression="SET #l = :l",
+        ExpressionAttributeNames={"#l": "language"},
+        ExpressionAttributeValues={":l": language},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Table provisioning
 # ---------------------------------------------------------------------------
 
@@ -306,6 +334,7 @@ def ensure_tables(
     users_table: str = _USERS_TABLE_NAME,
     diplomacies_table: str = _DIPLOMACIES_TABLE_NAME,
     naps_table: str = _NAPS_TABLE_NAME,
+    guild_settings_table: str = _GUILD_SETTINGS_TABLE_NAME,
     region: Optional[str] = None,
 ) -> bool:
     """Ensure both users and diplomacies tables exist in DynamoDB.
@@ -432,6 +461,34 @@ def ensure_tables(
             )
             client.get_waiter("table_exists").wait(
                 TableName=naps_table, WaiterConfig={"Delay": 2, "MaxAttempts": 25}
+            )
+            created_any = True
+        except ClientError as ce:
+            if ce.response.get("Error", {}).get("Code") == "ResourceInUseException":
+                created_any = True
+            else:
+                raise
+
+    # ------------------------------------------------------------------
+    # Guild settings table  (hash key: guild_id; attribute: language)
+    # ------------------------------------------------------------------
+    try:
+        client.describe_table(TableName=guild_settings_table)
+        created_any = True
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") != "ResourceNotFoundException":
+            raise
+        try:
+            client.create_table(
+                TableName=guild_settings_table,
+                AttributeDefinitions=[
+                    {"AttributeName": "guild_id", "AttributeType": "S"},
+                ],
+                KeySchema=[{"AttributeName": "guild_id", "KeyType": "HASH"}],
+                BillingMode="PAY_PER_REQUEST",
+            )
+            client.get_waiter("table_exists").wait(
+                TableName=guild_settings_table, WaiterConfig={"Delay": 2, "MaxAttempts": 25}
             )
             created_any = True
         except ClientError as ce:

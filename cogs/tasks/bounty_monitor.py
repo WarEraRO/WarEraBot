@@ -1,6 +1,7 @@
 from discord.ext import commands, tasks
 from utils.api import get_shared_session, get_active_battles, get_country
 from utils.db import init_db
+from utils.i18n import get_translator
 from config import config
 from datetime import datetime, timezone
 import asyncio
@@ -118,6 +119,8 @@ class BountyMonitorJob(commands.Cog):
 
         # For each side with a positive pool, send a single embed if it's new/changed
         channel = guild.get_channel(config.get('channels', {}).get('bounties')) if guild else None
+        tr = await get_translator(guild)
+        unknown = tr('common.unknown')
         current_keys = set()
         for entry in battles_with_bounty:
             b = entry['battle']
@@ -126,8 +129,8 @@ class BountyMonitorJob(commands.Cog):
             dfn = b.get('defender') or {}
             atk_cid = atk.get('country')
             def_cid = dfn.get('country')
-            atk_name = country_cache.get(atk_cid, atk_cid or 'unknown')
-            def_name = country_cache.get(def_cid, def_cid or 'unknown')
+            atk_name = country_cache.get(atk_cid, atk_cid or unknown)
+            def_name = country_cache.get(def_cid, def_cid or unknown)
 
             # attacker side: send a simple plain-text message instead of an embed
             if entry['attacker_pool'] > 0 and entry['attacker_bounty_at']:
@@ -142,7 +145,16 @@ class BountyMonitorJob(commands.Cog):
                     pool = round(float(entry['attacker_pool']), 2)
                     battle_link = f"https://app.warera.io/battle/{bid}"
                     # Format: "moneyPer/pool from <country_A> (Attacker) against <country_B> (Defender) — View battle: <link>"
-                    msg = f"**[BOUNTY]** {money_per}/{pool} from {atk_name} (Attacker) against {def_name} (Defender) — [View Battle]({battle_link})"
+                    msg = tr(
+                        "bounty_monitor.bounty",
+                        money_per=money_per,
+                        pool=pool,
+                        country=atk_name,
+                        side=tr("common.side_title.attacker"),
+                        opponent=def_name,
+                        opponent_side=tr("common.side_title.defender"),
+                        link=battle_link,
+                    )
                     if channel:
                         try:
                             sent = await channel.send(msg)
@@ -164,7 +176,16 @@ class BountyMonitorJob(commands.Cog):
                     pool = round(float(entry['defender_pool']), 2)
                     battle_link = f"https://app.warera.io/battle/{bid}"
                     # Format: "moneyPer/pool from <country_A> (Defender) against <country_B> (Attacker) — View battle: <link>"
-                    msg = f"**[BOUNTY]** {money_per}/{pool} from {def_name} (Defender) against {atk_name} (Attacker) — [View Battle]({battle_link})"
+                    msg = tr(
+                        "bounty_monitor.bounty",
+                        money_per=money_per,
+                        pool=pool,
+                        country=def_name,
+                        side=tr("common.side_title.defender"),
+                        opponent=atk_name,
+                        opponent_side=tr("common.side_title.attacker"),
+                        link=battle_link,
+                    )
                     if channel:
                         try:
                             sent = await channel.send(msg)

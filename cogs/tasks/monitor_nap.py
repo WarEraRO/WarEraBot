@@ -8,6 +8,7 @@ from discord.ext import commands, tasks
 from config import config
 from utils.api import get_active_battles, get_military_unit, get_shared_session
 from utils.db import get_all_naps, init_db
+from utils.i18n import get_translator
 
 
 logger = logging.getLogger(__name__)
@@ -91,7 +92,7 @@ class NAPMonitorJob(commands.Cog):
             return f"[{name}](https://app.warera.io/country/{country_id})"
 
         def mu_link(mu_id: str, mu_name: str | None = None) -> str:
-            name = mu_name or f"Military Unit {mu_id}"
+            name = mu_name or tr("nap_monitor.mu_fallback", id=mu_id)
             return f"[{name}](https://app.warera.io/mu/{mu_id})"
 
         async def get_mu_info(mu_id: str) -> tuple[str | None, str | None]:
@@ -174,6 +175,7 @@ class NAPMonitorJob(commands.Cog):
         channel = guild.get_channel(config.get("channels", {}).get("government"))
         if channel is None:
             return
+        tr = await get_translator(guild)
 
         new_violations = []
         for violation in violations:
@@ -194,9 +196,9 @@ class NAPMonitorJob(commands.Cog):
         for chunk_start in range(0, len(new_violations), 10):
             chunk = new_violations[chunk_start:chunk_start + 10]
             embed = discord.Embed(
-                title="NAP Violation Alert",
+                title=tr("nap_monitor.title"),
                 color=discord.Color.red(),
-                description="Active battle orders were found against configured NAP partners.",
+                description=tr("nap_monitor.description"),
             )
 
             for violation in chunk:
@@ -213,9 +215,12 @@ class NAPMonitorJob(commands.Cog):
                     source = f"{mu_link(violation['source_id'], violation.get('source_name'))} ({source_country})"
                 embed.add_field(
                     name=f"{pair_name_a} - {pair_name_b}",
-                    value=(
-                        f"{source} has {violation['side']} orders against "
-                        f"{opponent_country}.\n[View battle]({battle_link})"
+                    value=tr(
+                        "nap_monitor.violation",
+                        source=source,
+                        side=tr(f"common.side.{violation['side']}"),
+                        opponent=opponent_country,
+                        link=battle_link,
                     ),
                     inline=False,
                 )

@@ -3,6 +3,7 @@ from discord.ext import commands
 from config import config
 import utils.api as api
 from datetime import datetime, timezone
+from utils.i18n import CommandTranslator, get_translator
 
 intents = discord.Intents.default()
 intents.members = True
@@ -14,15 +15,17 @@ class WarEraBot(commands.Bot):
         self._startup_embed_sent = False
         self._shutdown_embed_sent = False
 
-    async def send_lifecycle_embed(self, title: str, color: discord.Color, description: str | None = None):
+    async def send_lifecycle_embed(self, key: str, color: discord.Color):
+        """Post the lifecycle.<key>.title / .description embed in the guild's language."""
         guild = self.get_guild(config["guild"])
         channel = guild.get_channel(config["channels"]["reports"]) if guild else None
         if channel is None:
             return
 
+        tr = await get_translator(guild)
         embed = discord.Embed(
-            title=title,
-            description=description,
+            title=tr(f"lifecycle.{key}.title"),
+            description=tr(f"lifecycle.{key}.description"),
             color=color,
             timestamp=datetime.now(timezone.utc),
         )
@@ -36,11 +39,7 @@ class WarEraBot(commands.Bot):
     async def close(self):
         if not self._shutdown_embed_sent and not self.is_closed():
             self._shutdown_embed_sent = True
-            await self.send_lifecycle_embed(
-                "WarEraBot stopped",
-                discord.Color.red(),
-                "The bot client is closing or disconnected unexpectedly.",
-            )
+            await self.send_lifecycle_embed("stopped", discord.Color.red())
         try:
             await super().close()
         finally:
@@ -78,6 +77,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.get_region_upgrade_cost")
         await self.load_extension("cogs.commands.battle_orders")
         await self.load_extension("cogs.commands.run-job")
+        await self.load_extension("cogs.commands.language")
 
         guild = discord.Object(id=config["guild"])
 
@@ -87,6 +87,8 @@ class WarEraBot(commands.Bot):
         except Exception:
             pass
 
+        # localized slash-command descriptions for Romanian Discord clients
+        await self.tree.set_translator(CommandTranslator())
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
         await self.tree.sync()
@@ -98,11 +100,7 @@ async def on_ready():
     print(f"Logged in as {bot.user}")
     if not bot._startup_embed_sent:
         bot._startup_embed_sent = True
-        await bot.send_lifecycle_embed(
-            "WarEraBot started",
-            discord.Color.green(),
-            "The bot is online and background jobs are running.",
-        )
+        await bot.send_lifecycle_embed("started", discord.Color.green())
 
 token = config["token"]
 if not token:

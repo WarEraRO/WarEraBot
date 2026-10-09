@@ -11,6 +11,7 @@ from cogs.tasks.military_unit_daily_report import PILL_CODE, _parse_iso, _pill_s
 from config import config
 from utils.api import get_game_config, get_military_unit, get_mu_members, get_shared_session, get_user_info
 from utils.common import to_local
+from utils.i18n import get_translator
 from utils.computational import is_economy_build
 
 logger = logging.getLogger(__name__)
@@ -122,9 +123,10 @@ class Pills(commands.Cog):
     @app_commands.command(name="pills", description="Show who is pilled, in debuff or not pilled in a military unit.")
     @app_commands.describe(military_unit="Military unit (one of the units configured for this server)")
     async def pills(self, interaction: discord.Interaction, military_unit: str):
+        tr = await get_translator(interaction.guild_id)
         mu_id = self._find_unit(military_unit)
         if mu_id is None:
-            await interaction.response.send_message("Unknown military unit. Pick one from the list.", ephemeral=True)
+            await interaction.response.send_message(tr("pills.unknown_unit"), ephemeral=True)
             return
         await interaction.response.defer()
 
@@ -137,7 +139,7 @@ class Pills(commands.Cog):
             self._mu_names[mu_id] = str(military_unit_data["name"])
         mu_name = discord.utils.escape_markdown(self._mu_names.get(mu_id, mu_id))
         if members is None:
-            await interaction.followup.send("Could not fetch the military unit members. Try again later.", ephemeral=True)
+            await interaction.followup.send(tr("pills.members_unavailable"), ephemeral=True)
             return
 
         semaphore = asyncio.Semaphore(USER_CONCURRENCY)
@@ -153,7 +155,7 @@ class Pills(commands.Cog):
         for user in users:
             if not user:
                 continue
-            name = discord.utils.escape_markdown(str(user.get("username") or "unknown"))
+            name = discord.utils.escape_markdown(str(user.get("username") or tr("common.unknown")))
             buffs = user.get("buffs") or {}
             # older responses had no codes, so an end time without codes is taken as a pill
             buff_end = _parse_iso(buffs.get("buffEndAt")) if PILL_CODE in (buffs.get("buffCodes") or [PILL_CODE]) else None
@@ -172,23 +174,23 @@ class Pills(commands.Cog):
         not_pilled.sort(key=str.lower)
 
         tz_name = to_local(now).tzname()
-        lines = [f"💊 **Pilled ({len(pilled)})** · pill hour → time left"]
+        lines = [tr("pills.pilled_header", count=len(pilled))]
         lines += _hour_lines(pilled, now) or ["—"]
-        lines.append(f"🥴 **Debuff ({len(debuffed)})** · ends at → time left")
+        lines.append(tr("pills.debuff_header", count=len(debuffed)))
         lines += _hour_lines(debuffed, now) or ["—"]
-        lines.append(f"⚪ **Not pilled ({len(not_pilled)})**")
+        lines.append(tr("pills.not_pilled_header", count=len(not_pilled)))
         lines.append(", ".join(not_pilled) or "—")
 
-        footer = f"Hours in {tz_name}"
+        footer = tr("pills.footer_hours", tz=tz_name)
         if economy:
-            footer += f" · {economy} economy member{'s' if economy != 1 else ''} not listed"
+            footer += " · " + tr.plural("pills.footer_economy", economy)
         if missing:
-            footer += f" · {missing} member{'s' if missing != 1 else ''} could not be fetched"
+            footer += " · " + tr.plural("pills.footer_missing", missing)
 
         chunks = _split(lines)
         embeds = []
         for index, chunk in enumerate(chunks, start=1):
-            title = f"Pills · {mu_name}"
+            title = tr("pills.title", mu=mu_name)
             if len(chunks) > 1:
                 title += f" ({index}/{len(chunks)})"
             embed = discord.Embed(title=title, description=chunk, color=discord.Color.purple(), timestamp=now)

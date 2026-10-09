@@ -1,6 +1,7 @@
 from discord.ext import commands, tasks
 from utils.api import get_user, get_shared_session, get_military_unit
 from utils.db import init_db
+from utils.i18n import Translator, get_translator
 from config import config
 import discord
 
@@ -32,6 +33,7 @@ class MilitaryUnitRolesJob(commands.Cog):
         # Build a mapping of manager_api_id -> set of MU ids they manage.
         # We need an active session to call the API.
         session = await get_shared_session()
+        tr = await get_translator(guild)
         owners: dict = {}
         for unit in military_units:
             try:
@@ -99,7 +101,7 @@ class MilitaryUnitRolesJob(commands.Cog):
             to_add = [r for r in desired_roles if r not in member.roles]
             if to_add:
                 try:
-                    await member.add_roles(*to_add, reason="Assigned Military Unit role.")
+                    await member.add_roles(*to_add, reason=tr("mu_roles.reason_added"))
                     for r in to_add:
                         name = r.name if r else str(getattr(r, 'id', 'unknown'))
                         added_members.setdefault(name, []).append(member.display_name)
@@ -110,7 +112,7 @@ class MilitaryUnitRolesJob(commands.Cog):
             roles_to_remove = [r for r in current_mu_roles if r not in desired_roles]
             if roles_to_remove:
                 try:
-                    await member.remove_roles(*roles_to_remove, reason="Removed unused Military Unit roles.")
+                    await member.remove_roles(*roles_to_remove, reason=tr("mu_roles.reason_removed"))
                     for r in roles_to_remove:
                         rname = r.name if r else str(getattr(r, 'id', 'unknown'))
                         removed_members.setdefault(rname, []).append(member.display_name)
@@ -123,7 +125,7 @@ class MilitaryUnitRolesJob(commands.Cog):
             total_changes = sum(len(v) for v in added_members.values()) + sum(len(v) for v in removed_members.values())
             if total_changes == 0:
                 return
-            embed = self.build_military_unit_embed(added_members, removed_members)
+            embed = self.build_military_unit_embed(added_members, removed_members, tr)
             if embed:
                 await channel.send(embed=embed)
 
@@ -131,7 +133,7 @@ class MilitaryUnitRolesJob(commands.Cog):
     async def before_military_unit_roles(self):
         await self.bot.wait_until_ready()
 
-    def build_military_unit_embed(self, added: dict, removed: dict) -> discord.Embed:
+    def build_military_unit_embed(self, added: dict, removed: dict, tr: Translator) -> discord.Embed:
         all_roles = set(list(added.keys()) + list(removed.keys()))
         total = sum(len(v) for v in added.values()) + sum(len(v) for v in removed.values())
 
@@ -139,8 +141,8 @@ class MilitaryUnitRolesJob(commands.Cog):
             return None
 
         embed = discord.Embed(
-            title="Military Unit Roles Updated",
-            description="Summary of military unit role changes:",
+            title=tr("mu_roles.title"),
+            description=tr("mu_roles.description"),
             color=discord.Color.orange()
         )
 
@@ -158,7 +160,7 @@ class MilitaryUnitRolesJob(commands.Cog):
             remaining = len(lines) - count
             if remaining > 0:
                 cur = cur.rstrip("\n")
-                cur += f"\n... and {remaining} more"
+                cur += "\n" + tr("common.and_more", count=remaining)
             return cur
 
         for role_name in sorted(all_roles):
@@ -169,10 +171,10 @@ class MilitaryUnitRolesJob(commands.Cog):
             if a_formatted is None and r_formatted is None:
                 continue
             if a_formatted is not None:
-                embed.add_field(name=role_name, value=f"Added:\n{a_formatted}\n", inline=False)
+                embed.add_field(name=role_name, value=f"{tr('mu_roles.added')}\n{a_formatted}\n", inline=False)
             if r_formatted is not None:
-                embed.add_field(name=role_name, value=f"Removed:\n{r_formatted}\n", inline=False)
-        embed.set_footer(text=f"Total changes: {total}")
+                embed.add_field(name=role_name, value=f"{tr('mu_roles.removed')}\n{r_formatted}\n", inline=False)
+        embed.set_footer(text=tr("common.total_changes", total=total))
         return embed  
 
 async def setup(bot: commands.Bot):

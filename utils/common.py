@@ -201,8 +201,9 @@ def country_flag(country_name: str | None) -> str | None:
     return COUNTRY_FLAGS.get(str(country_name).strip().casefold())
 
 
-def country_with_flag(country_name: str | None, left: bool) -> str:
-    name = str(country_name or "unknown")
+def country_with_flag(country_name: str | None, left: bool, unknown: str = "unknown") -> str:
+    """The country name with its flag emoji; `unknown` (pass a translated word) when there is no name."""
+    name = str(country_name or unknown)
     flag = country_flag(name)
     if not flag:
         return name
@@ -210,6 +211,12 @@ def country_with_flag(country_name: str | None, left: bool) -> str:
         return f"{flag} {name}"
     else:
         return f"{name} {flag}"
+
+
+def is_developer(member) -> bool:
+    """True when the member has the Developer role (config.json roles.developer); always False in DMs."""
+    developer_role_id = config.get("roles", {}).get("developer")
+    return bool(developer_role_id) and any(role.id == developer_role_id for role in getattr(member, "roles", []))
 
 
 async def get_mu_destination(guild: discord.Guild, unit: dict, thread_key: str):

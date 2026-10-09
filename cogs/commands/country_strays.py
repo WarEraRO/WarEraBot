@@ -3,15 +3,16 @@ from discord import app_commands
 from discord.ext import commands
 from config import config
 from utils.api import get_user, get_shared_session, get_all_countries, get_country
+from utils.i18n import Translator, get_translator
 
 _PAGE_SIZE = 15
 
 
-def _build_pages(items: list[tuple]) -> list[discord.Embed]:
-    title = "Citizenship Issues"
+def _build_pages(items: list[tuple], tr: Translator) -> list[discord.Embed]:
+    title = tr("country_strays.title")
     if not items:
-        embed = discord.Embed(title=title, description="*No citizenship issues found.*", color=discord.Color.green())
-        embed.set_footer(text="Page 1 of 1 — Total: 0")
+        embed = discord.Embed(title=title, description=tr("country_strays.none_found"), color=discord.Color.green())
+        embed.set_footer(text=tr("common.page_total", page=1, pages=1, total=0))
         return [embed]
     lines = [f"{name} — {country}" for name, country in items]
     total = len(lines)
@@ -21,17 +22,19 @@ def _build_pages(items: list[tuple]) -> list[discord.Embed]:
         chunk = lines[i : i + _PAGE_SIZE]
         embed = discord.Embed(title=title, color=discord.Color.orange())
         embed.description = "\n".join(f"• {l}" for l in chunk)
-        embed.set_footer(text=f"Page {i // _PAGE_SIZE + 1} of {total_pages} — Total: {total}")
+        embed.set_footer(text=tr("common.page_total", page=i // _PAGE_SIZE + 1, pages=total_pages, total=total))
         pages.append(embed)
     return pages
 
 
 class _Paginator(discord.ui.View):
-    def __init__(self, pages: list[discord.Embed], timeout: int = 180):
+    def __init__(self, pages: list[discord.Embed], tr: Translator, timeout: int = 180):
         super().__init__(timeout=timeout)
         self.pages = pages
         self.current = 0
         self.message: discord.Message | None = None
+        self.prev_btn.label = tr("common.prev")
+        self.next_btn.label = tr("common.next")
         self._sync()
 
     def _sync(self):
@@ -71,10 +74,11 @@ class CountryStrays(commands.Cog):
     )
     async def country_strays(self, interaction: discord.Interaction):
         await interaction.response.defer()
+        tr = await get_translator(interaction.guild_id)
 
         guild = interaction.guild or self.bot.get_guild(config["guild"])
         if guild is None:
-            await interaction.followup.send("Guild not found.", ephemeral=True)
+            await interaction.followup.send(tr("common.guild_not_found"), ephemeral=True)
             return
 
         allowed = set(config.get("citizenship_countries", []) or [])
@@ -123,15 +127,15 @@ class CountryStrays(commands.Cog):
                     country_name = None
 
             if country_name not in allowed:
-                issues.append((member.display_name, country_name or "Unknown"))
+                issues.append((member.display_name, country_name or tr("common.unknown_title")))
 
         issues.sort(key=lambda x: x[0].lower())
-        pages = _build_pages(issues)
+        pages = _build_pages(issues, tr)
 
         if len(pages) == 1:
             await interaction.followup.send(embed=pages[0])
         else:
-            view = _Paginator(pages)
+            view = _Paginator(pages, tr)
             msg = await interaction.followup.send(embed=pages[0], view=view, wait=True)
             view.message = msg
 

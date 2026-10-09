@@ -5,6 +5,7 @@ from typing import Optional, List
 from config import config
 from utils import db
 from utils.api import get_all_country_names
+from utils.i18n import Translator, get_translator
 import math
 import time
 import asyncio
@@ -47,12 +48,12 @@ def _embed_field_value(value: object, fallback: str) -> str:
     return text[:EMBED_FIELD_VALUE_LIMIT - 3] + "..."
 
 
-def _diplomacy_entry_parts(entry: object) -> tuple[str, str]:
+def _diplomacy_entry_parts(entry: object, tr: Translator) -> tuple[str, str]:
     if isinstance(entry, dict):
         text = entry.get("text") or entry.get("info")
-        entry_date = entry.get("date") or "Date unavailable"
+        entry_date = entry.get("date") or tr("diplomacy.date_unavailable")
         return str(text or "").strip(), str(entry_date).strip()
-    return str(entry or "").strip(), "Date unavailable"
+    return str(entry or "").strip(), tr("diplomacy.date_unavailable")
 
 
 class Diplomacy(commands.Cog):
@@ -85,6 +86,7 @@ class Diplomacy(commands.Cog):
     @app_commands.describe(country_name="Optional country name to show details for")
     async def diplomacy(self, interaction: discord.Interaction, country_name: Optional[str] = None):
         await interaction.response.defer()
+        tr = await get_translator(interaction.guild_id)
         guild = await self._get_guild(interaction)
 
         active = await get_all_country_names()
@@ -104,7 +106,7 @@ class Diplomacy(commands.Cog):
                         break
 
             if not match:
-                await interaction.followup.send(f"Country '{country_name}' not found.")
+                await interaction.followup.send(tr("diplomacy.country_not_found", country=country_name))
                 return
 
             rec = db.get_diplomacy(match) or {}
@@ -114,18 +116,18 @@ class Diplomacy(commands.Cog):
             except Exception:
                 has_gov = False
 
-            embed = discord.Embed(title=f"Diplomacy — {match}", color=discord.Color.green())
-            status = rec.get('status') or 'Unknown'
-            desc = rec.get('description') or 'No description.'
-            embed.add_field(name="Status", value=_embed_field_value(status, "Unknown"), inline=False)
+            embed = discord.Embed(title=tr("diplomacy.details_title", country=match), color=discord.Color.green())
+            status = rec.get('status') or tr("common.unknown_title")
+            desc = rec.get('description') or tr("common.no_description")
+            embed.add_field(name=tr("diplomacy.status"), value=_embed_field_value(status, tr("common.unknown_title")), inline=False)
             embed.add_field(
-                name="Description",
-                value=_embed_field_value(desc, "No description."),
+                name=tr("diplomacy.description"),
+                value=_embed_field_value(desc, tr("common.no_description")),
                 inline=False,
             )
             if has_gov:
                 entries = rec.get('diplomacy') or []
-                view = self.DiplomacyDetailsView(match, entries, interaction.user)
+                view = self.DiplomacyDetailsView(match, entries, interaction.user, tr)
                 await interaction.followup.send(embed=embed, view=view)
             else:
                 await interaction.followup.send(embed=embed)
@@ -134,7 +136,7 @@ class Diplomacy(commands.Cog):
         # show only countries that have diplomacies created (paginated, 3 per page)
         all_recs = db.get_all_diplomacies()
         if not all_recs:
-            await interaction.followup.send("No diplomacies have been created.")
+            await interaction.followup.send(tr("diplomacy.none_created"))
             return
 
         countries = [self._build_country_record(c, rec) for c, rec in all_recs.items()]
@@ -142,7 +144,7 @@ class Diplomacy(commands.Cog):
         # default sort: alphabetical
         countries.sort(key=lambda x: x['country_name'].lower())
 
-        paginator = self.DiplomacyPaginator(countries, interaction.user, per_page=3)
+        paginator = self.DiplomacyPaginator(countries, interaction.user, tr, per_page=3)
         await paginator.start(interaction)
 
     async def _generate_country_choices(self, current: str) -> List[app_commands.Choice[str]]:
@@ -183,9 +185,10 @@ class Diplomacy(commands.Cog):
     @app_commands.command(name="update_diplomacy", description="Update diplomacy status/description/entries for a country (government only).")
     @app_commands.describe(country_name="Country name", status="Diplomacy status (optional)", diplomacy="Diplomacy entry to append (optional)", description="Optional description")
     async def update_diplomacy(self, interaction: discord.Interaction, country_name: str, status: Optional[str] = None, diplomacy: Optional[str] = None, description: Optional[str] = None):
+        tr = await get_translator(interaction.guild_id)
         # permission check
         if not self._member_has_government(interaction.user):
-            await interaction.response.send_message("You are not authorized to use this command.", ephemeral=True)
+            await interaction.response.send_message(tr("common.not_authorized"), ephemeral=True)
             return
 
         # defer because we may do DB work
@@ -196,7 +199,7 @@ class Diplomacy(commands.Cog):
         if status is not None:
             status_n = self._normalize_status(status)
             if status_n not in STATUS_OPTIONS:
-                await interaction.followup.send(f"Invalid status. Allowed: {', '.join(STATUS_OPTIONS)}", ephemeral=True)
+                await interaction.followup.send(tr("diplomacy.invalid_status", allowed=", ".join(STATUS_OPTIONS)), ephemeral=True)
                 return
 
         # ensure country exists
@@ -207,12 +210,12 @@ class Diplomacy(commands.Cog):
                 match = c
                 break
         if not match:
-            await interaction.followup.send(f"Country '{country_name}' not found.", ephemeral=True)
+            await interaction.followup.send(tr("diplomacy.country_not_found", country=country_name), ephemeral=True)
             return
 
         # If nothing provided to update, inform the user
         if status_n is None and diplomacy is None and description is None:
-            await interaction.followup.send("No updates provided. Specify at least one of `status`, `diplomacy`, or `description`.", ephemeral=True)
+            await interaction.followup.send(tr("diplomacy.no_updates"), ephemeral=True)
             return
 
         # Apply updates: append diplomacy entry if provided, update status/description if provided
@@ -230,20 +233,21 @@ class Diplomacy(commands.Cog):
 
         parts: list[str] = []
         if status_n is not None:
-            parts.append(f"status: {status_n}")
+            parts.append(tr("diplomacy.updated_status", status=status_n))
         if diplomacy is not None:
-            parts.append(f"diplomacy entry added ({entry_date})")
+            parts.append(tr("diplomacy.updated_entry", date=entry_date))
         if description is not None:
-            parts.append("description updated")
+            parts.append(tr("diplomacy.updated_description"))
 
-        await interaction.followup.send(f"Updated '{match}' ({', '.join(parts)}).")
+        await interaction.followup.send(tr("diplomacy.updated", country=match, changes=", ".join(parts)))
 
     @app_commands.command(name="add_diplomacy", description="Create a diplomacy record for a country (government only).")
     @app_commands.describe(country_name="Country name", status="Optional status", description="Optional description")
     async def add_diplomacy(self, interaction: discord.Interaction, country_name: str, status: Optional[str] = None, description: Optional[str] = None):
+        tr = await get_translator(interaction.guild_id)
         # permission check
         if not self._member_has_government(interaction.user):
-            await interaction.response.send_message("You are not authorized to use this command.", ephemeral=True)
+            await interaction.response.send_message(tr("common.not_authorized"), ephemeral=True)
             return
 
         # defer for DB/network operations
@@ -254,7 +258,7 @@ class Diplomacy(commands.Cog):
         if status is not None:
             status_n = self._normalize_status(status)
             if status_n not in STATUS_OPTIONS:
-                await interaction.followup.send(f"Invalid status. Allowed: {', '.join(STATUS_OPTIONS)}", ephemeral=True)
+                await interaction.followup.send(tr("diplomacy.invalid_status", allowed=", ".join(STATUS_OPTIONS)), ephemeral=True)
                 return
 
         # ensure country exists
@@ -265,24 +269,25 @@ class Diplomacy(commands.Cog):
                 match = c
                 break
         if not match:
-            await interaction.followup.send(f"Country '{country_name}' not found.", ephemeral=True)
+            await interaction.followup.send(tr("diplomacy.country_not_found", country=country_name), ephemeral=True)
             return
 
         # if a diplomacy already exists for this country, ignore and instruct to use update_diplomacy
         existing = db.get_diplomacy(match)
         if existing:
-            await interaction.followup.send(f"Diplomacy for '{match}' already exists. Use `/update_diplomacy` to modify it.", ephemeral=True)
+            await interaction.followup.send(tr("diplomacy.already_exists", country=match), ephemeral=True)
             return
 
         # create new diplomacy record (diplomacy list empty)
         db.update_diplomacy(match, status=status_n, description=description)
-        await interaction.followup.send(f"Diplomacy for '{match}' created.")
+        await interaction.followup.send(tr("diplomacy.created", country=match))
 
     @app_commands.command(name="remove_diplomacy", description="Remove an entry from a country's diplomacy list (government only).")
     @app_commands.describe(country_name="Country name", position="1-based position to remove")
     async def remove_diplomacy(self, interaction: discord.Interaction, country_name: str, position: int):
+        tr = await get_translator(interaction.guild_id)
         if not self._member_has_government(interaction.user):
-            await interaction.response.send_message("You are not authorized to use this command.", ephemeral=True)
+            await interaction.response.send_message(tr("common.not_authorized"), ephemeral=True)
             return
 
         active = await get_all_country_names()
@@ -292,20 +297,21 @@ class Diplomacy(commands.Cog):
                 match = c
                 break
         if not match:
-            await interaction.response.send_message(f"Country '{country_name}' not found.", ephemeral=True)
+            await interaction.response.send_message(tr("diplomacy.country_not_found", country=country_name), ephemeral=True)
             return
 
         ok = db.remove_diplomacy_entry(match, position)
         if not ok:
-            await interaction.response.send_message(f"Could not remove entry {position} for '{match}'.", ephemeral=True)
+            await interaction.response.send_message(tr("diplomacy.remove_failed", position=position, country=match), ephemeral=True)
         else:
-            await interaction.response.send_message(f"Removed entry {position} for '{match}'.")
+            await interaction.response.send_message(tr("diplomacy.removed", position=position, country=match))
 
     @app_commands.command(name="delete_diplomacy", description="Delete the diplomacy record for a country (government only).")
     @app_commands.describe(country_name="Country name")
     async def delete_diplomacy(self, interaction: discord.Interaction, country_name: str):
+        tr = await get_translator(interaction.guild_id)
         if not self._member_has_government(interaction.user):
-            await interaction.response.send_message("You are not authorized to use this command.", ephemeral=True)
+            await interaction.response.send_message(tr("common.not_authorized"), ephemeral=True)
             return
         # defer because fetching country list may take time
         await interaction.response.defer()
@@ -317,14 +323,14 @@ class Diplomacy(commands.Cog):
                 match = c
                 break
         if not match:
-            await interaction.followup.send(f"Country '{country_name}' not found.", ephemeral=True)
+            await interaction.followup.send(tr("diplomacy.country_not_found", country=country_name), ephemeral=True)
             return
 
         ok = db.delete_diplomacy(match)
         if not ok:
-            await interaction.followup.send(f"No diplomacy record found for '{match}'.", ephemeral=True)
+            await interaction.followup.send(tr("diplomacy.no_record", country=match), ephemeral=True)
         else:
-            await interaction.followup.send(f"Diplomacy for '{match}' deleted.")
+            await interaction.followup.send(tr("diplomacy.deleted", country=match))
 
     @diplomacy.autocomplete('country_name')
     async def diplomacy_country_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
@@ -366,17 +372,19 @@ class Diplomacy(commands.Cog):
         return choices
 
     class DiplomacyDetailsView(discord.ui.View):
-        def __init__(self, country_name: str, entries: list, author, timeout: float = 120.0):
+        def __init__(self, country_name: str, entries: list, author, tr: Translator, timeout: float = 120.0):
             super().__init__(timeout=timeout)
             self.country_name = country_name
             self.entries = entries
             self.author = author
+            self.tr = tr
+            self.show_diplomacy.label = tr("diplomacy.show_list_button")
 
         async def interaction_check(self, interaction: discord.Interaction) -> bool:
             if interaction.user.id == self.author.id:
                 return True
             await interaction.response.send_message(
-                "Only the person who used this command can open the diplomacy list.",
+                self.tr("diplomacy.only_author_open"),
                 ephemeral=True,
             )
             return False
@@ -394,6 +402,7 @@ class Diplomacy(commands.Cog):
                 self.country_name,
                 self.entries,
                 self.author,
+                self.tr,
                 per_page=3,
             )
             paginator.message = interaction.message
@@ -409,6 +418,7 @@ class Diplomacy(commands.Cog):
             country_name: str,
             entries: list,
             author,
+            tr: Translator,
             per_page: int = 3,
             timeout: float = 120.0,
         ):
@@ -416,6 +426,11 @@ class Diplomacy(commands.Cog):
             self.country_name = country_name
             self.entries = entries
             self.author = author
+            self.tr = tr
+            self.first_button.label = tr("common.first")
+            self.previous_button.label = tr("common.previous")
+            self.next_button.label = tr("common.next_plain")
+            self.last_button.label = tr("common.last")
             self.per_page = per_page
             self.index = 0
             self.message: discord.Message | None = None
@@ -423,6 +438,7 @@ class Diplomacy(commands.Cog):
             self._sync_buttons()
 
         def _build_embeds(self) -> List[discord.Embed]:
+            tr = self.tr
             pages = max(1, math.ceil(len(self.entries) / self.per_page))
             embeds: List[discord.Embed] = []
 
@@ -430,24 +446,21 @@ class Diplomacy(commands.Cog):
                 start = page_index * self.per_page
                 chunk = self.entries[start:start + self.per_page]
                 embed = discord.Embed(
-                    title=f"Diplomacy List - {self.country_name}",
+                    title=tr("diplomacy.list_title", country=self.country_name),
                     color=discord.Color.green(),
                 )
                 if chunk:
                     for offset, entry in enumerate(chunk):
-                        entry_text, entry_date = _diplomacy_entry_parts(entry)
+                        entry_text, entry_date = _diplomacy_entry_parts(entry, tr)
                         embed.add_field(
-                            name=f"Entry {start + offset + 1} | {entry_date}",
-                            value=_embed_field_value(entry_text, "(empty entry)"),
+                            name=tr("diplomacy.entry_name", number=start + offset + 1, date=entry_date),
+                            value=_embed_field_value(entry_text, tr("diplomacy.empty_entry")),
                             inline=False,
                         )
                 else:
-                    embed.description = "(empty)"
+                    embed.description = tr("diplomacy.empty")
                 embed.set_footer(
-                    text=(
-                        f"Page {page_index + 1}/{pages} | "
-                        f"Entries: {len(self.entries)}"
-                    )
+                    text=tr("diplomacy.list_footer", page=page_index + 1, pages=pages, entries=len(self.entries))
                 )
                 embeds.append(embed)
 
@@ -464,7 +477,7 @@ class Diplomacy(commands.Cog):
             if interaction.user.id == self.author.id:
                 return True
             await interaction.response.send_message(
-                "Only the person who used this command can change pages.",
+                self.tr("diplomacy.only_author_pages"),
                 ephemeral=True,
             )
             return False
@@ -522,10 +535,12 @@ class Diplomacy(commands.Cog):
             await self._show_page(interaction)
 
     class DiplomacyPaginator(discord.ui.View):
-        def __init__(self, countries: List[dict], author, per_page: int = 3, timeout: float = 120.0):
+        def __init__(self, countries: List[dict], author, tr: Translator, per_page: int = 3, timeout: float = 120.0):
             super().__init__(timeout=timeout)
             self.countries = countries
             self.author = author
+            self.tr = tr
+            self.toggle_sort.label = tr("diplomacy.sort_button")
             self.per_page = per_page
             self.index = 0
             self.embeds: List[discord.Embed] = []
@@ -545,16 +560,17 @@ class Diplomacy(commands.Cog):
             per = self.per_page
             pages = max(1, math.ceil(len(items) / per))
             embeds: List[discord.Embed] = []
+            tr = self.tr
             for p in range(pages):
                 chunk = items[p*per:(p+1)*per]
-                embed = discord.Embed(title="Diplomacies", color=discord.Color.blue())
+                embed = discord.Embed(title=tr("diplomacy.list_all_title"), color=discord.Color.blue())
                 for c in chunk:
                     name = c.get('country_name')
-                    status = c.get('status') or 'Unknown'
+                    status = c.get('status') or tr("common.unknown_title")
                     desc = c.get('description') or ''
                     short = desc if len(desc) < 200 else desc[:197] + '...'
-                    embed.add_field(name=f"{name} — {status}", value=short or '(no description)', inline=False)
-                embed.set_footer(text=f"Page {p+1}/{pages} — Sorted: {self.current_sort}")
+                    embed.add_field(name=f"{name} — {status}", value=short or tr("diplomacy.no_description_short"), inline=False)
+                embed.set_footer(text=tr("diplomacy.sorted_footer", page=p + 1, pages=pages, sort=tr(f"diplomacy.sort_{self.current_sort}")))
                 embeds.append(embed)
             self.embeds = embeds
 
