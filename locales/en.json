@@ -152,7 +152,7 @@
             },
             "run_job": {
                 "name": "/run_job job_name",
-                "desc": "Developer-only. Force a background job to run once now, without waiting for or changing its loop timer. Refused while the job is already running; a scheduled run due during a forced run is skipped. The job field supports autocomplete."
+                "desc": "Developers only; commanders can run only skill_roles and military_unit_roles. Force a background job to run once now, without waiting for or changing its loop timer. Refused while the job is already running; a scheduled run due during a forced run is skipped. The job field supports autocomplete."
             },
             "setlang": {
                 "name": "/setlang language",
@@ -578,5 +578,116 @@
         "tip_battles": "Only {won} of {total} battles were won; focus damage on fewer, winnable battles.",
         "footer": "Battles count once they end · bounty is estimated as battle money minus contract payouts",
         "footer_incomplete": "⚠️ Some battles could not be fetched, battle numbers may be low"
+    },
+    "damage": {
+        "player_not_found": "❌ Player **{name}** not found.",
+        "data_unavailable": "❌ Game data or market prices could not be loaded. Try again later.",
+        "not_enough_sp": "❌ **{name}** does not have enough skill points ({total}) for {count} companies.",
+        "no_builds": "❌ Could not generate any builds. Try again later.",
+        "title": "⚔️ Pill builds · {name}",
+        "header_player": "**Level** {level} · **{sp} SP** for combat ({reserved} SP on Companies)",
+        "header_bonus": "**Military rank** +{rank}% · **battle bonus** +{battle}% (assumed)",
+        "header_companies": "**Companies** {count} × engine L{level}, +{bonus}% → {pp} PP/day of {product} × {per_pp}/PP = **{income}/day**",
+        "header_no_companies": "**Companies**: none counted",
+        "header_prices": "**Prices**: Pill {pill} · case {case} · elite case {elite} · scrap {scrap} · pool item ~{pool}",
+        "model_title": "How it is calculated",
+        "model_text": "• One Pill a day: you fight only during the 8 h buff, starting with full bars, so you use 1.8 Health bars and 1.8 Hunger bars of food.\n• Gear: average rolls at average market prices, 100 durability, 1 lost per hit (the weapon on every hit, other gear only on hits that are not dodged). Every weapon except the Knife uses 1 ammo per hit.\n• Returns: cases at market price (Loot Chance per hit that is not a miss, elite = 1/100 of that), broken gear gives 1/3 of its scrap, round/battle pool items (1 per 200k + 1 per 500k damage), company engine output.\n• Damage is an estimate (miss = ½ Attack, crit = Attack × (1 + Crit Damage)). Respec, travel and bounties are not included.",
+        "bracket_title": "💰 ≤ {bracket}/1k · {damage} damage/day ({cost}/1k)",
+        "bracket_unreachable_title": "💰 Cheapest build · {damage} damage/day ({cost}/1k)",
+        "bracket_unreachable": "No build gets down to ≤ {brackets}/1k with these settings; this one has the lowest net cost per 1k damage found.",
+        "bracket_same": "Same build as the ≤ {bracket}/1k budget: no build deals more damage within this cost.",
+        "field_skills": "📊 Skills",
+        "field_gear": "🛡️ Equipment (average price)",
+        "field_consumables": "🎒 Consumables per day",
+        "field_combat": "⚔️ Combat",
+        "field_costs": "💸 Costs per day",
+        "field_returns": "💵 Returns per day",
+        "field_net": "🏦 Net",
+        "pill_line": "💊 Pill ×1 · {cost}",
+        "ammo_line": "🔫 {name} ×{count} · {cost}",
+        "no_ammo": "🔫 No ammo",
+        "food_line": "🍖 {name} ×{count} · {cost}",
+        "no_food": "🍖 No food",
+        "combat": "**{per_hit}** damage per hit × **{hits}** hits\nAttack {attack} · Precision {precision}%\nCrit {crit}% × {crit_damage}% crit damage\nArmor {armor} → {armor_pct}% · Dodge {dodge} → {dodge_pct}%\nHealth {health} · Hunger {hunger} · Loot {loot}%\nHealth per hit {health_per_hit}",
+        "costs": "Pill {pill} · Ammo {ammo} · Food {food}\nGear wear {gear}\n**Total {total}**",
+        "returns": "Cases {cases} → {case_value}\nElite cases {elite} → {elite_value}\nScrap {scrap} → {scrap_value}\nPool loot ~{pool} items → {pool_value}\nCompanies {companies}\n**Total {total}**",
+        "net": "**{net}/day** → **{cost} per 1k damage**",
+        "footer": "SP used {used}/{sp} · economy skills left at 0",
+        "gear_none": "none",
+        "skills": {
+            "attack": "Attack",
+            "precision": "Precision",
+            "criticalChance": "Crit chance",
+            "criticalDamages": "Crit damage",
+            "armor": "Armor",
+            "dodge": "Dodge",
+            "health": "Health",
+            "hunger": "Hunger",
+            "lootChance": "Loot"
+        },
+        "slots": {
+            "weapon": "Weapon",
+            "helmet": "Helmet",
+            "gloves": "Gloves",
+            "chest": "Chest",
+            "pants": "Pants",
+            "boots": "Boots"
+        },
+        "weapons": {
+            "knife": "Knife",
+            "gun": "Gun",
+            "rifle": "Rifle",
+            "sniper": "Sniper",
+            "tank": "Tank",
+            "jet": "Jet"
+        },
+        "rarities": {
+            "common": "Common",
+            "uncommon": "Uncommon",
+            "rare": "Rare",
+            "epic": "Epic",
+            "legendary": "Legendary",
+            "mythic": "Mythic"
+        },
+        "stat_short": {
+            "attack": "{value} atk",
+            "criticalChance": "{value}% crit",
+            "criticalDamages": "+{value}% crit dmg",
+            "precision": "+{value}% prec",
+            "armor": "{value} armor",
+            "dodge": "{value} dodge"
+        },
+        "ammo": {
+            "lightAmmo": "Light ammo",
+            "ammo": "Ammo",
+            "heavyAmmo": "Heavy ammo"
+        },
+        "food": {
+            "bread": "Bread",
+            "steak": "Steak",
+            "cookedFish": "Cooked fish"
+        },
+        "products": {
+            "grain": "Grain",
+            "limestone": "Limestone",
+            "iron": "Iron",
+            "lead": "Lead",
+            "coca": "Coca",
+            "petroleum": "Petroleum",
+            "wood": "Wood",
+            "livestock": "Livestock",
+            "fish": "Fish",
+            "bread": "Bread",
+            "steak": "Steak",
+            "cookedFish": "Cooked fish",
+            "concrete": "Concrete",
+            "steel": "Steel",
+            "oil": "Oil",
+            "paper": "Paper",
+            "lightAmmo": "Light ammo",
+            "ammo": "Ammo",
+            "heavyAmmo": "Heavy ammo",
+            "cocain": "Pill"
+        }
     }
 }

@@ -8,12 +8,14 @@ from typing import List
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-from utils.common import is_developer
+from utils.common import is_commander, is_developer
 from utils.i18n import Translator, get_translator
 
 logger = logging.getLogger(__name__)
 
 TASKS_MODULE_PREFIX = "cogs.tasks."
+# jobs members with the Commander role may force; developers may force every job
+COMMANDER_JOBS = frozenset({"military_unit_roles", "skill_roles"})
 
 
 def _format_interval(loop: tasks.Loop, tr: Translator) -> str:
@@ -33,8 +35,13 @@ class RunJob(commands.Cog):
         # job names currently being executed through /run_job
         self._forced_running: set[str] = set()
 
-    def _member_is_developer(self, member: discord.abc.User) -> bool:
-        return is_developer(member)
+    def _allowed_jobs(self, member: discord.abc.User) -> dict[str, tasks.Loop]:
+        """The jobs this member may force: all of them for developers, COMMANDER_JOBS for commanders, none otherwise."""
+        if is_developer(member):
+            return self._get_jobs()
+        if is_commander(member):
+            return {name: loop for name, loop in self._get_jobs().items() if name in COMMANDER_JOBS}
+        return {}
 
     def _get_jobs(self) -> dict[str, tasks.Loop]:
         """Collect every tasks.Loop exposed by the cogs loaded from cogs/tasks/*.py, keyed by job name."""
@@ -79,12 +86,13 @@ class RunJob(commands.Cog):
         loop.coro = guarded
 
     async def job_name_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-        if not self._member_is_developer(interaction.user):
+        jobs = self._allowed_jobs(interaction.user)
+        if not jobs:
             return []
         tr = await get_translator(interaction.guild_id)
         lower = (current or "").lower()
         choices = []
-        for name, loop in sorted(self._get_jobs().items()):
+        for name, loop in sorted(jobs.items()):
             if lower and lower not in name.lower():
                 continue
             choices.append(app_commands.Choice(name=f"{name} ({_format_interval(loop, tr)})", value=name))
@@ -92,16 +100,17 @@ class RunJob(commands.Cog):
                 break
         return choices
 
-    @app_commands.command(name="run_job", description="Force a background job to run now, outside its loop timer (developers only).")
+    @app_commands.command(name="run_job", description="Force a background job to run now, outside its loop timer (developers and commanders only).")
     @app_commands.describe(job_name="Background job to execute")
     @app_commands.autocomplete(job_name=job_name_autocomplete)
     async def run_job(self, interaction: discord.Interaction, job_name: str):
         tr = await get_translator(interaction.guild_id)
-        if not self._member_is_developer(interaction.user):
+        if not (is_developer(interaction.user) or is_commander(interaction.user)):
             await interaction.response.send_message(tr("common.not_authorized"), ephemeral=True)
             return
 
-        jobs = self._get_jobs()
+        # a job outside the member's allowed set is reported like an unknown one
+        jobs = self._allowed_jobs(interaction.user)
         loop = jobs.get(job_name.strip())
         if loop is None:
             available = ", ".join(f"`{name}`" for name in sorted(jobs)) or tr("run_job.no_jobs")

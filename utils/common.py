@@ -219,6 +219,12 @@ def is_developer(member) -> bool:
     return bool(developer_role_id) and any(role.id == developer_role_id for role in getattr(member, "roles", []))
 
 
+def is_commander(member) -> bool:
+    """True when the member has the Commander role (config.json roles.commander); always False in DMs."""
+    commander_role_id = config.get("roles", {}).get("commander")
+    return bool(commander_role_id) and any(role.id == commander_role_id for role in getattr(member, "roles", []))
+
+
 async def get_mu_destination(guild: discord.Guild, unit: dict, thread_key: str):
     """Where an MU's posts go: the thread in threadIds[thread_key] when set, otherwise the MU's channelId.
 

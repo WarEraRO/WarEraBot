@@ -152,7 +152,7 @@
             },
             "run_job": {
                 "name": "/run_job job_name",
-                "desc": "Doar pentru dezvoltatori. Rulează acum o sarcină de fundal, o singură dată, fără să-i schimbe programul. E refuzată dacă sarcina rulează deja; o rulare programată care cade în timpul unei rulări forțate este sărită. Câmpul are sugestii."
+                "desc": "Doar pentru dezvoltatori; comandanții pot rula doar skill_roles și military_unit_roles. Rulează acum o sarcină de fundal, o singură dată, fără să-i schimbe programul. E refuzată dacă sarcina rulează deja; o rulare programată care cade în timpul unei rulări forțate este sărită. Câmpul are sugestii."
             },
             "setlang": {
                 "name": "/setlang language",
@@ -582,6 +582,117 @@
         "footer": "Bătăliile se numără după ce se încheie · recompensa e estimată ca banii din bătălie minus plățile contractelor",
         "footer_incomplete": "⚠️ Unele bătălii nu au putut fi preluate, cifrele pot fi mai mici"
     },
+    "damage": {
+        "player_not_found": "❌ Jucătorul **{name}** nu a fost găsit.",
+        "data_unavailable": "❌ Datele jocului sau prețurile pieței nu au putut fi preluate. Încearcă din nou mai târziu.",
+        "not_enough_sp": "❌ **{name}** nu are destule puncte de abilitate ({total}) pentru {count} companii.",
+        "no_builds": "❌ Nu s-a putut genera niciun build. Încearcă din nou mai târziu.",
+        "title": "⚔️ Builduri cu pastilă · {name}",
+        "header_player": "**Nivel** {level} · **{sp} SP** pentru luptă ({reserved} SP pe Companii)",
+        "header_bonus": "**Rang militar** +{rank}% · **bonus de luptă** +{battle}% (presupus)",
+        "header_companies": "**Companii** {count} × motor N{level}, +{bonus}% → {pp} PP/zi de {product} × {per_pp}/PP = **{income}/zi**",
+        "header_no_companies": "**Companii**: niciuna luată în calcul",
+        "header_prices": "**Prețuri**: pastilă {pill} · cutie {case} · cutie de elită {elite} · fier vechi {scrap} · obiect din pool ~{pool}",
+        "model_title": "Cum se calculează",
+        "model_text": "• O pastilă pe zi: lupți doar în cele 8 h de buff, pornind cu barele pline, deci folosești 1,8 bare de Viață și 1,8 bare de Foame în mâncare.\n• Echipament: valori medii la prețul mediu al pieței, durabilitate 100, 1 pierdut pe lovitură (arma la fiecare lovitură, restul doar la loviturile neeschivate). Orice armă în afară de cuțit folosește 1 muniție pe lovitură.\n• Câștiguri: cutii la prețul pieței (Șansa de pradă la fiecare lovitură care nu ratează, elită = 1/100 din asta), echipamentul rupt dă 1/3 din fierul vechi, obiecte din pool-urile de rundă/bătălie (1 la 200k + 1 la 500k daune), producția motoarelor companiilor.\n• Daunele sunt estimate (ratare = ½ Atac, critică = Atac × (1 + Daune critice)). Resetarea abilităților, deplasarea și recompensele nu sunt incluse.",
+        "bracket_title": "💰 ≤ {bracket}/1k · {damage} daune/zi ({cost}/1k)",
+        "bracket_unreachable_title": "💰 Cel mai ieftin build · {damage} daune/zi ({cost}/1k)",
+        "bracket_unreachable": "Niciun build nu ajunge la ≤ {brackets}/1k cu aceste setări; acesta are cel mai mic cost net la 1k daune găsit.",
+        "bracket_same": "Același build ca la bugetul ≤ {bracket}/1k: niciun build nu face mai multe daune în acest cost.",
+        "field_skills": "📊 Abilități",
+        "field_gear": "🛡️ Echipament (preț mediu)",
+        "field_consumables": "🎒 Consumabile pe zi",
+        "field_combat": "⚔️ Luptă",
+        "field_costs": "💸 Costuri pe zi",
+        "field_returns": "💵 Câștiguri pe zi",
+        "field_net": "🏦 Net",
+        "pill_line": "💊 Pastilă ×1 · {cost}",
+        "ammo_line": "🔫 {name} ×{count} · {cost}",
+        "no_ammo": "🔫 Fără muniție",
+        "food_line": "🍖 {name} ×{count} · {cost}",
+        "no_food": "🍖 Fără mâncare",
+        "combat": "**{per_hit}** daune pe lovitură × **{hits}** lovituri\nAtac {attack} · Precizie {precision}%\nCritică {crit}% × {crit_damage}% daune critice\nArmură {armor} → {armor_pct}% · Eschivă {dodge} → {dodge_pct}%\nViață {health} · Foame {hunger} · Pradă {loot}%\nViață pe lovitură {health_per_hit}",
+        "costs": "Pastilă {pill} · Muniție {ammo} · Mâncare {food}\nUzură echipament {gear}\n**Total {total}**",
+        "returns": "Cutii {cases} → {case_value}\nCutii de elită {elite} → {elite_value}\nFier vechi {scrap} → {scrap_value}\nPradă din pool ~{pool} obiecte → {pool_value}\nCompanii {companies}\n**Total {total}**",
+        "net": "**{net}/zi** → **{cost} la 1k daune**",
+        "footer": "SP folosite {used}/{sp} · abilitățile economice rămân la 0",
+        "gear_none": "nimic",
+        "skills": {
+            "attack": "Atac",
+            "precision": "Precizie",
+            "criticalChance": "Șansă critică",
+            "criticalDamages": "Daune critice",
+            "armor": "Armură",
+            "dodge": "Eschivă",
+            "health": "Viață",
+            "hunger": "Foame",
+            "lootChance": "Pradă"
+        },
+        "slots": {
+            "weapon": "Armă",
+            "helmet": "Cască",
+            "gloves": "Mănuși",
+            "chest": "Vestă",
+            "pants": "Pantaloni",
+            "boots": "Bocanci"
+        },
+        "weapons": {
+            "knife": "Cuțit",
+            "gun": "Pistol",
+            "rifle": "Pușcă",
+            "sniper": "Lunetă",
+            "tank": "Tanc",
+            "jet": "Avion"
+        },
+        "rarities": {
+            "common": "Comun",
+            "uncommon": "Neobișnuit",
+            "rare": "Rar",
+            "epic": "Epic",
+            "legendary": "Legendar",
+            "mythic": "Mitic"
+        },
+        "stat_short": {
+            "attack": "{value} atac",
+            "criticalChance": "{value}% critică",
+            "criticalDamages": "+{value}% daune crit.",
+            "precision": "+{value}% precizie",
+            "armor": "{value} armură",
+            "dodge": "{value} eschivă"
+        },
+        "ammo": {
+            "lightAmmo": "Muniție ușoară",
+            "ammo": "Muniție",
+            "heavyAmmo": "Muniție grea"
+        },
+        "food": {
+            "bread": "Pâine",
+            "steak": "Friptură",
+            "cookedFish": "Pește gătit"
+        },
+        "products": {
+            "grain": "Grâu",
+            "limestone": "Calcar",
+            "iron": "Fier",
+            "lead": "Plumb",
+            "coca": "Coca",
+            "petroleum": "Țiței",
+            "wood": "Lemn",
+            "livestock": "Animale",
+            "fish": "Pește",
+            "bread": "Pâine",
+            "steak": "Friptură",
+            "cookedFish": "Pește gătit",
+            "concrete": "Beton",
+            "steel": "Oțel",
+            "oil": "Petrol",
+            "paper": "Hârtie",
+            "lightAmmo": "Muniție ușoară",
+            "ammo": "Muniție",
+            "heavyAmmo": "Muniție grea",
+            "cocain": "Pastilă"
+        }
+    },
     "slash": {
         "help": {"description": "Afișează comenzile botului și sarcinile de fundal (paginat)."},
         "setlang": {
@@ -589,7 +700,7 @@
             "params": {"language": "Limba tuturor mesajelor botului pe acest server"}
         },
         "run_job": {
-            "description": "Rulează acum o sarcină de fundal, în afara programului ei (doar pentru dezvoltatori).",
+            "description": "Rulează acum o sarcină de fundal, în afara programului ei (doar pentru dezvoltatori și comandanți).",
             "params": {"job_name": "Sarcina de fundal de rulat"}
         },
         "fightstatus": {
@@ -690,6 +801,17 @@
         "get_region_upgrade_cost": {
             "description": "Calculează consumul zilnic de petrol al îmbunătățirilor active din regiunile unei țări.",
             "params": {"country": "Țara de calculat (alege una din sugestii)."}
+        },
+        "damage": {
+            "description": "Builduri de luptă pentru o zi cu pastilă, ordonate după costul net la 1.000 de daune.",
+            "params": {
+                "player_name": "Numele jucătorului din joc.",
+                "number_of_companies": "Companii ținute active (0-12); punctele lor de abilitate sunt rezervate.",
+                "companies_level": "Nivelul Motorului Automat al acelor companii (0-7).",
+                "company_product": "Ce produc companiile (implicit: cel mai profitabil pe punct de producție).",
+                "production_bonus": "Bonusul de producție al companiilor, în procente (zăcământ, țară, ...).",
+                "battle_bonus": "Bonusul total de luptă în procente (patriotic, ordine, alianță, ...). Implicit 20."
+            }
         }
     }
 }
