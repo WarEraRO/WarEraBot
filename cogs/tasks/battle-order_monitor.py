@@ -17,6 +17,7 @@ from utils.api import (
     get_tournament_team,
 )
 from utils.common import country_flag, country_with_flag
+from utils.i18n import Translator, get_translator
 
 
 logger = logging.getLogger(__name__)
@@ -145,23 +146,24 @@ class BattleOrderMonitorJob(commands.Cog):
         return len(new_entries)
 
     async def add_priority_from_link(self, link: str, description: str = "") -> tuple[bool, str, dict | None]:
+        """(added, translation key of the result message, entry)."""
         battle_id = self._parse_battle_id(link)
         if not battle_id:
-            return False, "Invalid battle link.", None
+            return False, "battle_orders.invalid_link", None
 
         session = await get_shared_session()
         battles = await get_active_battles(session)
         if battles is None:
-            return False, "Could not fetch active battles.", None
+            return False, "battle_orders.fetch_failed", None
         battle = next((item for item in battles if self._battle_id(item) == battle_id), None)
         if not battle:
-            return False, "Battle is not active or could not be found.", None
+            return False, "battle_orders.not_active", None
 
         tournament = await self._tournament_context(battle, session)
         if tournament is not None and tournament["type"] != COUNTRY_TOURNAMENT_TYPE:
             if tournament["type"] is None:
-                return False, "Could not fetch the tournament for this battle.", None
-            return False, "Only country tournament battles can be added as priorities.", None
+                return False, "battle_orders.tournament_fetch_failed", None
+            return False, "battle_orders.only_country_tournaments", None
 
         await self._get_country_id(ROMANIA_NAME, session)
         side_name, side, opponent_side_name, opponent = self._preferred_side_for_manual_entry(battle, tournament)
@@ -182,7 +184,7 @@ class BattleOrderMonitorJob(commands.Cog):
 
         async with self._lock:
             if any(existing.get("battle_id") == battle_id for existing in self.priority_cache):
-                return False, "That battle is already in the priority list.", None
+                return False, "battle_orders.already_listed", None
             self._removed_auto_tokens = {
                 removed_token
                 for removed_token in self._removed_auto_tokens
@@ -191,7 +193,7 @@ class BattleOrderMonitorJob(commands.Cog):
             self.priority_cache.append(entry)
 
         await self.notify_manual_priority(entry)
-        return True, "Priority added.", entry
+        return True, "battle_orders.priority_added", entry
 
     async def set_description(self, entry_number: int, description: str) -> bool:
         async with self._lock:
@@ -240,10 +242,11 @@ class BattleOrderMonitorJob(commands.Cog):
         if channel is None:
             return
 
-        message = self.format_priority_message(entry)
+        tr = await get_translator(guild)
+        message = self.format_priority_message(entry, tr)
         description = entry.get("description")
         if description:
-            message += f"\nOrder Description: {description}"
+            message += "\n" + tr("battle_orders.order_description", description=description)
 
         await self._send_priority_message(channel, message)
 
@@ -255,12 +258,19 @@ class BattleOrderMonitorJob(commands.Cog):
         if channel is None:
             return
 
-        description = entry.get("description") or "No description."
+        tr = await get_translator(guild)
+        description = entry.get("description") or tr("common.no_description")
         message = (
-            f"A new priority was added: {self.format_priority_title(entry)} "
-            f"in [{entry.get('region_name')}]({entry.get('battle_link')})\n"
-            f"Order Description: {description}\n"
-            f"Battle Link: {entry.get('battle_link')}"
+            tr(
+                "battle_orders.manual_added",
+                title=self.format_priority_title(entry, tr),
+                region=self._region_label(entry, tr),
+                link=entry.get("battle_link"),
+            )
+            + "\n"
+            + tr("battle_orders.order_description", description=description)
+            + "\n"
+            + tr("battle_orders.battle_link", link=entry.get("battle_link"))
         )
 
         await self._send_priority_message(channel, message)
@@ -275,36 +285,46 @@ class BattleOrderMonitorJob(commands.Cog):
         except discord.DiscordException:
             logger.exception("Failed to send battle order priority alert")
 
-    def format_priority_message(self, entry: dict) -> str:
-        if entry.get("tournament_name"):
-            return (
-                f"{country_with_flag(ROMANIA_NAME, left=True)} put an order in the "
-                f"[tournament]({entry.get('battle_link')}) against "
-                f"{self._format_team(entry.get('opponent_team_names'))}"
+    def _region_label(self, entry: dict, tr: Translator) -> str:
+        if entry.get("is_tournament"):
+            return entry.get("region_name") or tr("battle_orders.tournament")
+        return entry.get("region_name") or tr("battle_orders.unknown_region")
+
+    def format_priority_message(self, entry: dict, tr: Translator) -> str:
+        if entry.get("is_tournament"):
+            return tr(
+                "battle_orders.tournament_order",
+                country=country_with_flag(ROMANIA_NAME, left=True),
+                link=entry.get("battle_link"),
+                opponents=self._format_team(entry.get("opponent_team_names"), tr),
             )
-        side_country = country_with_flag(entry.get("side_country_name"), left=True)
-        opponent_country = country_with_flag(entry.get("opponent_country_name"), left=False)
-        return (
-            f"{ROMANIA_NAME} placed an order for the {entry.get('side_name')} "
-            f"{side_country} against {entry.get('opponent_side_name')} "
-            f"{opponent_country} in "
-            f"[{entry.get('region_name')}]({entry.get('battle_link')})"
+        unknown = tr("common.unknown")
+        return tr(
+            "battle_orders.order_placed",
+            country=ROMANIA_NAME,
+            side=tr(f"common.side.{entry.get('side_name')}"),
+            side_country=country_with_flag(entry.get("side_country_name"), left=True, unknown=unknown),
+            opponent_side=tr(f"common.side.{entry.get('opponent_side_name')}"),
+            opponent_country=country_with_flag(entry.get("opponent_country_name"), left=False, unknown=unknown),
+            region=self._region_label(entry, tr),
+            link=entry.get("battle_link"),
         )
 
-    def format_priority_title(self, entry: dict) -> str:
-        if entry.get("tournament_name"):
-            return (
-                f"Tournament: {entry.get('side_name').capitalize()} "
-                f"{self._format_team(entry.get('side_team_names'), compact=True)} - "
-                f"{self._format_team(entry.get('opponent_team_names'), compact=True)} "
-                f"{entry.get('opponent_side_name').capitalize()}"
+    def format_priority_title(self, entry: dict, tr: Translator) -> str:
+        side = tr(f"common.side.{entry.get('side_name')}").capitalize()
+        opponent_side = tr(f"common.side.{entry.get('opponent_side_name')}").capitalize()
+        if entry.get("is_tournament"):
+            return tr(
+                "battle_orders.tournament_title",
+                side=side,
+                side_team=self._format_team(entry.get("side_team_names"), tr, compact=True),
+                opponent_team=self._format_team(entry.get("opponent_team_names"), tr, compact=True),
+                opponent_side=opponent_side,
             )
-        side_country = country_with_flag(entry.get("side_country_name"), left=True)
-        opponent_country = country_with_flag(entry.get("opponent_country_name"), left=False)
-        return (
-            f"{entry.get('side_name').capitalize()} {side_country} - "
-            f"{opponent_country} {entry.get('opponent_side_name').capitalize()}"
-        )
+        unknown = tr("common.unknown")
+        side_country = country_with_flag(entry.get("side_country_name"), left=True, unknown=unknown)
+        opponent_country = country_with_flag(entry.get("opponent_country_name"), left=False, unknown=unknown)
+        return f"{side} {side_country} - {opponent_country} {opponent_side}"
 
     async def _build_entry(
         self,
@@ -333,8 +353,9 @@ class BattleOrderMonitorJob(commands.Cog):
                 "opponent_side_name": opponent_side_name,
                 "side_team_names": side_team_names,
                 "opponent_team_names": opponent_team_names,
+                "is_tournament": True,
                 "tournament_name": tournament["name"],
-                # read by the manual-priority message ("... in [region](link)")
+                # read by the manual-priority message ("... in [region](link)"); None shows a translated fallback
                 "region_name": tournament["name"],
                 "description": description or "",
             }
@@ -389,17 +410,17 @@ class BattleOrderMonitorJob(commands.Cog):
 
     async def _tournament_context(self, battle: dict, session) -> dict | None:
         """None for regular battles. For tournament battles: {"type", "name", "teams": {side: [country ids]}};
-        "type" is None when the tournament could not be fetched."""
+        "type" is None when the tournament could not be fetched, "name" is None when unknown."""
         if battle.get("type") != TOURNAMENT_BATTLE_TYPE:
             return None
-        context = {"type": None, "name": "Tournament", "teams": {}}
+        context = {"type": None, "name": None, "teams": {}}
         tournament = await self._cached_lookup(
             self._tournaments_cache, str(battle.get("tournament") or ""), get_tournament, session
         )
         if tournament is None:
             return context
         context["type"] = tournament.get("type")
-        context["name"] = str(tournament.get("name") or "Tournament")
+        context["name"] = str(tournament["name"]) if tournament.get("name") else None
         if context["type"] != COUNTRY_TOURNAMENT_TYPE:
             return context
 
@@ -435,12 +456,13 @@ class BattleOrderMonitorJob(commands.Cog):
     async def _country_names(self, country_ids: list[str], session) -> list[str]:
         return list(await asyncio.gather(*(self._country_name(country_id, session) for country_id in country_ids)))
 
-    def _format_team(self, country_names: list[str] | None, compact: bool = False) -> str:
+    def _format_team(self, country_names: list[str] | None, tr: Translator, compact: bool = False) -> str:
+        unknown = tr("common.unknown")
         if not country_names:
-            return "unknown"
+            return unknown
         if compact:
-            return ", ".join(country_flag(name) or name for name in country_names)
-        return ", ".join(country_with_flag(name, left=True) for name in country_names)
+            return ", ".join(country_flag(name) or name or unknown for name in country_names)
+        return ", ".join(country_with_flag(name, left=True, unknown=unknown) for name in country_names)
 
     async def _get_country_id(self, country_name: str, session) -> str | None:
         now = time.monotonic()
@@ -462,9 +484,10 @@ class BattleOrderMonitorJob(commands.Cog):
         self._country_id_cache[cache_key] = (None, now)
         return None
 
-    async def _country_name(self, country_id: str, session) -> str:
+    async def _country_name(self, country_id: str, session) -> str | None:
+        # None is shown as a translated "unknown"
         if not country_id:
-            return "unknown"
+            return None
         if country_id in self._country_cache:
             return self._country_cache[country_id]
         country = await get_country(country_id, session)
@@ -472,10 +495,11 @@ class BattleOrderMonitorJob(commands.Cog):
         self._country_cache[country_id] = str(name or country_id)
         return self._country_cache[country_id]
 
-    async def _region_name(self, battle: dict, session) -> str:
+    async def _region_name(self, battle: dict, session) -> str | None:
         region_id = self._region_id(battle)
+        # None is shown as a translated "Unknown region"
         if not region_id:
-            return "Unknown region"
+            return None
 
         now = time.monotonic()
         cached = self._regions_cache.get(region_id)

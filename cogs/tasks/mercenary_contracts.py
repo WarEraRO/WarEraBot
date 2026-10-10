@@ -1,6 +1,7 @@
 from discord.ext import commands, tasks
 from utils.api import get_shared_session, get_mercenary_auctions, get_country
 from utils.db import init_db
+from utils.i18n import get_translator
 from config import config
 
 # how often the mercenary auction monitor runs (minutes)
@@ -42,12 +43,13 @@ class MercenaryContractsJob(commands.Cog):
         channel = guild.get_channel(config.get('channels', {}).get('contracts')) if guild else None
         if channel is None:
             return
+        tr = await get_translator(guild)
 
         # simple cache for country names
         country_cache: dict = {}
         async def resolve_country(cid):
             if not cid:
-                return 'unknown'
+                return tr('common.unknown')
             if cid in country_cache:
                 return country_cache[cid]
             try:
@@ -81,7 +83,15 @@ class MercenaryContractsJob(commands.Cog):
             budget = a.get('budget')
             side = a.get('forCountrySide') or a.get('forCountrySide')
             battle_link = f"https://app.warera.io/battle/{a.get('battle')}"
-            text = f"**[CONTRACT]** {country_name} posted a {initial}/{budget} contract for {side} side — [View Battle]({battle_link})"
+            side_name = tr(f'common.side.{side}') if side in ('attacker', 'defender') else side
+            text = tr(
+                'mercenary_contracts.posted',
+                country=country_name,
+                initial=initial,
+                budget=budget,
+                side=side_name,
+                link=battle_link,
+            )
             try:
                 sent = await channel.send(text)
                 await sent.edit(suppress=True)

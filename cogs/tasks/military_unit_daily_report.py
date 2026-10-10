@@ -17,12 +17,14 @@ from utils.api import (
     get_shared_session,
     get_user_info,
 )
-from utils.common import country_with_flag
+from utils.common import country_with_flag, to_local
 from utils.computational import is_economy_build
+from utils.i18n import Translator, get_translator
 
 logger = logging.getLogger(__name__)
 
-# the game day and the daily missions reset at 00:00 UTC (gameConfig.getDates.nextDayAt), so the report runs just before
+# the game day and the daily missions reset at 00:00 UTC (gameConfig.getDates.nextDayAt), so the report runs just before;
+# the schedule and day boundaries stay in UTC, only the times shown are converted to config.json "timezone"
 REPORT_TIME = dt_time(hour=23, minute=30, tzinfo=timezone.utc)
 # MUs with less weekly damage than this get no report
 MIN_REPORT_DAMAGE = 5_000_000
@@ -78,19 +80,20 @@ def _truncate(text: str) -> str:
     return text[: EMBED_FIELD_VALUE_LIMIT - 1] + "…"
 
 
-def _hour_buckets(times: list[datetime], now: datetime | None = None) -> str:
-    """`07h ×2 · 18h ×5`, sorted by time; times not after `now` are grouped as `now`, the first hour after
-    `now`'s day is marked `tmrw`."""
+def _hour_buckets(times: list[datetime], tr: Translator, now: datetime | None = None) -> str:
+    """`07h ×2 · 18h ×5` in local time, sorted by time; times not after `now` are grouped as `now`, the first
+    hour after `now`'s local day is marked `tmrw`."""
     ready_now = sum(1 for value in times if now is not None and value <= now)
     buckets = Counter(
-        value.replace(minute=0, second=0, microsecond=0) for value in times if now is None or value > now
+        to_local(value).replace(minute=0, second=0, microsecond=0) for value in times if now is None or value > now
     )
-    parts = [f"now ×{ready_now}"] if ready_now else []
+    now = to_local(now) if now is not None else None
+    parts = [f"{tr('mu_daily.now')} ×{ready_now}"] if ready_now else []
     marked = False
     for hour, count in sorted(buckets.items()):
         prefix = ""
         if now is not None and not marked and hour.date() > now.date():
-            prefix, marked = "tmrw ", True
+            prefix, marked = f"{tr('mu_daily.tomorrow_short')} ", True
         parts.append(f"{prefix}{hour:%H}h ×{count}")
     return " · ".join(parts)
 
@@ -134,6 +137,8 @@ class MilitaryUnitDailyReportJob(commands.Cog):
             get_all_countries(session),
         )
         settings = _pill_settings(game_config)
+        # reports are DMed to the leaders in the language of the configured server
+        tr = await get_translator()
         country_names = {
             str(country.get("_id")): str(country.get("name"))
             for country in countries or []
@@ -142,7 +147,7 @@ class MilitaryUnitDailyReportJob(commands.Cog):
 
         for mu_id, unit in units.items():
             try:
-                embeds = await self._build_embeds(mu_id, unit, session, now, settings, battles, country_names)
+                embeds = await self._build_embeds(mu_id, unit, session, now, settings, battles, country_names, tr)
                 if not embeds:
                     continue
                 leader = await self._leader(unit["leaderId"])
@@ -201,6 +206,7 @@ class MilitaryUnitDailyReportJob(commands.Cog):
         settings: dict,
         battles: list[dict] | None,
         country_names: dict[str, str],
+        tr: Translator,
     ) -> list[discord.Embed] | None:
         """The MU's daily report as one or more embeds, or None when it has no members or dealt less than
         MIN_REPORT_DAMAGE this week."""
@@ -236,7 +242,7 @@ class MilitaryUnitDailyReportJob(commands.Cog):
                 continue
             dates = user.get("dates") or {}
             rows.append({
-                "name": discord.utils.escape_markdown(str(user.get("username") or "unknown")),
+                "name": discord.utils.escape_markdown(str(user.get("username") or tr("common.unknown"))),
                 "weekly": member.get("weeklyDamagesCount") or 0,
                 "economy": is_economy_build(user),
                 "pill": self._pill_state(user, now, settings),
@@ -278,7 +284,7 @@ class MilitaryUnitDailyReportJob(commands.Cog):
             if row["pill"]["phase"] == "debuff":
                 continue
             bars = [
-                label for skill, label in (("health", "HP"), ("hunger", "food"))
+                label for skill, label in (("health", tr("mu_daily.bar_health")), ("hunger", tr("mu_daily.bar_hunger")))
                 if (row["skills"].get(skill) or {}).get("total")
                 and (row["skills"][skill].get("currentBarValue") or 0) >= row["skills"][skill]["total"]
             ]
@@ -287,65 +293,103 @@ class MilitaryUnitDailyReportJob(commands.Cog):
         offline = [row for row in rows if row["last_seen_at"] and now - row["last_seen_at"] >= OFFLINE_AFTER]
         no_damage = [row for row in fighters if not row["weekly"] and row not in offline]
 
+        # EET or EEST for Europe/Bucharest, depending on daylight saving time
+        tz_name = to_local(now).tzname()
+
         # topics in report order; each is a list of (name, value, inline) fields that stays in one embed when it fits
-        pills_text = (
-            f"🔥 **{len(buffed)}** buffed now\n"
-            f"🟢 **{len(pilled_today) - len(buffed)}** pilled earlier today (now in debuff)\n"
-            f"⚪ **{len(no_pill)}** no pill today"
+        pills_text = tr(
+            "mu_daily.pills_value",
+            buffed=len(buffed),
+            pilled_earlier=len(pilled_today) - len(buffed),
+            no_pill=len(no_pill),
         )
         if cooling_down:
-            pills_text += f"\n⏳ {len(cooling_down)} still in debuff from yesterday"
-        pills = [(f"💊 Pills · {len(fighters)} fighters", pills_text, False)]
+            pills_text += "\n" + tr("mu_daily.pills_cooling_down", count=len(cooling_down))
+        pills = [(tr("mu_daily.pills_title", fighters=len(fighters)), pills_text, False)]
         if no_pill:
             pills.append((
-                f"⚪ No pill today ({len(no_pill)})",
-                self._name_list([f"{row['name']} ({_fmt_short(row['weekly'])})" for row in no_pill]),
+                tr("mu_daily.no_pill_title", count=len(no_pill)),
+                self._name_list([f"{row['name']} ({_fmt_short(row['weekly'])})" for row in no_pill], tr),
                 False,
             ))
         if pilled_today:
-            pills.append(("🕒 Pill times today (UTC)", _hour_buckets([row["pill"]["pilled_at"] for row in pilled_today]), True))
+            pills.append((
+                tr("mu_daily.pill_times_title", tz=tz_name),
+                _hour_buckets([row["pill"]["pilled_at"] for row in pilled_today], tr),
+                True,
+            ))
         if fighters:
-            pills.append(("📅 Next pill ready (UTC)", _hour_buckets([row["pill"]["ready_at"] for row in fighters], now), True))
+            pills.append((
+                tr("mu_daily.next_pill_title", tz=tz_name),
+                _hour_buckets([row["pill"]["ready_at"] for row in fighters], tr, now),
+                True,
+            ))
 
-        orders_and_skills = [("📌 MU orders now", self._orders_text(orders, battles, country_names), False)]
+        orders_and_skills = [(tr("mu_daily.orders_title"), self._orders_text(orders, battles, country_names, tr), False)]
         if reskilled:
             lines = [
-                f"{row['name']} → {'Economy' if row['economy'] else 'Fight'} · "
-                f"next reset {row['last_reset_at'] + settings['reset_cooldown']:%b %d %H:%M}"
+                tr(
+                    "mu_daily.reskill_line",
+                    name=row["name"],
+                    build=tr("mu_daily.build_economy") if row["economy"] else tr("mu_daily.build_fight"),
+                    next_reset=tr.strftime(
+                        to_local(row["last_reset_at"] + settings["reset_cooldown"]), tr("mu_daily.datetime_format")
+                    ),
+                )
                 for row in reskilled
             ]
-            orders_and_skills.append((f"🔄 Skill resets, last 24h ({len(reskilled)})", self._name_list(lines, separator="\n"), False))
+            orders_and_skills.append((
+                tr("mu_daily.reskills_title", count=len(reskilled)),
+                self._name_list(lines, tr, separator="\n"),
+                False,
+            ))
 
-        tips = self._insights(fighters, no_pill, pilled_today, reskilled, orders, battles, no_help, now, settings)
-        advice = [("💡 For tomorrow", "\n".join(f"• {tip}" for tip in tips), False)] if tips else []
+        tips = self._insights(fighters, no_pill, pilled_today, reskilled, orders, battles, no_help, now, settings, tr)
+        advice = [(tr("mu_daily.tips_title"), "\n".join(f"• {tip}" for tip in tips), False)] if tips else []
 
         readiness = []
         if no_help:
-            readiness.append((f"🤝 No MU help asked today ({len(no_help)})", self._name_list([row["name"] for row in no_help]), False))
-        if full_bars:
             readiness.append((
-                f"🔋 Full bars, regen lost ({len(full_bars)})",
-                self._name_list([f"{row['name']} ({', '.join(bars)})" for row, bars in full_bars]),
+                tr("mu_daily.no_help_title", count=len(no_help)),
+                self._name_list([row["name"] for row in no_help], tr),
                 False,
             ))
-        quiet = [f"{row['name']} ({(now - row['last_seen_at']).days}d offline)" for row in offline]
-        quiet += [f"{row['name']} (0 dmg this week)" for row in no_damage]
+        if full_bars:
+            readiness.append((
+                tr("mu_daily.full_bars_title", count=len(full_bars)),
+                self._name_list([f"{row['name']} ({', '.join(bars)})" for row, bars in full_bars], tr),
+                False,
+            ))
+        quiet = [tr("mu_daily.quiet_offline", name=row["name"], days=(now - row["last_seen_at"]).days) for row in offline]
+        quiet += [tr("mu_daily.quiet_no_damage", name=row["name"]) for row in no_damage]
         if quiet:
-            readiness.append((f"💤 Quiet ({len(quiet)})", self._name_list(quiet), False))
+            readiness.append((tr("mu_daily.quiet_title", count=len(quiet)), self._name_list(quiet, tr), False))
 
         days = (now - _week_start(now)).days + 1
-        description = f"Game day **{now:%a %b %d}** · resets 00:00 UTC\n⚔️ Week **{_fmt_short(weekly_damage)}**"
+        # the game day is the UTC date; its reset is shown in local time
+        next_reset = to_local(day_start + timedelta(days=1))
+        description = tr(
+            "mu_daily.description_day",
+            day=tr.strftime(now, tr("mu_daily.date_format")),
+            reset=f"{next_reset:%H:%M}",
+            tz=tz_name,
+        ) + "\n" + tr("mu_daily.description_week", damage=_fmt_short(weekly_damage))
         if weekly.get("rank"):
-            description += f" · rank #{weekly['rank']}"
+            description += " · " + tr("mu_daily.description_rank", rank=weekly["rank"])
         description += (
-            f" · ~{_fmt_short(weekly_damage / days)}/day\n"
-            f"👥 {len(fighters)} fighters · {len(rows) - len(fighters)} economy · {len(members)} members"
+            " · " + tr("mu_daily.description_per_day", damage=_fmt_short(weekly_damage / days)) + "\n"
+            + tr(
+                "mu_daily.description_members",
+                fighters=len(fighters),
+                economy=len(rows) - len(fighters),
+                members=len(members),
+            )
         )
-        footer = "Fighters = members with a fight skill build · pill state read at report time"
+        footer = tr("mu_daily.footer")
         if missing:
-            footer = f"⚠️ {missing} member(s) could not be fetched · " + footer
+            footer = tr("mu_daily.footer_missing", count=missing) + " · " + footer
 
-        author = f"🗓️ {mu_name} · Daily Report"
+        author = tr("mu_daily.author", mu=mu_name)
         icon_url = military_unit.get("avatarUrl") or None
         pages = self._paginate([pills, orders_and_skills, advice, readiness], author, description, footer)
         embeds = []
@@ -416,17 +460,20 @@ class MilitaryUnitDailyReportJob(commands.Cog):
                 messages.append([embed])
         return messages
 
-    def _name_list(self, entries: list[str], separator: str = ", ") -> str:
+    def _name_list(self, entries: list[str], tr: Translator, separator: str = ", ") -> str:
         shown = separator.join(entries[:NAMES_SHOWN])
         if len(entries) > NAMES_SHOWN:
-            shown += f"{separator}and {len(entries) - NAMES_SHOWN} more"
+            shown += separator + tr("mu_daily.and_more", count=len(entries) - NAMES_SHOWN)
         return shown
 
-    def _orders_text(self, orders: list[tuple[dict, str]], battles: list[dict] | None, country_names: dict[str, str]) -> str:
+    def _orders_text(
+        self, orders: list[tuple[dict, str]], battles: list[dict] | None, country_names: dict[str, str], tr: Translator
+    ) -> str:
         if battles is None:
-            return "unavailable"
+            return tr("common.unavailable")
         if not orders:
-            return "No active MU order"
+            return tr("mu_daily.no_order")
+        unknown = tr("common.unknown")
         lines = []
         for battle, side in orders[:ORDERS_SHOWN]:
             attacker = str((battle.get("attacker") or {}).get("country") or "")
@@ -434,15 +481,17 @@ class MilitaryUnitDailyReportJob(commands.Cog):
             # tournament battles have no side country
             if attacker and defender:
                 title = (
-                    f"{country_with_flag(country_names.get(attacker), left=True)} vs "
-                    f"{country_with_flag(country_names.get(defender), left=False)}"
+                    f"{country_with_flag(country_names.get(attacker), left=True, unknown=unknown)} vs "
+                    f"{country_with_flag(country_names.get(defender), left=False, unknown=unknown)}"
                 )
-                fighting_for = country_with_flag(country_names.get(attacker if side == "attacker" else defender), left=True)
+                fighting_for = country_with_flag(
+                    country_names.get(attacker if side == "attacker" else defender), left=True, unknown=unknown
+                )
             else:
-                title, fighting_for = "Tournament battle", side
-            lines.append(f"[{title}]({BATTLE_LINK.format(battle.get('_id'))}) · for {fighting_for}")
+                title, fighting_for = tr("common.tournament_battle"), tr(f"common.side.{side}")
+            lines.append(tr("mu_daily.order_line", title=title, link=BATTLE_LINK.format(battle.get("_id")), side=fighting_for))
         if len(orders) > ORDERS_SHOWN:
-            lines.append(f"and {len(orders) - ORDERS_SHOWN} more")
+            lines.append(tr("mu_daily.and_more", count=len(orders) - ORDERS_SHOWN))
         return "\n".join(lines)
 
     def _insights(
@@ -456,34 +505,37 @@ class MilitaryUnitDailyReportJob(commands.Cog):
         no_help: list[dict],
         now: datetime,
         settings: dict,
+        tr: Translator,
     ) -> list[str]:
         tips = []
         if battles is not None and not orders:
-            tips.append("No MU order is active; set one so fighters know where to pill and hit tomorrow.")
+            tips.append(tr("mu_daily.tip_no_order"))
         elif orders and no_pill:
-            tips.append(f"{len(no_pill)} fighter(s) did not pill today while the MU had an active order.")
+            tips.append(tr("mu_daily.tip_no_pill", count=len(no_pill)))
         if len(fighters) >= 3:
             # earliest time by which most fighters can pill: a natural shared pill window
             ready = sorted(row["pill"]["ready_at"] for row in fighters)
             needed = math.ceil(len(ready) * SHARED_WINDOW_PERCENT / 100)
             ready_at = ready[needed - 1]
             if ready_at > now:
+                ready_at = to_local(ready_at)
                 start = ready_at.replace(minute=0, second=0, microsecond=0)
                 if start < ready_at:
                     start += timedelta(hours=1)
                 tips.append(
-                    f"{needed}/{len(ready)} fighters can pill by {start:%H}:00 UTC; "
-                    "agree on a shared pill time from then."
+                    tr("mu_daily.tip_shared_window", needed=needed, total=len(ready), hour=f"{start:%H}", tz=start.tzname())
                 )
             spread = {row["pill"]["pilled_at"].hour for row in pilled_today}
             if len(spread) >= 4:
-                tips.append(f"Today's pills were spread over {len(spread)} different hours; a shared window hits harder.")
+                tips.append(tr("mu_daily.tip_spread", hours=len(spread)))
         to_economy = [row for row in reskilled if row["economy"]]
         if to_economy:
             back_at = min(row["last_reset_at"] for row in to_economy) + settings["reset_cooldown"]
-            tips.append(f"{len(to_economy)} member(s) reset to economy; they can't reset back to fight before {back_at:%b %d}.")
+            tips.append(
+                tr("mu_daily.tip_to_economy", count=len(to_economy), date=tr.strftime(to_local(back_at), tr("mu_daily.date_short_format")))
+            )
         if no_help:
-            tips.append(f"{len(no_help)} fighter(s) asked for no MU help today; that's free health, best used while pilled.")
+            tips.append(tr("mu_daily.tip_no_help", count=len(no_help)))
         return tips
 
 

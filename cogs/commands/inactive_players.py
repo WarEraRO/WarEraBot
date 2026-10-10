@@ -4,18 +4,22 @@ from discord.ext import commands
 from datetime import datetime, timezone
 from config import config
 from utils.api import get_user, get_shared_session
+from utils.i18n import Translator, get_translator
 
 _INACTIVE_THRESHOLD_SECONDS = 3 * 24 * 3600
 _PAGE_SIZE = 15
 
 
-def _build_pages(items: list) -> list[discord.Embed]:
-    title = "Inactive Players"
+def _build_pages(items: list, tr: Translator) -> list[discord.Embed]:
+    title = tr("inactive_players.title")
     if not items:
-        embed = discord.Embed(title=title, description="*No inactive players found.*", color=discord.Color.green())
-        embed.set_footer(text="Page 1 of 1 — Total: 0")
+        embed = discord.Embed(title=title, description=tr("inactive_players.none_found"), color=discord.Color.green())
+        embed.set_footer(text=tr("common.page_total", page=1, pages=1, total=0))
         return [embed]
-    lines = [f"{name} — Level: {level} — {note}" for name, level, note in items]
+    lines = [
+        tr("inactive_players.line", name=name, level=level, last_active=last_active)
+        for name, level, last_active in items
+    ]
     total = len(lines)
     total_pages = max(1, (total - 1) // _PAGE_SIZE + 1)
     pages = []
@@ -23,17 +27,19 @@ def _build_pages(items: list) -> list[discord.Embed]:
         chunk = lines[i : i + _PAGE_SIZE]
         embed = discord.Embed(title=title, color=discord.Color.red())
         embed.description = "\n".join(f"• {l}" for l in chunk)
-        embed.set_footer(text=f"Page {i // _PAGE_SIZE + 1} of {total_pages} — Total: {total}")
+        embed.set_footer(text=tr("common.page_total", page=i // _PAGE_SIZE + 1, pages=total_pages, total=total))
         pages.append(embed)
     return pages
 
 
 class _Paginator(discord.ui.View):
-    def __init__(self, pages: list[discord.Embed], timeout: int = 180):
+    def __init__(self, pages: list[discord.Embed], tr: Translator, timeout: int = 180):
         super().__init__(timeout=timeout)
         self.pages = pages
         self.current = 0
         self.message: discord.Message | None = None
+        self.prev_btn.label = tr("common.prev")
+        self.next_btn.label = tr("common.next")
         self._sync()
 
     def _sync(self):
@@ -72,10 +78,11 @@ class InactivePlayers(commands.Cog):
     )
     async def inactive_players(self, interaction: discord.Interaction):
         await interaction.response.defer()
+        tr = await get_translator(interaction.guild_id)
 
         guild = interaction.guild or self.bot.get_guild(config["guild"])
         if guild is None:
-            await interaction.followup.send("Guild not found.", ephemeral=True)
+            await interaction.followup.send(tr("common.guild_not_found"), ephemeral=True)
             return
 
         citizen = guild.get_role(config["roles"]["citizen"])
@@ -107,17 +114,17 @@ class InactivePlayers(commands.Cog):
                 if delta.total_seconds() >= _INACTIVE_THRESHOLD_SECONDS:
                     leveling = user.get("leveling", {}) or {}
                     level = leveling.get("level") if isinstance(leveling.get("level"), int) else None
-                    inactive.append((member.display_name, level, f"Last active: {last_conn_str}"))
+                    inactive.append((member.display_name, level, last_conn_str))
             except Exception:
                 continue
 
         inactive.sort(key=lambda x: x[0].lower())
-        pages = _build_pages(inactive)
+        pages = _build_pages(inactive, tr)
 
         if len(pages) == 1:
             await interaction.followup.send(embed=pages[0])
         else:
-            view = _Paginator(pages)
+            view = _Paginator(pages, tr)
             msg = await interaction.followup.send(embed=pages[0], view=view, wait=True)
             view.message = msg
 

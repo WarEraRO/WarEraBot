@@ -18,6 +18,7 @@ from utils.api import (
     get_won_mercenary_auctions,
 )
 from utils.common import country_flag, get_mu_destination
+from utils.i18n import Translator, get_translator
 
 logger = logging.getLogger(__name__)
 
@@ -40,12 +41,12 @@ DEFAULT_ROUNDS_TO_WIN = 2
 SIDE_ICONS = {"attacker": "⚔️", "defender": "🛡️"}
 
 
-def format_amount(value) -> str:
+def format_amount(value, unknown: str = "unknown") -> str:
     """Thousands separators, at most 4 decimals and no trailing zeros (0.08, 400, 5,008,000)."""
     try:
         number = float(value)
     except (TypeError, ValueError):
-        return "unknown"
+        return unknown
     return f"{number:,.4f}".rstrip("0").rstrip(".")
 
 
@@ -130,6 +131,7 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
             logger.info("MU contract monitor seeded with %d already won contracts", len(ours))
             return
 
+        tr = await get_translator(guild)
         # oldest first so the channel reads chronologically
         for contract in reversed(ours):
             contract_id = str(contract["_id"])
@@ -141,7 +143,7 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
                 logger.warning("Contracts channel/thread for MU %s not found", unit.get("friendlyName"))
                 continue
             try:
-                embed = await self._build_embed(contract, unit, session)
+                embed = await self._build_embed(contract, unit, session, tr)
                 await channel.send(embed=embed)
             except discord.DiscordException:
                 logger.exception("Failed to post contract %s for MU %s", contract_id, unit.get("friendlyName"))
@@ -174,7 +176,7 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
             if target is not None and not target.get("isActive"):
                 del self._posted[contract_id]
 
-    async def _build_embed(self, contract: dict, unit: dict, session) -> discord.Embed:
+    async def _build_embed(self, contract: dict, unit: dict, session, tr: Translator) -> discord.Embed:
         battle_id = str(contract.get("battle") or "")
         battle_link = f"https://app.warera.io/battle/{battle_id}"
         battle = await get_battle(battle_id, session) if battle_id else None
@@ -192,13 +194,14 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
 
         attacker = battle.get("attacker") or {}
         defender = battle.get("defender") or {}
-        issuer_name = country_names.get(str(contract.get("country") or contract.get("forCountry") or ""), "unknown")
-        attacker_name = country_names.get(str(attacker.get("country") or ""), "unknown")
-        defender_name = country_names.get(str(defender.get("country") or ""), "unknown")
+        unknown = tr("common.unknown")
+        issuer_name = country_names.get(str(contract.get("country") or contract.get("forCountry") or ""), unknown)
+        attacker_name = country_names.get(str(attacker.get("country") or ""), unknown)
+        defender_name = country_names.get(str(defender.get("country") or ""), unknown)
         side_icon = SIDE_ICONS.get(contract.get("forCountrySide"), "")
 
         embed = discord.Embed(
-            title=f"{side_icon} {issuer_name} · Mercenary Auction".strip(),
+            title=f"{side_icon} {tr('mu_contracts.title', country=issuer_name)}".strip(),
             url=battle_link,
             description=(
                 f"{SIDE_ICONS['attacker']} {self._country_label(attacker_name)} vs. "
@@ -207,14 +210,14 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
             color=discord.Color.blue(),
             timestamp=datetime.now(timezone.utc),
         )
-        embed.add_field(name="Min. Damage", value=format_amount(contract.get("minimumDamage")), inline=True)
-        embed.add_field(name="Per 1k Damage", value=format_amount(contract.get("currentPerK")), inline=True)
-        embed.add_field(name="Total Payout", value=format_amount(contract.get("currentPayout")), inline=True)
-        embed.add_field(name="Battle ETA", value=self._eta_text(contract, battle, round_obj, game_config), inline=True)
-        embed.add_field(name="Score", value=self._score_text(battle, game_config), inline=True)
+        embed.add_field(name=tr("mu_contracts.min_damage"), value=format_amount(contract.get("minimumDamage"), unknown), inline=True)
+        embed.add_field(name=tr("mu_contracts.per_1k"), value=format_amount(contract.get("currentPerK"), unknown), inline=True)
+        embed.add_field(name=tr("mu_contracts.total_payout"), value=format_amount(contract.get("currentPayout"), unknown), inline=True)
+        embed.add_field(name=tr("mu_contracts.battle_eta"), value=self._eta_text(contract, battle, round_obj, game_config, tr), inline=True)
+        embed.add_field(name=tr("mu_contracts.score"), value=self._score_text(battle, game_config, tr), inline=True)
         # in-game name and avatar make the winner clear; the config's friendlyName is often an abbreviation
-        mu_name = military_unit.get("name") or unit.get("friendlyName") or "unknown MU"
-        embed.set_footer(text=f"Contract won by {mu_name}")
+        mu_name = military_unit.get("name") or unit.get("friendlyName") or tr("mu_contracts.unknown_mu")
+        embed.set_footer(text=tr("mu_contracts.won_by", mu=mu_name))
         if military_unit.get("avatarUrl"):
             embed.set_thumbnail(url=military_unit["avatarUrl"])
         return embed
@@ -223,30 +226,39 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
         flag = country_flag(name)
         return f"{flag} **{name}**" if flag else f"**{name}**"
 
-    def _score_text(self, battle: dict, game_config: dict) -> str:
+    def _score_text(self, battle: dict, game_config: dict, tr: Translator) -> str:
         if not battle:
-            return "unknown"
+            return tr("common.unknown")
         attacker_wins = (battle.get("attacker") or {}).get("wonRoundsCount") or 0
         defender_wins = (battle.get("defender") or {}).get("wonRoundsCount") or 0
         rounds_to_win = battle.get("roundsToWin") or game_config["rounds_to_win"]
         round_number = len(battle.get("rounds") or []) or 1
-        return (
-            f"Round {round_number} · {SIDE_ICONS['attacker']} {attacker_wins} – {defender_wins} "
-            f"{SIDE_ICONS['defender']} (first to {rounds_to_win})"
+        return tr(
+            "mu_contracts.score_value",
+            round=round_number,
+            attacker_icon=SIDE_ICONS["attacker"],
+            attacker_wins=attacker_wins,
+            defender_wins=defender_wins,
+            defender_icon=SIDE_ICONS["defender"],
+            rounds_to_win=rounds_to_win,
         )
 
-    def _eta_text(self, contract: dict, battle: dict, round_obj, game_config: dict) -> str:
+    def _eta_text(self, contract: dict, battle: dict, round_obj, game_config: dict, tr: Translator) -> str:
         is_round_contract = bool(contract.get("round"))
         if not battle or not isinstance(round_obj, dict):
-            return "unknown"
+            return tr("common.unknown")
         if not battle.get("isActive"):
-            return "Battle ended"
+            return tr("mu_contracts.battle_ended")
         if is_round_contract and not round_obj.get("isActive"):
-            return "Round ended"
+            return tr("mu_contracts.round_ended")
 
         eta = self._round_eta(round_obj, game_config)
         if is_round_contract:
-            return f"{format_duration(eta)} (round {contract.get('roundNumber') or round_obj.get('number')})"
+            return tr(
+                "mu_contracts.round_eta",
+                eta=format_duration(eta),
+                round=contract.get("roundNumber") or round_obj.get("number"),
+            )
 
         # battle contract: the side leading this round wins it, then keeps winning full rounds until roundsToWin
         attacker_points = (round_obj.get("attacker") or {}).get("points") or 0

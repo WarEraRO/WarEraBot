@@ -19,12 +19,14 @@ from utils.api import (
     get_user_info,
     get_won_mercenary_auctions,
 )
-from utils.common import country_with_flag, get_mu_destination
+from utils.common import country_with_flag, get_mu_destination, to_local
+from utils.i18n import Translator, get_translator
 
 logger = logging.getLogger(__name__)
 
 MU_BATTLE_TRACKER_INTERVAL_MINUTES = 60
-# the game week (and the MU weekly damage ranking) resets on Monday 00:00 UTC, so the report runs just before
+# the game week (and the MU weekly damage ranking) resets on Monday 00:00 UTC, so the report runs just before;
+# the schedule and week boundaries stay in UTC, only the times shown are converted to config.json "timezone"
 REPORT_TIME = dt_time(hour=23, minute=30, tzinfo=timezone.utc)
 SUNDAY = 6
 # battles last at most ~1 day and are listed newest-created first, so a battle that ended this week
@@ -235,10 +237,11 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
         }
 
         names: dict[str, str] = {}
+        tr = await get_translator(guild)
         for mu_id, unit in units.items():
             try:
                 embed = await self._build_embed(
-                    mu_id, unit, session, week_start, now, contracts, battles_complete, names, country_names
+                    mu_id, unit, session, week_start, now, contracts, battles_complete, names, country_names, tr
                 )
                 if embed is None:
                     continue
@@ -265,6 +268,7 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
         battles_complete: bool,
         names: dict[str, str],
         country_names: dict[str, str],
+        tr: Translator,
     ) -> discord.Embed | None:
         """The MU's weekly report, or None when it has no members or dealt less than MIN_REPORT_DAMAGE."""
         week_start_iso = _iso(week_start)
@@ -363,109 +367,132 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
 
         # Discord does not allow a wider embed, so the avatar goes in the author line instead of a thumbnail
         # (which takes a column from every field row) and lines in the 3-column rows stay ~22 characters
+        # the game week runs over UTC dates; its reset is shown in local time
+        next_reset = to_local(week_start + timedelta(days=7))
         embed = discord.Embed(
-            description=f"Game week **{week_start:%b %d} – {now:%b %d}** (resets Monday 00:00 UTC)",
+            description=tr(
+                "mu_weekly.description",
+                start=tr.strftime(week_start, tr("mu_weekly.date_format")),
+                end=tr.strftime(now, tr("mu_weekly.date_format")),
+                reset=tr.strftime(next_reset, tr("mu_weekly.reset_format")),
+            ),
             color=discord.Color.gold(),
             timestamp=now,
         )
-        embed.set_author(name=f"📊 {mu_name} · Weekly Report", icon_url=military_unit.get("avatarUrl") or None)
+        embed.set_author(name=tr("mu_weekly.author", mu=mu_name), icon_url=military_unit.get("avatarUrl") or None)
+        unknown = tr("common.unknown")
 
         # row 1: damage, battles, earnings
         damage_text = f"**{_fmt_int(total_damage)}**"
         if weekly.get("rank"):
-            damage_text += f"\nRank #{weekly['rank']}" + (f" · {weekly['tier']}" if weekly.get("tier") else "")
-        embed.add_field(name="⚔️ Damage", value=damage_text, inline=True)
+            damage_text += "\n" + tr("mu_weekly.rank", rank=weekly["rank"]) + (f" · {weekly['tier']}" if weekly.get("tier") else "")
+        embed.add_field(name=tr("mu_weekly.damage_title"), value=damage_text, inline=True)
 
-        battles_text = f"**{len(fought)}** ended\n{won} won · {len(fought) - won} lost"
+        battles_text = tr("mu_weekly.battles_value", ended=len(fought), won=won, lost=len(fought) - won)
         if unpaid:
             share = "<1" if unpaid_percent < 1 else f"{unpaid_percent:.0f}"
-            battles_text += f"\n{len(unpaid)} unpaid · {share}% dmg"
-        embed.add_field(name="🗺️ Battles", value=battles_text, inline=True)
+            battles_text += "\n" + tr("mu_weekly.battles_unpaid", count=len(unpaid), share=share)
+        embed.add_field(name=tr("mu_weekly.battles_title"), value=battles_text, inline=True)
 
-        earnings_text = (
-            f"**{_fmt_int(battle_money)}**\n"
-            f"Bounty ~{_fmt_int(bounty)}\n"
-            f"Contracts ~{_fmt_int(battle_money - bounty)}"
+        earnings_text = tr(
+            "mu_weekly.earned_value",
+            total=_fmt_int(battle_money),
+            bounty=_fmt_int(bounty),
+            contracts=_fmt_int(battle_money - bounty),
         )
         if battle_damage:
-            earnings_text += f"\n{_fmt_money(battle_money / battle_damage * 1000)} per 1k dmg"
-        embed.add_field(name="💰 Earned", value=earnings_text, inline=True)
+            earnings_text += "\n" + tr("mu_weekly.earned_per_1k", amount=_fmt_money(battle_money / battle_damage * 1000))
+        embed.add_field(name=tr("mu_weekly.earned_title"), value=earnings_text, inline=True)
 
         # row 2: contracts, reputation, treasury
         if contracts_available:
-            contracts_text = f"**{len(won_contracts)}** won · {_fmt_int(contract_value)}"
+            contracts_text = tr("mu_weekly.contracts_won", count=len(won_contracts), value=_fmt_int(contract_value))
             if won_contracts:
-                contracts_text += f"\n{_fmt_perk(won_perk)} (start {_fmt_perk(won_start_perk)})"
+                contracts_text += "\n" + tr("mu_weekly.contracts_perk", perk=_fmt_perk(won_perk), start=_fmt_perk(won_start_perk))
             if lost_auctions:
-                contracts_text += (
-                    f"\n{len(lost_auctions)} lost · ours {_fmt_perk(lost_our_perk)}"
-                    f"\nWinners {_fmt_perk(lost_winner_perk)}"
+                contracts_text += "\n" + tr(
+                    "mu_weekly.contracts_lost",
+                    count=len(lost_auctions),
+                    ours=_fmt_perk(lost_our_perk),
+                    winners=_fmt_perk(lost_winner_perk),
                 )
         else:
-            contracts_text = "unavailable"
-        embed.add_field(name="📜 Contracts (per 1k)", value=contracts_text, inline=True)
+            contracts_text = tr("common.unavailable")
+        embed.add_field(name=tr("mu_weekly.contracts_title"), value=contracts_text, inline=True)
 
         reputation = (military_unit.get("rankings") or {}).get("muReputation") or {}
         reputation_value = military_unit.get("mercenaryReputation", reputation.get("value"))
         if reputation_value is not None:
             reputation_text = f"**{reputation_value:.2f}**"
             if reputation.get("rank"):
-                reputation_text += f"\nRank #{reputation['rank']}" + (f" · {reputation['tier']}" if reputation.get("tier") else "")
-            embed.add_field(name="🎖️ Reputation", value=reputation_text, inline=True)
+                reputation_text += "\n" + tr("mu_weekly.rank", rank=reputation["rank"]) + (f" · {reputation['tier']}" if reputation.get("tier") else "")
+            embed.add_field(name=tr("mu_weekly.reputation_title"), value=reputation_text, inline=True)
 
-        embed.add_field(name="🏦 Treasury", value=self._treasury_text(mu_id, military_unit, transactions, open_orders), inline=True)
+        embed.add_field(
+            name=tr("mu_weekly.treasury_title"),
+            value=self._treasury_text(mu_id, military_unit, transactions, open_orders, tr),
+            inline=True,
+        )
 
         # row 3: activity, damage spread, top fighters
         if members:
-            activity_text = f"**{len(active_members)}/{len(members)}** fought"
+            activity_text = tr("mu_weekly.activity_fought", active=len(active_members), members=len(members))
             if new_members:
-                activity_text += f" · {len(new_members)} new"
-            activity_text += (
-                f"\n{_fmt_int(help_count)} help · {help_count / len(members):.0f}/member"
-                f"\n{len(no_help)} gave no help"
+                activity_text += " · " + tr("mu_weekly.activity_new", count=len(new_members))
+            activity_text += "\n" + tr(
+                "mu_weekly.activity_help",
+                help=_fmt_int(help_count),
+                per_member=f"{help_count / len(members):.0f}",
+                no_help=len(no_help),
             )
-            embed.add_field(name="👥 Activity", value=activity_text, inline=True)
-            spread_text = (
-                f"Median {_fmt_short(median_damage)}\n"
-                f"Avg {_fmt_short(average_damage)}\n"
-                f"{len(low_contributors)} below {LOW_CONTRIBUTOR_PERCENT}% of avg"
+            embed.add_field(name=tr("mu_weekly.activity_title"), value=activity_text, inline=True)
+            spread_text = tr(
+                "mu_weekly.spread_value",
+                median=_fmt_short(median_damage),
+                average=_fmt_short(average_damage),
+                low=len(low_contributors),
+                percent=LOW_CONTRIBUTOR_PERCENT,
             )
-            embed.add_field(name="📈 Damage spread", value=spread_text, inline=True)
+            embed.add_field(name=tr("mu_weekly.spread_title"), value=spread_text, inline=True)
             fighters_text = "\n".join(
-                f"{index}. {_shorten(names.get(str(member.get('user')), 'unknown'))} {_fmt_short(member.get('weeklyDamagesCount'))}"
+                f"{index}. {_shorten(names.get(str(member.get('user'))) or unknown)} {_fmt_short(member.get('weeklyDamagesCount'))}"
                 for index, member in enumerate(top_fighters, start=1)
                 if member.get("weeklyDamagesCount")
             )
-            embed.add_field(name="🏅 Top fighters", value=fighters_text or "nobody fought", inline=True)
+            embed.add_field(name=tr("mu_weekly.top_fighters_title"), value=fighters_text or tr("mu_weekly.nobody_fought"), inline=True)
 
         if fought:
             battle_id, result = max(fought.items(), key=lambda item: item[1]["damage"])
-            embed.add_field(name="🔥 Biggest battle", value=self._battle_text(battle_id, result, country_names), inline=False)
+            embed.add_field(
+                name=tr("mu_weekly.biggest_battle_title"),
+                value=self._battle_text(battle_id, result, country_names, tr),
+                inline=False,
+            )
 
         if new_members:
             embed.add_field(
-                name=f"🆕 New members ({len(new_members)})",
-                value=_truncate(self._name_list(new_members, NEW_MEMBERS_SHOWN, names)),
+                name=tr("mu_weekly.new_members_title", count=len(new_members)),
+                value=_truncate(self._name_list(new_members, NEW_MEMBERS_SHOWN, names, tr)),
                 inline=False,
             )
 
         if idle_members:
             embed.add_field(
-                name=f"💤 No damage this week ({len(idle_members)})",
-                value=_truncate(self._name_list(idle_members, IDLE_MEMBERS_SHOWN, names)),
+                name=tr("mu_weekly.idle_title", count=len(idle_members)),
+                value=_truncate(self._name_list(idle_members, IDLE_MEMBERS_SHOWN, names, tr)),
                 inline=False,
             )
 
         insights = self._insights(
             members, top_fighters, idle_members, lost_auctions, won_contracts,
-            fought, won, unpaid_percent, lost_winner_perk,
+            fought, won, unpaid_percent, lost_winner_perk, tr,
         )
         if insights:
-            embed.add_field(name="💡 Focus for next week", value=_truncate("\n".join(f"• {tip}" for tip in insights)), inline=False)
+            embed.add_field(name=tr("mu_weekly.tips_title"), value=_truncate("\n".join(f"• {tip}" for tip in insights)), inline=False)
 
-        footer = "Battles count once they end · bounty is estimated as battle money minus contract payouts"
+        footer = tr("mu_weekly.footer")
         if not battles_complete:
-            footer = "⚠️ Some battles could not be fetched, battle numbers may be low · " + footer
+            footer = tr("mu_weekly.footer_incomplete") + " · " + footer
         embed.set_footer(text=footer)
 
         # every field is capped at 1024 characters, so only the name lists can push the embed over the limit
@@ -474,52 +501,65 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
             embed.remove_field(len(embed.fields) - 1)
         return embed
 
-    def _treasury_text(self, mu_id: str, military_unit: dict, transactions: list[dict] | None, open_orders: dict | None) -> str:
+    def _treasury_text(
+        self, mu_id: str, military_unit: dict, transactions: list[dict] | None, open_orders: dict | None, tr: Translator
+    ) -> str:
         lines = []
         wealth = (military_unit.get("rankings") or {}).get("muWealth") or {}
         if wealth.get("value") is not None:
-            lines.append(f"Wealth **{_fmt_int(wealth['value'])}**" + (f" (#{wealth['rank']})" if wealth.get("rank") else ""))
+            lines.append(tr("mu_weekly.wealth", value=_fmt_int(wealth["value"])) + (f" (#{wealth['rank']})" if wealth.get("rank") else ""))
         if transactions is None:
-            lines.append("Transactions unavailable")
+            lines.append(tr("mu_weekly.transactions_unavailable"))
         else:
             donations = [item for item in transactions if item.get("transactionType") == "donation"]
             bought = [item for item in transactions if item.get("transactionType") == "trading" and str(item.get("buyerMuId") or "") == mu_id]
             sold = [item for item in transactions if item.get("transactionType") == "trading" and str(item.get("sellerMuId") or "") == mu_id]
             donors = {str(item.get("buyerId")) for item in donations if item.get("buyerId")}
-            lines.append(f"+{_fmt_int(sum(item.get('money') or 0 for item in donations))} from {len(donors)} donors")
+            lines.append(tr("mu_weekly.donations", amount=_fmt_int(sum(item.get('money') or 0 for item in donations)), donors=len(donors)))
             if bought:
                 spent_by_item = Counter()
                 for item in bought:
-                    spent_by_item[str(item.get("itemCode") or "items")] += item.get("money") or 0
-                lines.append(f"−{_fmt_int(sum(spent_by_item.values()))} bought ({spent_by_item.most_common(1)[0][0]})")
+                    spent_by_item[str(item.get("itemCode") or tr("mu_weekly.items"))] += item.get("money") or 0
+                lines.append(
+                    tr("mu_weekly.bought", amount=_fmt_int(sum(spent_by_item.values())), item=spent_by_item.most_common(1)[0][0])
+                )
             if sold:
-                lines.append(f"+{_fmt_int(sum(item.get('money') or 0 for item in sold))} sold")
+                lines.append(tr("mu_weekly.sold", amount=_fmt_int(sum(item.get('money') or 0 for item in sold))))
         if open_orders and open_orders.get("allOrders"):
             lines.append(
-                f"{len(open_orders['allOrders'])} orders · "
-                f"{_fmt_int(open_orders.get('totalBuyMoneyInvested'))} invested"
+                tr(
+                    "mu_weekly.open_orders",
+                    count=len(open_orders["allOrders"]),
+                    invested=_fmt_int(open_orders.get("totalBuyMoneyInvested")),
+                )
             )
-        return "\n".join(lines) or "unavailable"
+        return "\n".join(lines) or tr("common.unavailable")
 
-    def _battle_text(self, battle_id: str, result: dict, country_names: dict[str, str]) -> str:
+    def _battle_text(self, battle_id: str, result: dict, country_names: dict[str, str], tr: Translator) -> str:
         countries = result.get("countries") or {}
+        unknown = tr("common.unknown")
         if countries.get("attacker") and countries.get("defender"):
             title = (
-                f"{country_with_flag(country_names.get(countries['attacker']), left=True)} vs "
-                f"{country_with_flag(country_names.get(countries['defender']), left=False)}"
+                f"{country_with_flag(country_names.get(countries['attacker']), left=True, unknown=unknown)} vs "
+                f"{country_with_flag(country_names.get(countries['defender']), left=False, unknown=unknown)}"
             )
         else:
-            title = "Tournament battle"
-        outcome = "won" if result["won_by"] == result["side"] else "lost"
-        return (
-            f"[{title}]({BATTLE_LINK.format(battle_id)}) · {_fmt_short(result['damage'])} damage · "
-            f"{_fmt_money(result['money'])} earned · {outcome}"
+            title = tr("common.tournament_battle")
+        outcome = tr("mu_weekly.outcome_won") if result["won_by"] == result["side"] else tr("mu_weekly.outcome_lost")
+        return tr(
+            "mu_weekly.battle_line",
+            title=title,
+            link=BATTLE_LINK.format(battle_id),
+            damage=_fmt_short(result["damage"]),
+            money=_fmt_money(result["money"]),
+            outcome=outcome,
         )
 
-    def _name_list(self, members: list[dict], limit: int, names: dict[str, str]) -> str:
-        shown = ", ".join(names.get(str(member.get("user")), "unknown") for member in members[:limit])
+    def _name_list(self, members: list[dict], limit: int, names: dict[str, str], tr: Translator) -> str:
+        unknown = tr("common.unknown")
+        shown = ", ".join(names.get(str(member.get("user"))) or unknown for member in members[:limit])
         if len(members) > limit:
-            shown += f" and {len(members) - limit} more"
+            shown += " " + tr("mu_weekly.and_more", count=len(members) - limit)
         return shown
 
     def _insights(
@@ -533,32 +573,33 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
         won: int,
         unpaid_percent: float,
         lost_winner_perk: float,
+        tr: Translator,
     ) -> list[str]:
         tips = []
         if idle_members:
-            tips.append(f"{len(idle_members)} member(s) dealt no damage; check in with them or free up their slots.")
+            tips.append(tr("mu_weekly.tip_idle", count=len(idle_members)))
         if unpaid_percent >= UNPAID_DAMAGE_PERCENT:
-            tips.append(f"{unpaid_percent:.0f}% of damage earned nothing; prefer battles with a bounty or a contract.")
+            tips.append(tr("mu_weekly.tip_unpaid", percent=f"{unpaid_percent:.0f}"))
         total_member_damage = sum(member.get("weeklyDamagesCount") or 0 for member in members)
         top_damage = sum(member.get("weeklyDamagesCount") or 0 for member in top_fighters)
         if total_member_damage and len(members) > len(top_fighters):
             share = top_damage / total_member_damage * 100
             if share >= DAMAGE_CONCENTRATION_PERCENT:
-                tips.append(f"Top {len(top_fighters)} fighters did {share:.0f}% of the damage; the rest of the MU can add a lot more.")
+                tips.append(tr("mu_weekly.tip_concentration", top=len(top_fighters), share=f"{share:.0f}"))
         if lost_auctions and len(lost_auctions) >= len(won_contracts):
             tips.append(
-                f"Lost {len(lost_auctions)} contract auctions vs {len(won_contracts)} won; "
-                f"winners went down to {_fmt_perk(lost_winner_perk)}/1k."
+                tr("mu_weekly.tip_auctions", lost=len(lost_auctions), won=len(won_contracts), perk=_fmt_perk(lost_winner_perk))
             )
         if fought and won * 2 < len(fought):
-            tips.append(f"Only {won} of {len(fought)} battles were won; focus damage on fewer, winnable battles.")
+            tips.append(tr("mu_weekly.tip_battles", won=won, total=len(fought)))
         return tips
 
     async def _resolve_names(self, user_ids: list[str], session, names: dict[str, str]):
         missing = [user_id for user_id in dict.fromkeys(user_ids) if user_id and user_id not in names]
         users = await asyncio.gather(*(get_user_info(user_id, session) for user_id in missing))
         for user_id, user in zip(missing, users):
-            names[user_id] = str((user or {}).get("username") or "unknown")
+            # "" when unknown; shown as a translated "unknown"
+            names[user_id] = str((user or {}).get("username") or "")
 
 
 async def setup(bot: commands.Bot):

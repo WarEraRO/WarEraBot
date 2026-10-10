@@ -1,7 +1,8 @@
 from discord.ext import commands, tasks
-from utils.api import get_user, get_all_countries, get_shared_session
+from utils.api import get_users_by_name, get_all_countries, get_shared_session
 from utils.db import init_db
 from utils.computational import is_economy_build
+from utils.i18n import Translator, get_translator
 from config import config
 import discord
 
@@ -37,6 +38,7 @@ class SkillRolesJob(commands.Cog):
         fight_role = guild.get_role(config['roles']['fight'])
         
         members = citizen.members if citizen else []
+        tr = await get_translator(guild)
         stats = {
             'economy_added': [],
             'economy_removed': [],
@@ -44,8 +46,10 @@ class SkillRolesJob(commands.Cog):
             'fight_removed': [],
         }
         session = await get_shared_session()
+        # One batched fetch for all members instead of one request per member
+        users = await get_users_by_name([m.display_name for m in members], session)
         for member in members:
-            user = await get_user(member.display_name, session)
+            user = users.get(member.display_name)
             if user is None:
                 continue
             is_economy = is_economy_build(user)
@@ -58,17 +62,17 @@ class SkillRolesJob(commands.Cog):
 
             if is_economy:
                 if economy_role and economy_role not in member.roles:
-                    await member.add_roles(economy_role, reason="Economy skill > 50")
+                    await member.add_roles(economy_role, reason=tr("skill_roles.reason_economy_added"))
                     stats['economy_added'].append(member.display_name)
                 if fight_role and fight_role in member.roles:
-                    await member.remove_roles(fight_role, reason="Economy > 50, remove fighter role")
+                    await member.remove_roles(fight_role, reason=tr("skill_roles.reason_fight_removed"))
                     stats['fight_removed'].append(member.display_name)
             else:
                 if fight_role and fight_role not in member.roles:
-                    await member.add_roles(fight_role, reason="Economy skill <= 50")
+                    await member.add_roles(fight_role, reason=tr("skill_roles.reason_fight_added"))
                     stats['fight_added'].append(member.display_name)
                 if economy_role and economy_role in member.roles:
-                    await member.remove_roles(economy_role, reason="Economy <= 50, remove economy role")
+                    await member.remove_roles(economy_role, reason=tr("skill_roles.reason_economy_removed"))
                     stats['economy_removed'].append(member.display_name)
             
             self.cached_members[member.id] = is_economy
@@ -78,7 +82,7 @@ class SkillRolesJob(commands.Cog):
         if channel:
             total_changes = sum(len(stats.get(k, [])) for k in ('economy_added', 'economy_removed', 'fight_added', 'fight_removed'))
             if total_changes > 0:
-                embed = self.build_skill_roles_embed(stats)
+                embed = self.build_skill_roles_embed(stats, tr)
                 if embed:
                     await channel.send(embed=embed)
 
@@ -86,7 +90,7 @@ class SkillRolesJob(commands.Cog):
     async def before_skill_roles(self):
         await self.bot.wait_until_ready()
 
-    def build_skill_roles_embed(self, stats: dict) -> discord.Embed:
+    def build_skill_roles_embed(self, stats: dict, tr: Translator) -> discord.Embed:
         economy_added = stats.get('economy_added', [])
         economy_removed = stats.get('economy_removed', [])
         fight_added = stats.get('fight_added', [])
@@ -98,14 +102,14 @@ class SkillRolesJob(commands.Cog):
             return None
 
         embed = discord.Embed(
-            title="Skill Roles Updated",
-            description="Summary of skill role changes:",
+            title=tr("skill_roles.title"),
+            description=tr("skill_roles.description"),
             color=discord.Color.orange()
         )
 
         def format_list(lst: list) -> str:
             if not lst:
-                return "None"
+                return tr("common.none")
             lines = [f"* {n}" for n in lst]
             cur = ""
             count = 0
@@ -117,14 +121,14 @@ class SkillRolesJob(commands.Cog):
             remaining = len(lines) - count
             if remaining > 0:
                 cur = cur.rstrip("\n")
-                cur += f"\n... and {remaining} more"
+                cur += "\n" + tr("common.and_more", count=remaining)
             return cur
 
-        embed.add_field(name="Economy Roles — Added", value=format_list(economy_added), inline=False)
-        embed.add_field(name="Economy Roles — Removed", value=format_list(economy_removed), inline=False)
-        embed.add_field(name="Fight Roles — Added", value=format_list(fight_added), inline=False)
-        embed.add_field(name="Fight Roles — Removed", value=format_list(fight_removed), inline=False)
-        embed.set_footer(text=f"Total changes: {total}")
+        embed.add_field(name=tr("skill_roles.economy_added"), value=format_list(economy_added), inline=False)
+        embed.add_field(name=tr("skill_roles.economy_removed"), value=format_list(economy_removed), inline=False)
+        embed.add_field(name=tr("skill_roles.fight_added"), value=format_list(fight_added), inline=False)
+        embed.add_field(name=tr("skill_roles.fight_removed"), value=format_list(fight_removed), inline=False)
+        embed.set_footer(text=tr("common.total_changes", total=total))
         return embed
 
 

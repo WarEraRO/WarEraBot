@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 from config import config
 from utils.api import get_articles, get_shared_session
+from utils.i18n import get_translator
 
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,7 @@ class ArticleMentionJob(commands.Cog):
             if guild
             else None
         )
+        tr = await get_translator(guild)
 
         for article in articles[:ARTICLE_LIMIT]:
             article_id = article.get("_id")
@@ -69,10 +71,7 @@ class ArticleMentionJob(commands.Cog):
 
             article_url = f"{ARTICLE_BASE_URL}/{article_id}"
             embed = discord.Embed(
-                description=(
-                    "Romania was mentioned in an article, you might want to "
-                    f"check it out -> [{article.get('title')}]({article_url})"
-                ),
+                description=tr("article_mention.mentioned", title=article.get("title"), url=article_url),
                 color=discord.Color.blue(),
             )
 

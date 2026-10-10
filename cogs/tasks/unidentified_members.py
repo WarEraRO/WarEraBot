@@ -1,6 +1,7 @@
 from discord.ext import commands, tasks
 from utils.api import get_shared_session, get_user, get_user_info
 from utils.db import init_db, save_user, find_api_id_by_display_name, find_api_id_by_discord_username, find_api_id_by_discord_id
+from utils.i18n import Translator, get_translator
 from config import config
 import discord
 
@@ -33,6 +34,7 @@ class UnidentifiedMembersJob(commands.Cog):
 
         unidentified = []
         session = await get_shared_session()
+        tr = await get_translator(guild)
         for member in members:
             user = await get_user(member.display_name, session)
             if user is None:
@@ -47,7 +49,7 @@ class UnidentifiedMembersJob(commands.Cog):
                             # If the API reports a different display name, try to update the member's server nickname
                             if new_display and new_display != member.display_name:
                                 try:
-                                    await member.edit(nick=new_display, reason="Sync WarEra username")
+                                    await member.edit(nick=new_display, reason=tr("unidentified.reason_nick_sync"))
                                 except Exception:
                                     # ignore failures (permissions, hierarchy, etc.)
                                     pass
@@ -70,7 +72,7 @@ class UnidentifiedMembersJob(commands.Cog):
         # Always send an embed, even if there are no unidentified players
         channel = guild.get_channel(config["channels"]["reports"]) if guild else None
         if channel:
-            embeds = self.build_unidentified_embed(unidentified)
+            embeds = self.build_unidentified_embed(unidentified, tr)
             # builder returns a list of embeds; send them sequentially
             if isinstance(embeds, list):
                 for e in embeds:
@@ -88,17 +90,17 @@ class UnidentifiedMembersJob(commands.Cog):
     async def before_unidentified_members(self):
         await self.bot.wait_until_ready()
 
-    def build_unidentified_embed(self, members: list[discord.Member]) -> list:
+    def build_unidentified_embed(self, members: list[discord.Member], tr: Translator) -> list:
         """Return a list of embeds (one or more) that together list unidentified members.
         Splits content so no single embed exceeds Discord's embed size limits.
         """
         if not members:
             embed = discord.Embed(
-                title="Unidentified Players Check",
-                description="No unidentified players were found.",
+                title=tr("unidentified.check_title"),
+                description=tr("unidentified.none_found"),
                 color=discord.Color.green()
             )
-            embed.set_footer(text="Total: 0")
+            embed.set_footer(text=tr("common.total", total=0))
             return [embed]
 
         lines = [f"* {m.display_name} ('{m.id}')" for m in members]
@@ -116,19 +118,19 @@ class UnidentifiedMembersJob(commands.Cog):
 
         # Now group fields into embeds without exceeding a safe embed size limit
         EMBED_CHAR_LIMIT = 5800  # keep some headroom under 6000
-        title = "Unidentified Players Found"
-        description = "The following members could not be matched:"
+        title = tr("unidentified.found_title")
+        description = tr("unidentified.found_description")
 
         embeds: list[discord.Embed] = []
         current_embed = discord.Embed(title=title, description=description, color=discord.Color.orange())
         current_length = len(title) + len(description)
 
         for field_value in field_chunks:
-            field_name = "Players"
+            field_name = tr("unidentified.players")
             field_len = len(field_name) + len(field_value)
             # Start a new embed if adding this field would exceed the safe limit
             if current_length + field_len > EMBED_CHAR_LIMIT and len(current_embed.fields) > 0:
-                current_embed.set_footer(text=f"Total: {len(members)}")
+                current_embed.set_footer(text=tr("common.total", total=len(members)))
                 embeds.append(current_embed)
                 current_embed = discord.Embed(title=title, description=description, color=discord.Color.orange())
                 current_length = len(title) + len(description)
@@ -137,7 +139,7 @@ class UnidentifiedMembersJob(commands.Cog):
             current_length += field_len
 
         # Append last embed
-        current_embed.set_footer(text=f"Total: {len(members)}")
+        current_embed.set_footer(text=tr("common.total", total=len(members)))
         embeds.append(current_embed)
         return embeds
 

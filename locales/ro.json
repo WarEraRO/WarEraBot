@@ -1,0 +1,817 @@
+{
+    "languages": {
+        "en": "Engleză",
+        "ro": "Română"
+    },
+    "dates": {
+        "days_short": ["lun", "mar", "mie", "joi", "vin", "sâm", "dum"],
+        "days": ["luni", "marți", "miercuri", "joi", "vineri", "sâmbătă", "duminică"],
+        "months_short": ["ian", "feb", "mar", "apr", "mai", "iun", "iul", "aug", "sep", "oct", "noi", "dec"],
+        "months": ["ianuarie", "februarie", "martie", "aprilie", "mai", "iunie", "iulie", "august", "septembrie", "octombrie", "noiembrie", "decembrie"]
+    },
+    "common": {
+        "not_authorized": "Nu ai permisiunea să folosești această comandă.",
+        "guild_not_found": "Serverul nu a fost găsit.",
+        "prev": "◀ Înapoi",
+        "next": "Înainte ▶",
+        "prev_plain": "Înapoi",
+        "next_plain": "Înainte",
+        "first": "Prima",
+        "previous": "Anterioara",
+        "last": "Ultima",
+        "page_total": "Pagina {page} din {pages} — Total: {total}",
+        "page_short": "Pagina {page}/{pages}",
+        "total": "Total: {total}",
+        "total_changes": "Total modificări: {total}",
+        "and_more": "... și încă {count}",
+        "unknown": "necunoscut",
+        "unknown_title": "Necunoscut",
+        "unknown_user": "Utilizator necunoscut ({id})",
+        "unknown_country": "Țară necunoscută",
+        "none": "Niciunul",
+        "yes": "Da",
+        "no": "Nu",
+        "added": "Adăugați",
+        "removed": "Eliminați",
+        "no_description": "Fără descriere.",
+        "unavailable": "indisponibil",
+        "tournament_battle": "Bătălie de turneu",
+        "country_list_unavailable": "Nu s-a putut încărca lista de țări. Încearcă din nou mai târziu.",
+        "country_not_found_autocomplete": "Țara `{country}` nu a fost găsită. Alege o țară din lista de sugestii.",
+        "side": {
+            "attacker": "atacator",
+            "defender": "apărător"
+        },
+        "side_title": {
+            "attacker": "Atacator",
+            "defender": "Apărător"
+        }
+    },
+    "lifecycle": {
+        "started": {
+            "title": "WarEraBot a pornit",
+            "description": "Botul este online și sarcinile de fundal rulează."
+        },
+        "stopped": {
+            "title": "WarEraBot s-a oprit",
+            "description": "Clientul botului se închide sau s-a deconectat neașteptat."
+        }
+    },
+    "setlang": {
+        "updated": "Limba botului pe acest server este acum **{language}**.",
+        "unknown": "Limbă necunoscută: `{language}`. Disponibile: {available}.",
+        "failed": "Limba nu a putut fi salvată. Încearcă din nou mai târziu."
+    },
+    "run_job": {
+        "every": "la fiecare {interval}",
+        "scheduled": "programat",
+        "no_jobs": "niciuna",
+        "unknown": "Sarcină necunoscută: `{job}`. Sarcini disponibile: {available}",
+        "already_running": "Sarcina `{job}` rulează deja. Încearcă din nou după ce se termină.",
+        "failed": "Sarcina `{job}` a eșuat după {seconds}s: `{error}`",
+        "finished": "Sarcina `{job}` s-a terminat în {seconds}s."
+    },
+    "help": {
+        "commands_title": "Comenzile botului",
+        "commands_description": "Folosește comenzile slash de mai jos. Sugestiile automate sunt disponibile acolo unde se aplică.",
+        "commands_footer": "Comenzi — Pagina {page} din {pages}",
+        "jobs_title": "Sarcini de fundal",
+        "jobs_description": "Sarcinile de fundal active și cât de des rulează.",
+        "jobs_footer": "Sarcini — Pagina {page} din {pages}",
+        "commands_button": "Comenzi",
+        "jobs_button": "Sarcini",
+        "unavailable": "Ajutorul nu poate fi afișat momentan.",
+        "commands": {
+            "diplomacy": {
+                "name": "/diplomacy [country_name]",
+                "desc": "Afișează informațiile diplomatice ale țărilor. Dacă dai `country_name`, arată detaliile acelei țări; altfel arată o listă paginată a țărilor cu înregistrări diplomatice (3 pe pagină). Câmpurile rezervate guvernului (lista diplomatică) apar dacă ai rolul de guvern."
+            },
+            "update_diplomacy": {
+                "name": "/update_diplomacy country_name [status] [diplomacy] [description]",
+                "desc": "Doar pentru guvern. Actualizează o înregistrare diplomatică existentă: setează `status`, adaugă o intrare `diplomacy` sau actualizează `description`. Intrările noi primesc automat data. Statusul trebuie să fie una dintre opțiunile predefinite, cu sugestii automate."
+            },
+            "add_diplomacy": {
+                "name": "/add_diplomacy country_name [status] [description]",
+                "desc": "Doar pentru guvern. Creează o înregistrare diplomatică nouă pentru o țară. Dacă există deja, folosește `/update_diplomacy`."
+            },
+            "remove_diplomacy": {
+                "name": "/remove_diplomacy country_name position",
+                "desc": "Doar pentru guvern. Elimină intrarea din lista diplomatică aflată la `position` (numerotare de la 1)."
+            },
+            "delete_diplomacy": {
+                "name": "/delete_diplomacy country_name",
+                "desc": "Doar pentru guvern. Șterge înregistrarea diplomatică a țării specificate."
+            },
+            "nap": {
+                "name": "/nap add country_a country_b | /nap remove country_a country_b | /nap list",
+                "desc": "Doar pentru guvern. Gestionează lista internă de NAP-uri folosită de monitorul orar al bătăliilor. Câmpurile de țară au sugestii din lista actuală de țări WarEra."
+            },
+            "priority": {
+                "name": "/priority list | /priority refresh | /priority add link description | /priority set entry_number description | /priority move entry_number_a entry_number_b | /priority remove entry_number",
+                "desc": "Gestionează prioritățile ordinelor de luptă din memoria monitorului de ordine. `list` arată prioritățile active cu descrieri; acțiunile rezervate guvernului pot reîmprospăta verificarea ordinelor României, adăuga manual o bătălie activă, seta descrieri, inversa priorități sau elimina o prioritate ca să nu mai fie adăugată automat decât manual."
+            },
+            "fightstatus": {
+                "name": "/fightstatus [military_unit]",
+                "desc": "Afișează starea de luptă a luptătorilor. Fără `military_unit`, folosește membrii cu rolul de luptă configurat; cu `military_unit`, membrii acelei unități. Rezultatele sunt paginate (10 pe pagină) și includ buff/debuff, viață/foame, nivel și dacă sunt online. Filtre disponibile: Cu buff/Neutri/Cu debuff."
+            },
+            "country_strays": {
+                "name": "/country_strays",
+                "desc": "Listează jucătorii a căror cetățenie din joc nu este printre țările permise configurate. Rezultatele sunt paginate."
+            },
+            "discorless": {
+                "name": "/discorless",
+                "desc": "Listează cetățenii României din WarEra care nu sunt pe Discord cu rolul Citizen sau Newbie. Potrivirea se face după numele afișate pe server; rezultatele sunt paginate."
+            },
+            "inactive_players": {
+                "name": "/inactive_players",
+                "desc": "Listează jucătorii inactivi de mai mult de 3 zile. Rezultatele sunt paginate."
+            },
+            "mu_stray": {
+                "name": "/mu_stray",
+                "desc": "Listează jucătorii rătăciți din MU, împărțiți în MU greșit, Fără MU și Rătăciți inactivi. Butoanele de filtrare comută între categorii."
+            },
+            "pills": {
+                "name": "/pills military_unit",
+                "desc": "Starea pastilelor într-o unitate militară configurată (cu sugestii): cine are pastilă, grupați după ora la care au luat-o, cine e în debuff, grupați după ora la care se termină (ambele cu timpul rămas), și luptătorii fără pastilă. Orele sunt afișate în fusul orar configurat."
+            },
+            "promotions": {
+                "name": "/promotions",
+                "desc": "Verifică dacă membrii noi pot fi promovați. Arată Candidați la promovare, Probleme de luptă, Inactivi și Probleme de date — butoanele de filtrare comută între categorii."
+            },
+            "top_user_weekly_damages": {
+                "name": "/top_user_weekly_damages country",
+                "desc": "Arată top 10 jucători după damage-ul săptămânal din una sau mai multe țări. Separă țările cu virgulă; rezultatele sunt grupate pe intervale de nivel și includ țara fiecărui jucător."
+            },
+            "top_user_weekly_donations": {
+                "name": "/top_user_weekly_donations country",
+                "desc": "Arată top 10 cetățeni după banii donați de luni, ora 00:00 UTC. Câmpul obligatoriu de țară are sugestii din lista actuală de țări WarEra."
+            },
+            "get_region_upgrade_cost": {
+                "name": "/get_region_upgrade_cost country",
+                "desc": "Calculează consumul zilnic de petrol și costul de piață pentru buncărele, bazele militare și centrele de pacificare active din regiunile deținute de țara aleasă. Câmpul obligatoriu de țară are sugestii."
+            },
+            "run_job": {
+                "name": "/run_job job_name",
+                "desc": "Doar pentru dezvoltatori; comandanții pot rula doar skill_roles și military_unit_roles. Rulează acum o sarcină de fundal, o singură dată, fără să-i schimbe programul. E refuzată dacă sarcina rulează deja; o rulare programată care cade în timpul unei rulări forțate este sărită. Câmpul are sugestii."
+            },
+            "setlang": {
+                "name": "/setlang language",
+                "desc": "Doar pentru dezvoltatori. Setează limba botului pe acest server (engleză sau română): răspunsuri la comenzi, butoane, rapoarte, alerte și mesajele private trimise din cauza acestui server. Câmpul are sugestii."
+            }
+        },
+        "jobs": {
+            "skill_roles": {
+                "name": "skill_roles — la fiecare oră",
+                "desc": "Verifică membrii cu rolul Citizen și le acordă/elimină rolurile Economy sau Fighter în funcție de distribuția abilităților din joc. Trimite un rezumat în canalul de rapoarte când apar modificări."
+            },
+            "military_unit_roles": {
+                "name": "military_unit_roles — la fiecare 3 ore",
+                "desc": "Acordă membrilor rolurile de unitate militară după MU-ul din joc și elimină rolurile de MU care nu se potrivesc. Trimite un rezumat în canalul de rapoarte când apar modificări."
+            },
+            "commander_roles": {
+                "name": "commander_roles — la fiecare 3 ore",
+                "desc": "Sincronizează rolul de comandant de pe Discord cu comandanții configurați în toate unitățile militare."
+            },
+            "unidentified_members": {
+                "name": "unidentified_members — la fiecare 6 ore",
+                "desc": "Verifică dacă porecla membrilor Citizen/Newbie corespunde unui jucător cunoscut. Salvează potrivirile găsite și raportează jucătorii neidentificați în canalul de rapoarte."
+            },
+            "takeover_countries": {
+                "name": "takeover_countries — la fiecare 5 minute",
+                "desc": "Verifică țările și raportează pe cele care par goale (fără guvern sau membri în congres), anunțând oportunitățile de preluare."
+            },
+            "buff_monitor": {
+                "name": "buff_monitor — la fiecare 10 minute",
+                "desc": "Urmărește buff-urile luptătorilor și îi anunță când buff-ul de la pastilă e pe cale să expire (folosește o memorie internă ca să nu repete notificările)."
+            },
+            "bounty_monitor": {
+                "name": "bounty_monitor — interval configurabil",
+                "desc": "Verifică bătăliile active pentru fonduri/recompense și postează un rezumat când e cazul (intervalul e setat prin `BOUNTY_MONITOR_INTERVAL_MINUTES` în configurare)."
+            },
+            "mercenary_contracts": {
+                "name": "mercenary_contracts — la fiecare minut",
+                "desc": "Verifică licitațiile active de contracte de mercenari și postează contractele noi sau actualizate."
+            },
+            "mu_contract_monitor": {
+                "name": "mu_contract_monitor — la fiecare 5 minute",
+                "desc": "Postează un embed în firul de contracte al unității militare (threadIds.contractsId) sau în canalul ei când MU-ul câștigă un contract de mercenari: bătălia, damage-ul minim, plata la 1k damage, plata totală, timpul estimat rămas și scorul."
+            },
+            "monitor_nap": {
+                "name": "monitor_nap - la fiecare oră",
+                "desc": "Verifică ordinele de țară din bătăliile active și naționalitatea ordinelor de MU față de NAP-urile configurate, apoi raportează încălcările noi în canalul de rapoarte."
+            },
+            "battle_order_monitor": {
+                "name": "battle-order_monitor - la fiecare 5 minute",
+                "desc": "Caută în bătăliile active ordinele de țară ale României, adaugă potrivirile noi în lista de priorități, postează alerte în canalul battle-orders și elimină prioritățile bătăliilor încheiate."
+            },
+            "reddit_monitor": {
+                "name": "reddit_monitor - la fiecare 5 minute",
+                "desc": "Verifică r/RomaniaWarEra pentru postări din ultimele 24 de ore și le anunță pe cele noi în canalul de rapoarte."
+            }
+        }
+    },
+    "fight_status": {
+        "no_fight_role": "Rolul de luptă nu este configurat.",
+        "no_fighters": "Nu s-au găsit luptători.",
+        "no_info": "Nu există informații despre luptători.",
+        "title": "Starea luptătorilor",
+        "user_fallback": "Utilizator {id}",
+        "status_buffed": "🟢 Cu buff",
+        "status_buff_expired": "🟡 Buff expirat",
+        "status_debuffed": "🔴 Cu debuff",
+        "status_debuff_expired": "🟡 Debuff expirat",
+        "status_none": "⚪ Fără status",
+        "player_line": "{flag} {name} — Nivel: {level} • Online: {online}",
+        "no_data": "Fără date",
+        "players": "Jucători",
+        "filter_buffed": "Cu buff",
+        "filter_neutral": "Neutri",
+        "filter_debuffed": "Cu debuff",
+        "filter_all": "Toți",
+        "buff": "Buff-ul",
+        "debuff": "Debuff-ul",
+        "buff_ends_in": "{kind} se termină în {hours}h {minutes}m",
+        "buff_expired_text": "{kind} a expirat"
+    },
+    "diplomacy": {
+        "date_unavailable": "Dată indisponibilă",
+        "country_not_found": "Țara '{country}' nu a fost găsită.",
+        "details_title": "Diplomație — {country}",
+        "status": "Status",
+        "description": "Descriere",
+        "none_created": "Nu a fost creată nicio diplomație.",
+        "invalid_status": "Status invalid. Permise: {allowed}",
+        "no_updates": "Nicio modificare. Specifică cel puțin unul dintre `status`, `diplomacy` sau `description`.",
+        "updated_status": "status: {status}",
+        "updated_entry": "intrare diplomatică adăugată ({date})",
+        "updated_description": "descriere actualizată",
+        "updated": "'{country}' a fost actualizată ({changes}).",
+        "already_exists": "Diplomația pentru '{country}' există deja. Folosește `/update_diplomacy` ca s-o modifici.",
+        "created": "Diplomația pentru '{country}' a fost creată.",
+        "remove_failed": "Intrarea {position} pentru '{country}' nu a putut fi eliminată.",
+        "removed": "Intrarea {position} pentru '{country}' a fost eliminată.",
+        "no_record": "Nu există nicio înregistrare diplomatică pentru '{country}'.",
+        "deleted": "Diplomația pentru '{country}' a fost ștearsă.",
+        "show_list_button": "Arată informațiile diplomatice",
+        "only_author_open": "Doar persoana care a folosit comanda poate deschide lista diplomatică.",
+        "only_author_pages": "Doar persoana care a folosit comanda poate schimba paginile.",
+        "list_title": "Lista diplomatică - {country}",
+        "entry_name": "Intrarea {number} | {date}",
+        "empty_entry": "(intrare goală)",
+        "empty": "(gol)",
+        "list_footer": "Pagina {page}/{pages} | Intrări: {entries}",
+        "sort_button": "Sortează după status",
+        "list_all_title": "Diplomații",
+        "no_description_short": "(fără descriere)",
+        "sorted_footer": "Pagina {page}/{pages} — Sortare: {sort}",
+        "sort_alpha": "alfabetică",
+        "sort_status": "status"
+    },
+    "naps": {
+        "country_not_found": "Țara '{country}' nu a fost găsită.",
+        "same_country": "Un NAP are nevoie de două țări diferite.",
+        "already_exists": "Există deja un NAP între {first} și {second}.",
+        "added": "NAP adăugat: {first} - {second}.",
+        "countries_not_found": "Una sau ambele țări nu au fost găsite.",
+        "not_exists": "Nu există niciun NAP între {first} și {second}.",
+        "removed": "NAP eliminat: {first} - {second}.",
+        "list_title": "NAP-uri configurate",
+        "list_empty": "Nu este configurat niciun NAP."
+    },
+    "battle_orders": {
+        "monitor_not_loaded": "Monitorul ordinelor de luptă nu este încărcat.",
+        "list_title": "Prioritățile ordinelor de luptă",
+        "list_empty": "Nu există momentan nicio prioritate activă.",
+        "order_description": "Descrierea ordinului: {description}",
+        "refreshed": "Prioritățile au fost reîmprospătate. Priorități noi adăugate: {count}.",
+        "invalid_number": "Număr de prioritate invalid.",
+        "updated": "Prioritatea {number} a fost actualizată.",
+        "added": "Prioritate adăugată. Este prioritatea {number}.",
+        "invalid_numbers": "Unul sau ambele numere de prioritate sunt invalide.",
+        "swapped": "Prioritățile {first} și {second} au fost inversate.",
+        "removed": "Prioritatea {number} a fost eliminată.",
+        "invalid_link": "Link de bătălie invalid.",
+        "fetch_failed": "Bătăliile active nu au putut fi preluate.",
+        "not_active": "Bătălia nu este activă sau nu a putut fi găsită.",
+        "tournament_fetch_failed": "Turneul acestei bătălii nu a putut fi preluat.",
+        "only_country_tournaments": "Doar bătăliile din turneele de țări pot fi adăugate ca priorități.",
+        "already_listed": "Bătălia este deja în lista de priorități.",
+        "priority_added": "Prioritate adăugată.",
+        "manual_added": "A fost adăugată o prioritate nouă: {title} în [{region}]({link})",
+        "battle_link": "Link bătălie: {link}",
+        "unknown_region": "Regiune necunoscută",
+        "tournament": "Turneu",
+        "tournament_order": "{country} a dat un ordin în [turneu]({link}), contra {opponents}",
+        "order_placed": "{country} a dat un ordin: {side} {side_country} contra {opponent_side} {opponent_country}, în [{region}]({link})",
+        "tournament_title": "Turneu: {side} {side_team} - {opponent_team} {opponent_side}"
+    },
+    "mu_stray": {
+        "title": "Rătăciți din unitățile militare",
+        "none_found": "Nu s-au găsit jucători rătăciți.",
+        "empty_category": "*Niciun jucător în această categorie.*",
+        "filter_wrong_mu": "MU greșit",
+        "filter_no_mu": "Fără MU",
+        "filter_inactive": "Rătăciți inactivi"
+    },
+    "inactive_players": {
+        "title": "Jucători inactivi",
+        "none_found": "*Nu s-au găsit jucători inactivi.*",
+        "line": "{name} — Nivel: {level} — Ultima activitate: {last_active}"
+    },
+    "country_strays": {
+        "title": "Probleme de cetățenie",
+        "none_found": "*Nu s-au găsit probleme de cetățenie.*"
+    },
+    "discordless": {
+        "title": "Utilizatori din {country} care nu sunt pe Discord",
+        "all_found": "*Toți cetățenii din {country} au fost găsiți pe Discord.*",
+        "footer": "Pagina {page} din {pages} - Lipsă: {missing} - Verificați pe Discord: {checked} - Utilizatori în țară: {country_total}",
+        "line": "- {name} - Nivel: {level}",
+        "country_missing": "`{country}` nu a fost găsită în lista de țări WarEra.",
+        "users_unavailable": "Utilizatorii din {country} nu au putut fi încărcați. Încearcă din nou mai târziu."
+    },
+    "promotions": {
+        "title": "Promovări membri noi",
+        "none_found": "Nu s-au găsit probleme sau candidați.",
+        "empty_category": "*Nicio intrare în această categorie.*",
+        "line": "{name} — Nivel: {level} — {note}",
+        "title_candidates": "Candidați la promovare",
+        "title_fight_issues": "Probleme de luptă",
+        "title_inactive": "Inactivi",
+        "title_data_issues": "Probleme de date",
+        "button_candidates": "Candidați",
+        "button_fight_issues": "Probleme de luptă",
+        "button_inactive": "Inactivi",
+        "button_data_issues": "Probleme de date",
+        "no_api_data": "Fără date din API",
+        "last_active": "Ultima activitate: {date}",
+        "no_last_connection": "Lipsește lastConnectionAt",
+        "reason_economy": "Economie",
+        "reason_level": "Nivel",
+        "low_level_fighter": "Nivel <= 15 în modul de luptă",
+        "error": "Eroare"
+    },
+    "pills": {
+        "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
+        "members_unavailable": "Membrii unității militare nu au putut fi preluați. Încearcă din nou mai târziu.",
+        "title": "Pastile · {mu}",
+        "pilled_header": "💊 **Cu pastilă ({count})** · ora pastilei → timp rămas",
+        "debuff_header": "🥴 **Debuff ({count})** · se termină la → timp rămas",
+        "not_pilled_header": "⚪ **Fără pastilă ({count})**",
+        "footer_hours": "Ore în {tz}",
+        "footer_economy": {
+            "one": "{count} membru economic nelistat",
+            "few": "{count} membri economici nelistați",
+            "other": "{count} de membri economici nelistați"
+        },
+        "footer_missing": {
+            "one": "{count} membru nu a putut fi preluat",
+            "few": "{count} membri nu au putut fi preluați",
+            "other": "{count} de membri nu au putut fi preluați"
+        }
+    },
+    "weekly_damages": {
+        "title": "Damage săptămânal jucători - {countries}",
+        "more_countries": "{names} + încă {count}",
+        "bracket_title": "Nivel [{start}-{end})",
+        "damage": "{damage} damage",
+        "no_entries": "*Nu s-a găsit damage săptămânal pentru țările alese.*",
+        "no_bracket_entries": "*Nu s-a găsit damage săptămânal în intervalele de nivel configurate.*",
+        "bracket_footer": "Interval {index}/{total} | Clasament săptămânal | Top 10 pe interval",
+        "footer": "Clasament săptămânal | Top 10 pe interval",
+        "countries_not_found": "Nu s-au găsit: {countries}. Alege țările din lista de sugestii.",
+        "no_country": "Specifică cel puțin o țară."
+    },
+    "weekly_donations": {
+        "title": "Donații săptămânale jucători - {country}",
+        "none_found": "*Nu s-au găsit donații ale jucătorilor din această țară săptămâna aceasta.*",
+        "money": "{amount} bani",
+        "footer": "{start} - {end} UTC | Top 10",
+        "citizens_unavailable": "Cetățenii țării nu au putut fi încărcați. Încearcă din nou mai târziu."
+    },
+    "region_upkeep": {
+        "title": "Întreținere îmbunătățiri regiuni - {country}",
+        "upgrades": {
+            "bunker": "Buncăr",
+            "base": "Bază militară",
+            "pacificationCenter": "Centru de pacificare"
+        },
+        "unavailable": "Indisponibil",
+        "oil_unit": "petrol",
+        "summary": "Rezumat",
+        "summary_value": "Regiuni deținute: **{regions}**\nDezvoltare medie: **{development}**\nÎmbunătățiri plătite active: **{upgrades}**",
+        "oil": "Petrol",
+        "oil_value": "Consum zilnic de petrol: **{upkeep}**\nPreț petrol pe piață: **{price}**\nCost zilnic la piață: **{cost}**",
+        "none_active": "*Nu s-au găsit buncăre, baze militare sau centre de pacificare active.*",
+        "upgrade_line": "**{region}** - {upgrade} niv. {level}: {oil}",
+        "more_upgrades": "...și încă {count} îmbunătățiri active.",
+        "active_upgrades": "Îmbunătățiri active",
+        "footer": "Estimarea întreținerii zilnice include doar îmbunătățirile active.",
+        "regions_unavailable": "Datele regiunilor nu au putut fi încărcate. Încearcă din nou mai târziu.",
+        "development_unavailable": "Datele de dezvoltare ale țării nu au putut fi încărcate. Încearcă din nou mai târziu.",
+        "average_unavailable": "Dezvoltarea medie a țării nu este disponibilă.",
+        "unknown_region": "Regiune necunoscută"
+    },
+    "takeover": {
+        "check_title": "Verificare țări de preluat",
+        "none_found": "Nu s-au găsit țări de preluat.",
+        "found_title": "Țări de preluat găsite",
+        "found_description": "Următoarele țări pot fi capturate:",
+        "countries": "Țări"
+    },
+    "article_mention": {
+        "mentioned": "România a fost menționată într-un articol, poate vrei să arunci o privire -> [{title}]({url})"
+    },
+    "mercenary_contracts": {
+        "posted": "**[CONTRACT]** {country} a publicat un contract {initial}/{budget} pentru {side} — [Vezi bătălia]({link})"
+    },
+    "skill_roles": {
+        "title": "Roluri de abilități actualizate",
+        "description": "Rezumatul modificărilor rolurilor de abilități:",
+        "economy_added": "Roluri Economy — Adăugate",
+        "economy_removed": "Roluri Economy — Eliminate",
+        "fight_added": "Roluri Fight — Adăugate",
+        "fight_removed": "Roluri Fight — Eliminate",
+        "reason_economy_added": "Abilități economice > 50",
+        "reason_fight_removed": "Economie > 50, se elimină rolul de luptător",
+        "reason_fight_added": "Abilități economice <= 50",
+        "reason_economy_removed": "Economie <= 50, se elimină rolul economic"
+    },
+    "commander_roles": {
+        "title": "Roluri de comandant actualizate",
+        "description": "Rezumatul sincronizării rolului de comandant:",
+        "reason_added": "Rol de comandant acordat din configurația MU",
+        "reason_removed": "Rol de comandant eliminat (nu mai este comandant de MU)"
+    },
+    "mu_roles": {
+        "title": "Roluri de unitate militară actualizate",
+        "description": "Rezumatul modificărilor rolurilor de unitate militară:",
+        "added": "Adăugați:",
+        "removed": "Eliminați:",
+        "reason_added": "Rol de unitate militară acordat.",
+        "reason_removed": "Roluri de unitate militară nefolosite eliminate."
+    },
+    "unidentified": {
+        "check_title": "Verificare jucători neidentificați",
+        "none_found": "Nu s-au găsit jucători neidentificați.",
+        "found_title": "Jucători neidentificați găsiți",
+        "found_description": "Următorii membri nu au putut fi potriviți:",
+        "players": "Jucători",
+        "reason_nick_sync": "Sincronizare nume WarEra"
+    },
+    "buff_monitor": {
+        "expiring": {
+            "one": "Salut {name}, buff-ul de la pastilă expiră în aproximativ {count} minut. Te rog să-ți golești barele într-o luptă dacă poți.",
+            "few": "Salut {name}, buff-ul de la pastilă expiră în aproximativ {count} minute. Te rog să-ți golești barele într-o luptă dacă poți.",
+            "other": "Salut {name}, buff-ul de la pastilă expiră în aproximativ {count} de minute. Te rog să-ți golești barele într-o luptă dacă poți."
+        }
+    },
+    "bounty_monitor": {
+        "bounty": "**[RECOMPENSĂ]** {money_per}/{pool} de la {country} ({side}) contra {opponent} ({opponent_side}) — [Vezi bătălia]({link})"
+    },
+    "nap_monitor": {
+        "title": "Alertă de încălcare NAP",
+        "description": "Au fost găsite ordine de luptă active împotriva partenerilor NAP configurați.",
+        "mu_fallback": "Unitatea militară {id}",
+        "violation": "{source} are ordine ({side}) contra {opponent}.\n[Vezi bătălia]({link})"
+    },
+    "mu_contracts": {
+        "title": "{country} · Licitație de mercenari",
+        "min_damage": "Damage minim",
+        "per_1k": "La 1k damage",
+        "total_payout": "Plată totală",
+        "battle_eta": "Timp estimat",
+        "score": "Scor",
+        "score_value": "Runda {round} · {attacker_icon} {attacker_wins} – {defender_wins} {defender_icon} (câștigă cine ajunge la {rounds_to_win})",
+        "battle_ended": "Bătălie încheiată",
+        "round_ended": "Rundă încheiată",
+        "round_eta": "{eta} (runda {round})",
+        "unknown_mu": "MU necunoscut",
+        "won_by": "Contract câștigat de {mu}"
+    },
+    "mu_daily": {
+        "author": "🗓️ {mu} · Raport zilnic",
+        "date_format": "%a %d %b",
+        "date_short_format": "%d %b",
+        "datetime_format": "%d %b %H:%M",
+        "description_day": "Ziua de joc **{day}** · resetare la {reset} {tz}",
+        "description_week": "⚔️ Săptămâna **{damage}**",
+        "description_rank": "locul #{rank}",
+        "description_per_day": "~{damage}/zi",
+        "description_members": "👥 {fighters} luptători · {economy} economie · {members} membri",
+        "now": "acum",
+        "tomorrow_short": "mâine",
+        "bar_health": "viață",
+        "bar_hunger": "foame",
+        "pills_title": "💊 Pastile · {fighters} luptători",
+        "pills_value": "🔥 **{buffed}** cu buff acum\n🟢 **{pilled_earlier}** au luat pastila mai devreme azi (acum în debuff)\n⚪ **{no_pill}** fără pastilă azi",
+        "pills_cooling_down": "⏳ {count} încă în debuff de ieri",
+        "no_pill_title": "⚪ Fără pastilă azi ({count})",
+        "pill_times_title": "🕒 Orele pastilelor azi ({tz})",
+        "next_pill_title": "📅 Următoarea pastilă ({tz})",
+        "orders_title": "📌 Ordine MU acum",
+        "no_order": "Niciun ordin MU activ",
+        "order_line": "[{title}]({link}) · pentru {side}",
+        "reskills_title": "🔄 Resetări de abilități, ultimele 24h ({count})",
+        "reskill_line": "{name} → {build} · următoarea resetare {next_reset}",
+        "build_economy": "Economie",
+        "build_fight": "Luptă",
+        "tips_title": "💡 Pentru mâine",
+        "no_help_title": "🤝 Fără cerere de ajutor MU azi ({count})",
+        "full_bars_title": "🔋 Bare pline, regenerare pierdută ({count})",
+        "quiet_title": "💤 Inactivi ({count})",
+        "quiet_offline": "{name} ({days}z offline)",
+        "quiet_no_damage": "{name} (0 damage săptămâna asta)",
+        "and_more": "și încă {count}",
+        "footer": "Luptători = membri cu build de luptă · starea pastilelor citită la momentul raportului",
+        "footer_missing": "⚠️ Membri care nu au putut fi preluați: {count}",
+        "tip_no_order": "Niciun ordin MU nu este activ; setează unul ca luptătorii să știe unde să ia pastila și să lovească mâine.",
+        "tip_no_pill": "Luptători care nu au luat pastila azi, deși MU-ul avea un ordin activ: {count}.",
+        "tip_shared_window": "{needed}/{total} luptători pot lua pastila până la {hour}:00 {tz}; stabiliți o oră comună de pastilă de atunci.",
+        "tip_spread": "Pastilele de azi au fost luate la {hours} ore diferite; o fereastră comună lovește mai tare.",
+        "tip_to_economy": "Membri resetați pe economie: {count}; nu se pot reseta înapoi pe luptă înainte de {date}.",
+        "tip_no_help": "Luptători care nu au cerut ajutor MU azi: {count}; e viață gratuită, cel mai bine folosită cu pastila activă."
+    },
+    "mu_weekly": {
+        "author": "📊 {mu} · Raport săptămânal",
+        "date_format": "%d %b",
+        "reset_format": "%A %H:%M %Z",
+        "description": "Săptămâna de joc **{start} – {end}** (resetare {reset})",
+        "rank": "Locul #{rank}",
+        "damage_title": "⚔️ Damage",
+        "battles_title": "🗺️ Bătălii",
+        "battles_value": "**{ended}** încheiate\n{won} câștigate\n{lost} pierdute",
+        "battles_unpaid": "{count} neplătite · {share}% dmg",
+        "earned_title": "💰 Câștiguri",
+        "earned_value": "**{total}**\nRecompense ~{bounty}\nContracte ~{contracts}",
+        "earned_per_1k": "{amount} la 1k dmg",
+        "contracts_title": "📜 Contracte (la 1k)",
+        "contracts_won": "**{count}** luate · {value}",
+        "contracts_perk": "{perk} (start {start})",
+        "contracts_lost": "{count} pierdute · noi {ours}\nCâștigători {winners}",
+        "reputation_title": "🎖️ Reputație",
+        "treasury_title": "🏦 Trezorerie",
+        "wealth": "Avere **{value}**",
+        "transactions_unavailable": "Tranzacții indisponibile",
+        "donations": "+{amount} ({donors} donatori)",
+        "items": "obiecte",
+        "bought": "−{amount} cumpărat ({item})",
+        "sold": "+{amount} vândut",
+        "open_orders": "{count} ordine · {invested} investit",
+        "activity_title": "👥 Activitate",
+        "activity_fought": "**{active}/{members}** au luptat",
+        "activity_new": "{count} noi",
+        "activity_help": "{help} ajutor\n{per_member}/membru\n{no_help} n-au ajutat",
+        "spread_title": "📈 Distribuție damage",
+        "spread_value": "Median {median}\nMediu {average}\n{low} sub {percent}% din medie",
+        "top_fighters_title": "🏅 Top luptători",
+        "nobody_fought": "nimeni n-a luptat",
+        "biggest_battle_title": "🔥 Cea mai mare bătălie",
+        "battle_line": "[{title}]({link}) · {damage} damage · {money} câștigat · {outcome}",
+        "outcome_won": "câștigată",
+        "outcome_lost": "pierdută",
+        "new_members_title": "🆕 Membri noi ({count})",
+        "idle_title": "💤 Fără damage săptămâna asta ({count})",
+        "and_more": "și încă {count}",
+        "tips_title": "💡 Obiective pentru săptămâna viitoare",
+        "tip_idle": "Membri care n-au dat damage: {count}; vorbește cu ei sau eliberează-le locurile.",
+        "tip_unpaid": "{percent}% din damage nu a adus nimic; preferă bătăliile cu recompensă sau contract.",
+        "tip_concentration": "Top {top} luptători au dat {share}% din damage; restul MU-ului poate contribui mult mai mult.",
+        "tip_auctions": "{lost} licitații de contracte pierdute față de {won} câștigate; câștigătorii au coborât până la {perk}/1k.",
+        "tip_battles": "Doar {won} din {total} bătălii au fost câștigate; concentrați damage-ul pe mai puține bătălii, care pot fi câștigate.",
+        "footer": "Bătăliile se numără după ce se încheie · recompensa e estimată ca banii din bătălie minus plățile contractelor",
+        "footer_incomplete": "⚠️ Unele bătălii nu au putut fi preluate, cifrele pot fi mai mici"
+    },
+    "damage": {
+        "player_not_found": "❌ Jucătorul **{name}** nu a fost găsit.",
+        "data_unavailable": "❌ Datele jocului sau prețurile pieței nu au putut fi preluate. Încearcă din nou mai târziu.",
+        "not_enough_sp": "❌ **{name}** nu are destule puncte de abilitate ({total}) pentru {count} companii.",
+        "no_builds": "❌ Nu s-a putut genera niciun build. Încearcă din nou mai târziu.",
+        "title": "⚔️ Builduri cu pastilă · {name}",
+        "header_player": "**Nivel** {level} · **{sp} SP** pentru luptă ({reserved} SP pe Companii)",
+        "header_bonus": "**Rang militar** +{rank}% · **bonus de luptă** +{battle}% (presupus)",
+        "header_companies": "**Companii** {count} × motor N{level}, +{bonus}% → {pp} PP/zi de {product} × {per_pp}/PP = **{income}/zi**",
+        "header_no_companies": "**Companii**: niciuna luată în calcul",
+        "header_prices": "**Prețuri**: pastilă {pill} · cutie {case} · cutie de elită {elite} · fier vechi {scrap} · obiect din pool ~{pool}",
+        "model_title": "Cum se calculează",
+        "model_text": "• O pastilă pe zi: lupți doar în cele 8 h de buff, pornind cu barele pline, deci folosești 1,8 bare de Viață și 1,8 bare de Foame în mâncare.\n• Echipament: valori medii la prețul mediu al pieței, durabilitate 100, 1 pierdut pe lovitură (arma la fiecare lovitură, restul doar la loviturile neeschivate). Orice armă în afară de cuțit folosește 1 muniție pe lovitură.\n• Câștiguri: cutii la prețul pieței (Șansa de pradă la fiecare lovitură care nu ratează, elită = 1/100 din asta), echipamentul rupt dă 1/3 din fierul vechi, obiecte din pool-urile de rundă/bătălie (1 la 200k + 1 la 500k daune), producția motoarelor companiilor.\n• Daunele sunt estimate (ratare = ½ Atac, critică = Atac × (1 + Daune critice)). Resetarea abilităților, deplasarea și recompensele nu sunt incluse.",
+        "bracket_title": "💰 ≤ {bracket}/1k · {damage} daune/zi ({cost}/1k)",
+        "bracket_unreachable_title": "💰 Cel mai ieftin build · {damage} daune/zi ({cost}/1k)",
+        "bracket_unreachable": "Niciun build nu ajunge la ≤ {brackets}/1k cu aceste setări; acesta are cel mai mic cost net la 1k daune găsit.",
+        "bracket_same": "Același build ca la bugetul ≤ {bracket}/1k: niciun build nu face mai multe daune în acest cost.",
+        "field_skills": "📊 Abilități",
+        "field_gear": "🛡️ Echipament (preț mediu)",
+        "field_consumables": "🎒 Consumabile pe zi",
+        "field_combat": "⚔️ Luptă",
+        "field_costs": "💸 Costuri pe zi",
+        "field_returns": "💵 Câștiguri pe zi",
+        "field_net": "🏦 Net",
+        "pill_line": "💊 Pastilă ×1 · {cost}",
+        "ammo_line": "🔫 {name} ×{count} · {cost}",
+        "no_ammo": "🔫 Fără muniție",
+        "food_line": "🍖 {name} ×{count} · {cost}",
+        "no_food": "🍖 Fără mâncare",
+        "combat": "**{per_hit}** daune pe lovitură × **{hits}** lovituri\nAtac {attack} · Precizie {precision}%\nCritică {crit}% × {crit_damage}% daune critice\nArmură {armor} → {armor_pct}% · Eschivă {dodge} → {dodge_pct}%\nViață {health} · Foame {hunger} · Pradă {loot}%\nViață pe lovitură {health_per_hit}",
+        "costs": "Pastilă {pill} · Muniție {ammo} · Mâncare {food}\nUzură echipament {gear}\n**Total {total}**",
+        "returns": "Cutii {cases} → {case_value}\nCutii de elită {elite} → {elite_value}\nFier vechi {scrap} → {scrap_value}\nPradă din pool ~{pool} obiecte → {pool_value}\nCompanii {companies}\n**Total {total}**",
+        "net": "**{net}/zi** → **{cost} la 1k daune**",
+        "footer": "SP folosite {used}/{sp} · abilitățile economice rămân la 0",
+        "gear_none": "nimic",
+        "skills": {
+            "attack": "Atac",
+            "precision": "Precizie",
+            "criticalChance": "Șansă critică",
+            "criticalDamages": "Daune critice",
+            "armor": "Armură",
+            "dodge": "Eschivă",
+            "health": "Viață",
+            "hunger": "Foame",
+            "lootChance": "Pradă"
+        },
+        "slots": {
+            "weapon": "Armă",
+            "helmet": "Cască",
+            "gloves": "Mănuși",
+            "chest": "Vestă",
+            "pants": "Pantaloni",
+            "boots": "Bocanci"
+        },
+        "weapons": {
+            "knife": "Cuțit",
+            "gun": "Pistol",
+            "rifle": "Pușcă",
+            "sniper": "Lunetă",
+            "tank": "Tanc",
+            "jet": "Avion"
+        },
+        "rarities": {
+            "common": "Comun",
+            "uncommon": "Neobișnuit",
+            "rare": "Rar",
+            "epic": "Epic",
+            "legendary": "Legendar",
+            "mythic": "Mitic"
+        },
+        "stat_short": {
+            "attack": "{value} atac",
+            "criticalChance": "{value}% critică",
+            "criticalDamages": "+{value}% daune crit.",
+            "precision": "+{value}% precizie",
+            "armor": "{value} armură",
+            "dodge": "{value} eschivă"
+        },
+        "ammo": {
+            "lightAmmo": "Muniție ușoară",
+            "ammo": "Muniție",
+            "heavyAmmo": "Muniție grea"
+        },
+        "food": {
+            "bread": "Pâine",
+            "steak": "Friptură",
+            "cookedFish": "Pește gătit"
+        },
+        "products": {
+            "grain": "Grâu",
+            "limestone": "Calcar",
+            "iron": "Fier",
+            "lead": "Plumb",
+            "coca": "Coca",
+            "petroleum": "Țiței",
+            "wood": "Lemn",
+            "livestock": "Animale",
+            "fish": "Pește",
+            "bread": "Pâine",
+            "steak": "Friptură",
+            "cookedFish": "Pește gătit",
+            "concrete": "Beton",
+            "steel": "Oțel",
+            "oil": "Petrol",
+            "paper": "Hârtie",
+            "lightAmmo": "Muniție ușoară",
+            "ammo": "Muniție",
+            "heavyAmmo": "Muniție grea",
+            "cocain": "Pastilă"
+        }
+    },
+    "slash": {
+        "help": {"description": "Afișează comenzile botului și sarcinile de fundal (paginat)."},
+        "setlang": {
+            "description": "Setează limba botului pe acest server (doar pentru dezvoltatori).",
+            "params": {"language": "Limba tuturor mesajelor botului pe acest server"}
+        },
+        "run_job": {
+            "description": "Rulează acum o sarcină de fundal, în afara programului ei (doar pentru dezvoltatori și comandanți).",
+            "params": {"job_name": "Sarcina de fundal de rulat"}
+        },
+        "fightstatus": {
+            "description": "Afișează starea de luptă a luptătorilor sau a unei unități militare, paginat.",
+            "params": {"military_unit": "Numele unității militare (opțional); altfel se folosesc membrii cu rolul de luptă."}
+        },
+        "diplomacy": {
+            "description": "Afișează informațiile diplomatice ale țărilor (paginat).",
+            "params": {"country_name": "Țara pentru care se afișează detaliile (opțional)"}
+        },
+        "update_diplomacy": {
+            "description": "Actualizează statusul/descrierea/intrările diplomatice ale unei țări (doar guvern).",
+            "params": {
+                "country_name": "Numele țării",
+                "status": "Status diplomatic (opțional)",
+                "diplomacy": "Intrare diplomatică de adăugat (opțional)",
+                "description": "Descriere (opțional)"
+            }
+        },
+        "add_diplomacy": {
+            "description": "Creează o înregistrare diplomatică pentru o țară (doar guvern).",
+            "params": {
+                "country_name": "Numele țării",
+                "status": "Status (opțional)",
+                "description": "Descriere (opțional)"
+            }
+        },
+        "remove_diplomacy": {
+            "description": "Elimină o intrare din lista diplomatică a unei țări (doar guvern).",
+            "params": {
+                "country_name": "Numele țării",
+                "position": "Poziția de eliminat (de la 1)"
+            }
+        },
+        "delete_diplomacy": {
+            "description": "Șterge înregistrarea diplomatică a unei țări (doar guvern).",
+            "params": {"country_name": "Numele țării"}
+        },
+        "nap": {
+            "description": "Gestionează pactele de neagresiune.",
+            "add": {
+                "description": "Adaugă un pact de neagresiune între două țări.",
+                "params": {"country_a": "Prima țară", "country_b": "A doua țară"}
+            },
+            "remove": {
+                "description": "Elimină un pact de neagresiune.",
+                "params": {"country_a": "Prima țară", "country_b": "A doua țară"}
+            },
+            "list": {"description": "Listează pactele de neagresiune configurate."}
+        },
+        "priority": {
+            "description": "Gestionează prioritățile ordinelor de luptă.",
+            "list": {"description": "Listează prioritățile actuale ale ordinelor de luptă."},
+            "refresh": {"description": "Forțează reîmprospătarea priorităților ordinelor de luptă."},
+            "set": {
+                "description": "Setează descrierea unei priorități.",
+                "params": {
+                    "entry_number": "Numărul priorității din /priority list",
+                    "description": "Descrierea ordinului"
+                }
+            },
+            "add": {
+                "description": "Adaugă o bătălie activă în lista de priorități.",
+                "params": {
+                    "link": "Linkul bătăliei din WarEra",
+                    "description": "Descrierea ordinului"
+                }
+            },
+            "move": {
+                "description": "Inversează două priorități.",
+                "params": {
+                    "entry_number_a": "Numărul primei priorități",
+                    "entry_number_b": "Numărul celei de-a doua priorități"
+                }
+            },
+            "remove": {
+                "description": "Elimină o prioritate.",
+                "params": {"entry_number": "Numărul priorității din /priority list"}
+            }
+        },
+        "mu_stray": {"description": "Listează jucătorii care nu aparțin niciunei unități militare configurate."},
+        "pills": {
+            "description": "Arată cine are pastilă, cine e în debuff și cine nu a luat pastila într-o unitate militară.",
+            "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
+        },
+        "inactive_players": {"description": "Listează jucătorii inactivi de mai mult de 3 zile."},
+        "promotions": {"description": "Verifică dacă membrii noi pot fi promovați și dacă respectă regulile."},
+        "country_strays": {"description": "Listează jucătorii a căror cetățenie nu este printre țările permise configurate."},
+        "discorless": {"description": "Listează cetățenii României care nu sunt pe Discord ca membri Citizen/Newbie."},
+        "top_user_weekly_damages": {
+            "description": "Arată top 10 jucători după damage-ul săptămânal din una sau mai multe țări.",
+            "params": {"country": "Țara/țările de clasat. Separă mai multe țări prin virgulă."}
+        },
+        "top_user_weekly_donations": {
+            "description": "Arată top 10 donatori dintr-o țară în această săptămână.",
+            "params": {"country": "Țara de clasat (alege una din sugestii)."}
+        },
+        "get_region_upgrade_cost": {
+            "description": "Calculează consumul zilnic de petrol al îmbunătățirilor active din regiunile unei țări.",
+            "params": {"country": "Țara de calculat (alege una din sugestii)."}
+        },
+        "damage": {
+            "description": "Builduri de luptă pentru o zi cu pastilă, ordonate după costul net la 1.000 de daune.",
+            "params": {
+                "player_name": "Numele jucătorului din joc.",
+                "number_of_companies": "Companii ținute active (0-12); punctele lor de abilitate sunt rezervate.",
+                "companies_level": "Nivelul Motorului Automat al acelor companii (0-7).",
+                "company_product": "Ce produc companiile (implicit: cel mai profitabil pe punct de producție).",
+                "production_bonus": "Bonusul de producție al companiilor, în procente (zăcământ, țară, ...).",
+                "battle_bonus": "Bonusul total de luptă în procente (patriotic, ordine, alianță, ...). Implicit 20."
+            }
+        }
+    }
+}

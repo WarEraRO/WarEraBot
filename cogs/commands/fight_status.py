@@ -5,6 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timezone
 from utils.api import get_user, get_fight_status, get_military_units, get_shared_session
+from utils.i18n import Translator, get_translator
 from config import config
 
 HEADERS = {'X-API-Key': config['api']}
@@ -27,6 +28,21 @@ def _is_inactive_user(user: dict | None) -> bool:
     except Exception:
         return False
 
+
+def _buff_text(info: dict, tr: Translator) -> str:
+    """Time left on the buff/debuff ("Buff ends in 2h 5m"), or that it expired."""
+    buff_type = info.get('buff_type')
+    kind = tr('fight_status.buff') if buff_type == 'Buff' else tr('fight_status.debuff')
+    try:
+        end = datetime.fromisoformat(str(info.get('buff_end_at')).replace('Z', '+00:00'))
+    except (TypeError, ValueError):
+        return f"{kind}: {info.get('buff_end_at')}"
+    remaining = int((end - datetime.now(timezone.utc)).total_seconds())
+    if remaining <= 0:
+        return tr('fight_status.buff_expired_text', kind=kind)
+    return tr('fight_status.buff_ends_in', kind=kind, hours=remaining // 3600, minutes=remaining % 3600 // 60)
+
+
 class FightStatus(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -35,13 +51,13 @@ class FightStatus(commands.Cog):
         self._mu_ttl: float = 300.0
         self._mu_refresh_task: asyncio.Task | None = None
 
-    async def _resolve_guild_and_role(self, interaction: discord.Interaction):
+    async def _resolve_guild_and_role(self, interaction: discord.Interaction, tr: Translator):
         guild = interaction.guild or self.bot.get_guild(config['guild'])
         if guild is None:
-            return None, "Guild not found."
+            return None, tr('common.guild_not_found')
         fight_role = guild.get_role(config['roles']['fight'])
         if fight_role is None:
-            return None, "Fight role not configured."
+            return None, tr('fight_status.no_fight_role')
         return fight_role, None
 
     async def _fallback_info_for_member(self, member: discord.Member) -> dict:
@@ -156,16 +172,17 @@ class FightStatus(commands.Cog):
     @app_commands.describe(military_unit="Military unit name (optional). If provided, shows members from that unit instead of guild role.")
     async def fightstatus(self, interaction: discord.Interaction, military_unit: str | None = None):
         """Fetch fight status for guild-role members or for a specific military unit."""
+        tr = await get_translator(interaction.guild_id)
         # If no military unit is provided, operate on the guild fight role members
         if military_unit is None:
-            fight_role, err = await self._resolve_guild_and_role(interaction)
+            fight_role, err = await self._resolve_guild_and_role(interaction, tr)
             if err:
                 await interaction.response.send_message(err)
                 return
 
             members = fight_role.members
             if not members:
-                await interaction.response.send_message("No fighters found.")
+                await interaction.response.send_message(tr('fight_status.no_fighters'))
                 return
 
         # defer early because we'll perform network I/O
@@ -179,7 +196,7 @@ class FightStatus(commands.Cog):
             infos = await self._fetch_infos_for_military_unit(military_unit, session)
 
         if not infos:
-            await interaction.followup.send("No fighter information available.")
+            await interaction.followup.send(tr('fight_status.no_info'))
             return
 
         # Sort fighters: buffed (active) first, neutral/expired second, debuffed (active) last
@@ -197,7 +214,7 @@ class FightStatus(commands.Cog):
 
         infos.sort(key=_sort_key)
 
-        paginator = self.FightEmbedPaginator(infos, interaction.user, per_page=10)
+        paginator = self.FightEmbedPaginator(infos, interaction.user, tr, per_page=10)
         await paginator.start(interaction)
 
     @fightstatus.autocomplete('military_unit')
@@ -242,10 +259,15 @@ class FightStatus(commands.Cog):
         return choices
 
     class FightEmbedPaginator(discord.ui.View):
-        def __init__(self, infos: list[dict], author, per_page: int = 10, timeout: float = 120.0):
+        def __init__(self, infos: list[dict], author, tr: Translator, per_page: int = 10, timeout: float = 120.0):
             super().__init__(timeout=timeout)
             self.raw_infos = infos
             self.author = author
+            self.tr = tr
+            self.buffed_filter_button.label = tr('fight_status.filter_buffed')
+            self.neutral_filter_button.label = tr('fight_status.filter_neutral')
+            self.debuffed_filter_button.label = tr('fight_status.filter_debuffed')
+            self.all_filter_button.label = tr('fight_status.filter_all')
             self.per_page = per_page
             self.index = 0
             self.message: discord.Message | None = None
@@ -257,7 +279,7 @@ class FightStatus(commands.Cog):
             if not self.embeds:
                 return
             embed = self.embeds[self.index]
-            embed.set_footer(text=f"Page {self.index+1}/{len(self.embeds)}")
+            embed.set_footer(text=self.tr('common.page_short', page=self.index + 1, pages=len(self.embeds)))
 
         def build_embeds(self, filter_mode: str | None = None):
             # allow explicit None to clear filters
@@ -295,27 +317,28 @@ class FightStatus(commands.Cog):
                 debuffed_sorted = sorted(debuffed, key=_stat_key)
                 filtered = buffed_sorted + neutral_sorted + debuffed_sorted
 
+            tr = self.tr
             pages: list[discord.Embed] = []
             per_page = self.per_page
             total_pages = max(1, (len(filtered) + per_page - 1) // per_page)
 
             for p in range(total_pages):
                 chunk = filtered[p * per_page:(p + 1) * per_page]
-                embed = discord.Embed(title="Fighters Status", color=discord.Color.blurple())
+                embed = discord.Embed(title=tr('fight_status.title'), color=discord.Color.blurple())
                 lines: list[str] = []
                 for i, info in enumerate(chunk):
-                    name_display = info.get('display_name') or info.get('warera_name') or f"User {info.get('userId')}"
+                    name_display = info.get('display_name') or info.get('warera_name') or tr('fight_status.user_fallback', id=info.get('userId'))
                     buff_type = info.get('buff_type')
                     buff_active = info.get('buff_active')
                     if buff_type == 'Buff':
-                        status_label = '🟢 Buffed' if buff_active else '🟡 Buff expired'
+                        status_label = tr('fight_status.status_buffed') if buff_active else tr('fight_status.status_buff_expired')
                     elif buff_type == 'Debuff':
-                        status_label = '🔴 Debuffed' if buff_active else '🟡 Debuff expired'
+                        status_label = tr('fight_status.status_debuffed') if buff_active else tr('fight_status.status_debuff_expired')
                     else:
-                        status_label = '⚪ No status'
+                        status_label = tr('fight_status.status_none')
 
                     level = info.get('level', 'N/A')
-                    online = 'Yes' if info.get('is_active') else 'No'
+                    online = tr('common.yes') if info.get('is_active') else tr('common.no')
                     health_curr = info.get('health_curr')
                     health_total = info.get('health_total')
                     hunger_curr = info.get('hunger_curr')
@@ -333,23 +356,34 @@ class FightStatus(commands.Cog):
                     hunger_str = f"{hunger_curr_fmt}/{hunger_total if hunger_total is not None else 'N/A'}"
 
                     flag = '🇷🇴'
-                    line1 = f"{flag} {name_display} — Level: {level} • Online: {online}"
+                    line1 = tr('fight_status.player_line', flag=flag, name=name_display, level=level, online=online)
                     line2 = f"❤️ {health_str} • 🍔 {hunger_str}"
-                    buff_text = (info.get('buff_text') or '').strip()
-                    if buff_type:
-                        if buff_text and buff_text.lower() != 'no buff/debuff':
-                            status_line = f"{status_label} • 🕒 {buff_text}"
-                        else:
-                            status_line = f"{status_label}"
+                    if buff_type and info.get('buff_end_at'):
+                        status_line = f"{status_label} • 🕒 {_buff_text(info, tr)}"
                     else:
                         status_line = status_label
 
                     player_block = f"{line1}\n{line2}\n{status_line}"
                     lines.append(player_block)
 
-                chunk_text = "\n\n".join(lines) or "No data"
-                embed.add_field(name="Players", value=chunk_text, inline=False)
-                embed.set_footer(text=f"Page {p+1}/{total_pages}")
+                # Discord caps a field value at 1024 chars, so spread the player blocks
+                # over as many fields as needed (continuation fields get a blank name).
+                field_values: list[str] = []
+                current = ""
+                for block in lines:
+                    candidate = f"{current}\n\n{block}" if current else block
+                    if len(candidate) > 1024 and current:
+                        field_values.append(current)
+                        current = block
+                    else:
+                        current = candidate
+                if current:
+                    field_values.append(current)
+                if not field_values:
+                    field_values = [tr('fight_status.no_data')]
+                for fi, value in enumerate(field_values):
+                    embed.add_field(name=tr('fight_status.players') if fi == 0 else "​", value=value[:1024], inline=False)
+                embed.set_footer(text=tr('common.page_short', page=p + 1, pages=total_pages))
                 pages.append(embed)
 
             self.embeds = pages

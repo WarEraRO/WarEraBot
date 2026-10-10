@@ -22,6 +22,11 @@ AWS_REGION=us-east-1  # optional, defaults to us-east-1
 
 The bot also expects guild/role/channel settings in `config.json`.
 
+### Languages
+The bot speaks English (default) and Romanian. Members with the Developer role (`roles.developer` in `config.json`) pick the language of a server with `/setlang <English|Romanian>`. The choice is saved per server in the `guild_settings` table (SQLite, or DynamoDB when AWS credentials are set, table name overridable with `DYNAMO_GUILD_SETTINGS_TABLE`) and applies to command responses, buttons, reports, alerts and the DMs the server triggers.
+
+All texts live in `locales/en.json` and `locales/ro.json`. Code looks them up through `utils/i18n.py` (`tr = await get_translator(guild)`, then `tr("section.key", name=value)`); a key missing in Romanian falls back to English. Slash-command descriptions are shown in Romanian to members whose Discord client is set to Romanian (from the `slash` section of `ro.json`), since Discord picks those by client language.
+
 ### 2) Run with Docker
 Build the image:
 

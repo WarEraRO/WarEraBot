@@ -1,4 +1,13 @@
+import logging
+from datetime import datetime, timezone, tzinfo
+from functools import cache
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
 import discord
+
+from config import config
+
+logger = logging.getLogger(__name__)
 
 
 COUNTRY_FLAGS: dict[str, str] = {
@@ -192,8 +201,9 @@ def country_flag(country_name: str | None) -> str | None:
     return COUNTRY_FLAGS.get(str(country_name).strip().casefold())
 
 
-def country_with_flag(country_name: str | None, left: bool) -> str:
-    name = str(country_name or "unknown")
+def country_with_flag(country_name: str | None, left: bool, unknown: str = "unknown") -> str:
+    """The country name with its flag emoji; `unknown` (pass a translated word) when there is no name."""
+    name = str(country_name or unknown)
     flag = country_flag(name)
     if not flag:
         return name
@@ -201,6 +211,18 @@ def country_with_flag(country_name: str | None, left: bool) -> str:
         return f"{flag} {name}"
     else:
         return f"{name} {flag}"
+
+
+def is_developer(member) -> bool:
+    """True when the member has the Developer role (config.json roles.developer); always False in DMs."""
+    developer_role_id = config.get("roles", {}).get("developer")
+    return bool(developer_role_id) and any(role.id == developer_role_id for role in getattr(member, "roles", []))
+
+
+def is_commander(member) -> bool:
+    """True when the member has the Commander role (config.json roles.commander); always False in DMs."""
+    commander_role_id = config.get("roles", {}).get("commander")
+    return bool(commander_role_id) and any(role.id == commander_role_id for role in getattr(member, "roles", []))
 
 
 async def get_mu_destination(guild: discord.Guild, unit: dict, thread_key: str):
@@ -219,3 +241,22 @@ async def get_mu_destination(guild: discord.Guild, unit: dict, thread_key: str):
         except discord.HTTPException:
             return None
     return target
+
+
+@cache
+def local_timezone() -> tzinfo:
+    """The timezone report times are shown in: config.json "timezone", an IANA name such as Europe/Bucharest,
+    so daylight saving time is applied. Falls back to UTC when unset or unknown."""
+    name = config.get("timezone")
+    if not name:
+        return timezone.utc
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        logger.warning("Unknown timezone %r in config.json, using UTC", name)
+        return timezone.utc
+
+
+def to_local(value: datetime) -> datetime:
+    """An aware datetime converted to local_timezone()."""
+    return value.astimezone(local_timezone())

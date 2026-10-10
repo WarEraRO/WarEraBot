@@ -1,0 +1,693 @@
+{
+    "languages": {
+        "en": "English",
+        "ro": "Romanian"
+    },
+    "dates": {
+        "days_short": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        "months_short": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+        "months": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    },
+    "common": {
+        "not_authorized": "You are not authorized to use this command.",
+        "guild_not_found": "Guild not found.",
+        "prev": "◀ Prev",
+        "next": "Next ▶",
+        "prev_plain": "Prev",
+        "next_plain": "Next",
+        "first": "First",
+        "previous": "Previous",
+        "last": "Last",
+        "page_total": "Page {page} of {pages} — Total: {total}",
+        "page_short": "Page {page}/{pages}",
+        "total": "Total: {total}",
+        "total_changes": "Total changes: {total}",
+        "and_more": "... and {count} more",
+        "unknown": "unknown",
+        "unknown_title": "Unknown",
+        "unknown_user": "Unknown user ({id})",
+        "unknown_country": "Unknown country",
+        "none": "None",
+        "yes": "Yes",
+        "no": "No",
+        "added": "Added",
+        "removed": "Removed",
+        "no_description": "No description.",
+        "unavailable": "unavailable",
+        "tournament_battle": "Tournament battle",
+        "country_list_unavailable": "Could not load the country list. Please try again later.",
+        "country_not_found_autocomplete": "Country `{country}` was not found. Please select a country from autocomplete.",
+        "side": {
+            "attacker": "attacker",
+            "defender": "defender"
+        },
+        "side_title": {
+            "attacker": "Attacker",
+            "defender": "Defender"
+        }
+    },
+    "lifecycle": {
+        "started": {
+            "title": "WarEraBot started",
+            "description": "The bot is online and background jobs are running."
+        },
+        "stopped": {
+            "title": "WarEraBot stopped",
+            "description": "The bot client is closing or disconnected unexpectedly."
+        }
+    },
+    "setlang": {
+        "updated": "The bot's language for this server is now **{language}**.",
+        "unknown": "Unknown language `{language}`. Available: {available}.",
+        "failed": "Could not save the language. Please try again later."
+    },
+    "run_job": {
+        "every": "every {interval}",
+        "scheduled": "scheduled",
+        "no_jobs": "none",
+        "unknown": "Unknown job `{job}`. Available jobs: {available}",
+        "already_running": "Job `{job}` is already running. Try again once it finishes.",
+        "failed": "Job `{job}` failed after {seconds}s: `{error}`",
+        "finished": "Job `{job}` finished in {seconds}s."
+    },
+    "help": {
+        "commands_title": "Bot Commands",
+        "commands_description": "Use the slash commands below. Autocomplete is available where applicable.",
+        "commands_footer": "Commands — Page {page} of {pages}",
+        "jobs_title": "Background Jobs / Tasks",
+        "jobs_description": "Active background tasks and how often they run.",
+        "jobs_footer": "Jobs — Page {page} of {pages}",
+        "commands_button": "Commands",
+        "jobs_button": "Jobs",
+        "unavailable": "Unable to display help at this time.",
+        "commands": {
+            "diplomacy": {
+                "name": "/diplomacy [country_name]",
+                "desc": "Show diplomacy info for countries. If `country_name` is provided, shows details for that country; otherwise shows a paginated list of countries with diplomacy records (3 per page). Government-only fields (diplomacy list) are shown when you have the government role."
+            },
+            "update_diplomacy": {
+                "name": "/update_diplomacy country_name [status] [diplomacy] [description]",
+                "desc": "Government-only. Update an existing diplomacy record: set `status`, append a `diplomacy` entry, or update `description`. New diplomacy entries are automatically dated. Status must be one of the predefined options and autocomplete is available."
+            },
+            "add_diplomacy": {
+                "name": "/add_diplomacy country_name [status] [description]",
+                "desc": "Government-only. Create a new diplomacy record for a country. If a record already exists, use `/update_diplomacy`."
+            },
+            "remove_diplomacy": {
+                "name": "/remove_diplomacy country_name position",
+                "desc": "Government-only. Remove the diplomacy list entry at the provided 1-based `position`."
+            },
+            "delete_diplomacy": {
+                "name": "/delete_diplomacy country_name",
+                "desc": "Government-only. Delete the diplomacy record for the specified country."
+            },
+            "nap": {
+                "name": "/nap add country_a country_b | /nap remove country_a country_b | /nap list",
+                "desc": "Government-only. Manage the internal NAP list used by the hourly battle monitor. Country fields support autocomplete from the current WarEra country list."
+            },
+            "priority": {
+                "name": "/priority list | /priority refresh | /priority add link description | /priority set entry_number description | /priority move entry_number_a entry_number_b | /priority remove entry_number",
+                "desc": "Manage battle order priorities from the battle order monitor cache. `list` shows active priorities with descriptions; government-only actions can refresh Romania order checks, add an active battle manually, set order descriptions, swap priorities, or remove a priority so it is not auto-added again unless manually added."
+            },
+            "fightstatus": {
+                "name": "/fightstatus [military_unit]",
+                "desc": "Fetch fight status for fighters. Without `military_unit`, operates on members with the configured 'fight' role; with `military_unit` fetches members of that unit. Results are paginated (10 per page) and include buff/debuff status, health/hunger, level, and online state. Filters for Buffed/Neutral/Debuffed available."
+            },
+            "country_strays": {
+                "name": "/country_strays",
+                "desc": "List players whose in-game citizenship is not in the configured allowed countries. Results are paginated."
+            },
+            "discorless": {
+                "name": "/discorless",
+                "desc": "List Romania citizens from WarEra who are not present in Discord with the Citizen or Newbie role. Results are matched against server display names and paginated."
+            },
+            "inactive_players": {
+                "name": "/inactive_players",
+                "desc": "List players who have been inactive for more than 3 days. Results are paginated."
+            },
+            "mu_stray": {
+                "name": "/mu_stray",
+                "desc": "List MU strays categorised as Wrong MU, No MU, or Inactive Strays. Filter buttons on the result view switch between categories."
+            },
+            "pills": {
+                "name": "/pills military_unit",
+                "desc": "Pill status of a configured military unit (autocomplete): who is pilled, grouped by the hour they pilled, who is in debuff, grouped by the hour it ends (both with time left), and fighters not pilled. Hours are shown in the configured timezone."
+            },
+            "promotions": {
+                "name": "/promotions",
+                "desc": "Check newbie members for promotion eligibility. Shows Promotion Candidates, Fight Issues, Inactive, and Data Issues — filter buttons on the result view switch between categories."
+            },
+            "top_user_weekly_damages": {
+                "name": "/top_user_weekly_damages country",
+                "desc": "Show the top 10 weekly damage dealers from one or more selected countries. Separate multiple countries with commas; results are grouped by player level bracket and include each player's country."
+            },
+            "top_user_weekly_donations": {
+                "name": "/top_user_weekly_donations country",
+                "desc": "Show the top 10 citizens by money donated since Monday at 00:00 UTC. The required country field supports autocomplete using the current country list from WarEra."
+            },
+            "get_region_upgrade_cost": {
+                "name": "/get_region_upgrade_cost country",
+                "desc": "Calculate daily oil upkeep and market cost for active bunkers, military bases, and pacification centers in regions held by the selected country. The required country field supports autocomplete."
+            },
+            "run_job": {
+                "name": "/run_job job_name",
+                "desc": "Developers only; commanders can run only skill_roles and military_unit_roles. Force a background job to run once now, without waiting for or changing its loop timer. Refused while the job is already running; a scheduled run due during a forced run is skipped. The job field supports autocomplete."
+            },
+            "setlang": {
+                "name": "/setlang language",
+                "desc": "Developer-only. Set the language the bot uses in this server (English or Romanian): command responses, buttons, reports, alerts and the DMs this server triggers. The language field supports autocomplete."
+            }
+        },
+        "jobs": {
+            "skill_roles": {
+                "name": "skill_roles — every 1 hour",
+                "desc": "Scans server members with the Citizen role and assigns/removes Economy or Fighter roles based on their in-game skill distribution. Sends a summary to the reports channel when changes occur."
+            },
+            "military_unit_roles": {
+                "name": "military_unit_roles — every 3 hours",
+                "desc": "Assigns Military Unit roles to members based on their in-game MU membership and removes conflicting MU roles. Sends a summary to the reports channel when changes occur."
+            },
+            "commander_roles": {
+                "name": "commander_roles — every 3 hours",
+                "desc": "Syncs the Discord commander role with the commanders configured across all military units."
+            },
+            "unidentified_members": {
+                "name": "unidentified_members — every 6 hours",
+                "desc": "Checks Citizen/Newbie members to see if their nickname maps to a known game user. Records mappings when found and reports unidentified players to the reports channel."
+            },
+            "takeover_countries": {
+                "name": "takeover_countries — every 5 minutes",
+                "desc": "Scans countries and reports those that appear empty (no government/congress members), posting takeover opportunities to the public channel."
+            },
+            "buff_monitor": {
+                "name": "buff_monitor — every 10 minutes",
+                "desc": "Monitors fighter buffs and notifies users when their active pill buff is nearing expiration (uses an internal cache to avoid repeated notifications)."
+            },
+            "bounty_monitor": {
+                "name": "bounty_monitor — configurable interval",
+                "desc": "Checks active battles for money pools/bounties and posts a summary to the public channel when relevant (interval set by `BOUNTY_MONITOR_INTERVAL_MINUTES` in config)."
+            },
+            "mercenary_contracts": {
+                "name": "mercenary_contracts — every 1 minute",
+                "desc": "Checks active mercenary contract auctions and posts new or updated contracts to the public channel."
+            },
+            "mu_contract_monitor": {
+                "name": "mu_contract_monitor — every 5 minutes",
+                "desc": "Posts an embed in a military unit's contracts thread (threadIds.contractsId) or channel when that MU wins a mercenary contract: battle, minimum damage, pay per 1k damage, total payout, estimated time left and score."
+            },
+            "monitor_nap": {
+                "name": "monitor_nap - every 1 hour",
+                "desc": "Checks active battle country orders and MU-order nationalities against configured NAPs, then reports new violations to the reports channel."
+            },
+            "battle_order_monitor": {
+                "name": "battle-order_monitor - every 5 minutes",
+                "desc": "Checks active battles for Romania country orders, adds new matches to the battle order priority cache, posts alerts in the battle-orders channel, and removes priorities for battles that ended."
+            },
+            "reddit_monitor": {
+                "name": "reddit_monitor - every 5 minutes",
+                "desc": "Checks r/RomaniaWarEra for posts from the last 24 hours and reports newly seen posts to the reports channel."
+            }
+        }
+    },
+    "fight_status": {
+        "no_fight_role": "Fight role not configured.",
+        "no_fighters": "No fighters found.",
+        "no_info": "No fighter information available.",
+        "title": "Fighters Status",
+        "user_fallback": "User {id}",
+        "status_buffed": "🟢 Buffed",
+        "status_buff_expired": "🟡 Buff expired",
+        "status_debuffed": "🔴 Debuffed",
+        "status_debuff_expired": "🟡 Debuff expired",
+        "status_none": "⚪ No status",
+        "player_line": "{flag} {name} — Level: {level} • Online: {online}",
+        "no_data": "No data",
+        "players": "Players",
+        "filter_buffed": "Buffed",
+        "filter_neutral": "Neutral",
+        "filter_debuffed": "Debuffed",
+        "filter_all": "All",
+        "buff": "Buff",
+        "debuff": "Debuff",
+        "buff_ends_in": "{kind} ends in {hours}h {minutes}m",
+        "buff_expired_text": "{kind} expired"
+    },
+    "diplomacy": {
+        "date_unavailable": "Date unavailable",
+        "country_not_found": "Country '{country}' not found.",
+        "details_title": "Diplomacy — {country}",
+        "status": "Status",
+        "description": "Description",
+        "none_created": "No diplomacies have been created.",
+        "invalid_status": "Invalid status. Allowed: {allowed}",
+        "no_updates": "No updates provided. Specify at least one of `status`, `diplomacy`, or `description`.",
+        "updated_status": "status: {status}",
+        "updated_entry": "diplomacy entry added ({date})",
+        "updated_description": "description updated",
+        "updated": "Updated '{country}' ({changes}).",
+        "already_exists": "Diplomacy for '{country}' already exists. Use `/update_diplomacy` to modify it.",
+        "created": "Diplomacy for '{country}' created.",
+        "remove_failed": "Could not remove entry {position} for '{country}'.",
+        "removed": "Removed entry {position} for '{country}'.",
+        "no_record": "No diplomacy record found for '{country}'.",
+        "deleted": "Diplomacy for '{country}' deleted.",
+        "show_list_button": "Show Diplomacy Information",
+        "only_author_open": "Only the person who used this command can open the diplomacy list.",
+        "only_author_pages": "Only the person who used this command can change pages.",
+        "list_title": "Diplomacy List - {country}",
+        "entry_name": "Entry {number} | {date}",
+        "empty_entry": "(empty entry)",
+        "empty": "(empty)",
+        "list_footer": "Page {page}/{pages} | Entries: {entries}",
+        "sort_button": "Sort by status",
+        "list_all_title": "Diplomacies",
+        "no_description_short": "(no description)",
+        "sorted_footer": "Page {page}/{pages} — Sorted: {sort}",
+        "sort_alpha": "alpha",
+        "sort_status": "status"
+    },
+    "naps": {
+        "country_not_found": "Country '{country}' was not found.",
+        "same_country": "A NAP needs two different countries.",
+        "already_exists": "A NAP between {first} and {second} already exists.",
+        "added": "Added NAP: {first} - {second}.",
+        "countries_not_found": "One or both countries were not found.",
+        "not_exists": "No NAP exists between {first} and {second}.",
+        "removed": "Removed NAP: {first} - {second}.",
+        "list_title": "Configured NAPs",
+        "list_empty": "No NAPs configured."
+    },
+    "battle_orders": {
+        "monitor_not_loaded": "Battle order monitor is not loaded.",
+        "list_title": "Battle Order Priorities",
+        "list_empty": "No battle order priorities are currently active.",
+        "order_description": "Order Description: {description}",
+        "refreshed": "Battle order priorities refreshed. Added {count} new priorities.",
+        "invalid_number": "Invalid priority number.",
+        "updated": "Updated priority {number}.",
+        "added": "Priority added. It is priority {number}.",
+        "invalid_numbers": "One or both priority numbers are invalid.",
+        "swapped": "Swapped priorities {first} and {second}.",
+        "removed": "Removed priority {number}.",
+        "invalid_link": "Invalid battle link.",
+        "fetch_failed": "Could not fetch active battles.",
+        "not_active": "Battle is not active or could not be found.",
+        "tournament_fetch_failed": "Could not fetch the tournament for this battle.",
+        "only_country_tournaments": "Only country tournament battles can be added as priorities.",
+        "already_listed": "That battle is already in the priority list.",
+        "priority_added": "Priority added.",
+        "manual_added": "A new priority was added: {title} in [{region}]({link})",
+        "battle_link": "Battle Link: {link}",
+        "unknown_region": "Unknown region",
+        "tournament": "Tournament",
+        "tournament_order": "{country} put an order in the [tournament]({link}) against {opponents}",
+        "order_placed": "{country} placed an order for the {side} {side_country} against {opponent_side} {opponent_country} in [{region}]({link})",
+        "tournament_title": "Tournament: {side} {side_team} - {opponent_team} {opponent_side}"
+    },
+    "mu_stray": {
+        "title": "Military Unit Strays",
+        "none_found": "No stray players found.",
+        "empty_category": "*No players in this category.*",
+        "filter_wrong_mu": "Wrong MU",
+        "filter_no_mu": "No MU",
+        "filter_inactive": "Inactive Strays"
+    },
+    "inactive_players": {
+        "title": "Inactive Players",
+        "none_found": "*No inactive players found.*",
+        "line": "{name} — Level: {level} — Last active: {last_active}"
+    },
+    "country_strays": {
+        "title": "Citizenship Issues",
+        "none_found": "*No citizenship issues found.*"
+    },
+    "discordless": {
+        "title": "{country} Users Not In Discord",
+        "all_found": "*All {country} citizens were found in Discord.*",
+        "footer": "Page {page} of {pages} - Missing: {missing} - Discord checked: {checked} - Country users: {country_total}",
+        "line": "- {name} - Level: {level}",
+        "country_missing": "Could not find `{country}` in the WarEra country list.",
+        "users_unavailable": "Could not load {country} users. Please try again later."
+    },
+    "promotions": {
+        "title": "Newbie Promotions",
+        "none_found": "No issues or candidates found.",
+        "empty_category": "*No entries in this category.*",
+        "line": "{name} — Level: {level} — {note}",
+        "title_candidates": "Promotion Candidates",
+        "title_fight_issues": "Fight Issues",
+        "title_inactive": "Inactive",
+        "title_data_issues": "Data Issues",
+        "button_candidates": "Candidates",
+        "button_fight_issues": "Fight Issues",
+        "button_inactive": "Inactive",
+        "button_data_issues": "Data Issues",
+        "no_api_data": "No API data",
+        "last_active": "Last active: {date}",
+        "no_last_connection": "No lastConnectionAt",
+        "reason_economy": "Economy",
+        "reason_level": "Level",
+        "low_level_fighter": "Level <= 15 in fight mode",
+        "error": "Exception"
+    },
+    "pills": {
+        "unknown_unit": "Unknown military unit. Pick one from the list.",
+        "members_unavailable": "Could not fetch the military unit members. Try again later.",
+        "title": "Pills · {mu}",
+        "pilled_header": "💊 **Pilled ({count})** · pill hour → time left",
+        "debuff_header": "🥴 **Debuff ({count})** · ends at → time left",
+        "not_pilled_header": "⚪ **Not pilled ({count})**",
+        "footer_hours": "Hours in {tz}",
+        "footer_economy": {
+            "one": "{count} economy member not listed",
+            "other": "{count} economy members not listed"
+        },
+        "footer_missing": {
+            "one": "{count} member could not be fetched",
+            "other": "{count} members could not be fetched"
+        }
+    },
+    "weekly_damages": {
+        "title": "Weekly User Damages - {countries}",
+        "more_countries": "{names} + {count} more",
+        "bracket_title": "Level [{start}-{end})",
+        "damage": "{damage} damage",
+        "no_entries": "*No weekly damage entries found for the selected countries.*",
+        "no_bracket_entries": "*No weekly damage entries found in the configured level brackets.*",
+        "bracket_footer": "Bracket {index}/{total} | Weekly ranking | Top 10 per bracket",
+        "footer": "Weekly ranking | Top 10 per bracket",
+        "countries_not_found": "Could not find: {countries}. Please select countries from autocomplete.",
+        "no_country": "Please provide at least one country."
+    },
+    "weekly_donations": {
+        "title": "Weekly Player Donations - {country}",
+        "none_found": "*No player donations found for this country this week.*",
+        "money": "{amount} money",
+        "footer": "{start} to {end} UTC | Top 10",
+        "citizens_unavailable": "Could not load the country's citizens. Please try again later."
+    },
+    "region_upkeep": {
+        "title": "Region Upgrade Upkeep - {country}",
+        "upgrades": {
+            "bunker": "Bunker",
+            "base": "Military Base",
+            "pacificationCenter": "Pacification Center"
+        },
+        "unavailable": "Unavailable",
+        "oil_unit": "oil",
+        "summary": "Summary",
+        "summary_value": "Regions held: **{regions}**\nAverage development: **{development}**\nActive paid upgrades: **{upgrades}**",
+        "oil": "Oil",
+        "oil_value": "Daily oil upkeep: **{upkeep}**\nMarket oil price: **{price}**\nDaily market cost: **{cost}**",
+        "none_active": "*No active bunkers, military bases, or pacification centers found.*",
+        "upgrade_line": "**{region}** - {upgrade} lvl {level}: {oil}",
+        "more_upgrades": "...and {count} more active upgrades.",
+        "active_upgrades": "Active Upgrades",
+        "footer": "Daily upkeep estimate uses active upgrades only.",
+        "regions_unavailable": "Could not load region data. Please try again later.",
+        "development_unavailable": "Could not load country development data. Please try again later.",
+        "average_unavailable": "Country average development is unavailable.",
+        "unknown_region": "Unknown region"
+    },
+    "takeover": {
+        "check_title": "Takeover Countries Check",
+        "none_found": "No takeover countries were found.",
+        "found_title": "Takeover Countries Found",
+        "found_description": "The following countries can be captured:",
+        "countries": "Countries"
+    },
+    "article_mention": {
+        "mentioned": "Romania was mentioned in an article, you might want to check it out -> [{title}]({url})"
+    },
+    "mercenary_contracts": {
+        "posted": "**[CONTRACT]** {country} posted a {initial}/{budget} contract for {side} side — [View Battle]({link})"
+    },
+    "skill_roles": {
+        "title": "Skill Roles Updated",
+        "description": "Summary of skill role changes:",
+        "economy_added": "Economy Roles — Added",
+        "economy_removed": "Economy Roles — Removed",
+        "fight_added": "Fight Roles — Added",
+        "fight_removed": "Fight Roles — Removed",
+        "reason_economy_added": "Economy skill > 50",
+        "reason_fight_removed": "Economy > 50, remove fighter role",
+        "reason_fight_added": "Economy skill <= 50",
+        "reason_economy_removed": "Economy <= 50, remove economy role"
+    },
+    "commander_roles": {
+        "title": "Commander Roles Updated",
+        "description": "Summary of commander role synchronization:",
+        "reason_added": "Assigned commander role from MU config",
+        "reason_removed": "Removed commander role (no longer MU commander)"
+    },
+    "mu_roles": {
+        "title": "Military Unit Roles Updated",
+        "description": "Summary of military unit role changes:",
+        "added": "Added:",
+        "removed": "Removed:",
+        "reason_added": "Assigned Military Unit role.",
+        "reason_removed": "Removed unused Military Unit roles."
+    },
+    "unidentified": {
+        "check_title": "Unidentified Players Check",
+        "none_found": "No unidentified players were found.",
+        "found_title": "Unidentified Players Found",
+        "found_description": "The following members could not be matched:",
+        "players": "Players",
+        "reason_nick_sync": "Sync WarEra username"
+    },
+    "buff_monitor": {
+        "expiring": {
+            "one": "Hi {name}, your pill buff expires in about {count} minute. Please empty into a fight if possible.",
+            "other": "Hi {name}, your pill buff expires in about {count} minutes. Please empty into a fight if possible."
+        }
+    },
+    "bounty_monitor": {
+        "bounty": "**[BOUNTY]** {money_per}/{pool} from {country} ({side}) against {opponent} ({opponent_side}) — [View Battle]({link})"
+    },
+    "nap_monitor": {
+        "title": "NAP Violation Alert",
+        "description": "Active battle orders were found against configured NAP partners.",
+        "mu_fallback": "Military Unit {id}",
+        "violation": "{source} has {side} orders against {opponent}.\n[View battle]({link})"
+    },
+    "mu_contracts": {
+        "title": "{country} · Mercenary Auction",
+        "min_damage": "Min. Damage",
+        "per_1k": "Per 1k Damage",
+        "total_payout": "Total Payout",
+        "battle_eta": "Battle ETA",
+        "score": "Score",
+        "score_value": "Round {round} · {attacker_icon} {attacker_wins} – {defender_wins} {defender_icon} (first to {rounds_to_win})",
+        "battle_ended": "Battle ended",
+        "round_ended": "Round ended",
+        "round_eta": "{eta} (round {round})",
+        "unknown_mu": "unknown MU",
+        "won_by": "Contract won by {mu}"
+    },
+    "mu_daily": {
+        "author": "🗓️ {mu} · Daily Report",
+        "date_format": "%a %b %d",
+        "date_short_format": "%b %d",
+        "datetime_format": "%b %d %H:%M",
+        "description_day": "Game day **{day}** · resets {reset} {tz}",
+        "description_week": "⚔️ Week **{damage}**",
+        "description_rank": "rank #{rank}",
+        "description_per_day": "~{damage}/day",
+        "description_members": "👥 {fighters} fighters · {economy} economy · {members} members",
+        "now": "now",
+        "tomorrow_short": "tmrw",
+        "bar_health": "HP",
+        "bar_hunger": "food",
+        "pills_title": "💊 Pills · {fighters} fighters",
+        "pills_value": "🔥 **{buffed}** buffed now\n🟢 **{pilled_earlier}** pilled earlier today (now in debuff)\n⚪ **{no_pill}** no pill today",
+        "pills_cooling_down": "⏳ {count} still in debuff from yesterday",
+        "no_pill_title": "⚪ No pill today ({count})",
+        "pill_times_title": "🕒 Pill times today ({tz})",
+        "next_pill_title": "📅 Next pill ready ({tz})",
+        "orders_title": "📌 MU orders now",
+        "no_order": "No active MU order",
+        "order_line": "[{title}]({link}) · for {side}",
+        "reskills_title": "🔄 Skill resets, last 24h ({count})",
+        "reskill_line": "{name} → {build} · next reset {next_reset}",
+        "build_economy": "Economy",
+        "build_fight": "Fight",
+        "tips_title": "💡 For tomorrow",
+        "no_help_title": "🤝 No MU help asked today ({count})",
+        "full_bars_title": "🔋 Full bars, regen lost ({count})",
+        "quiet_title": "💤 Quiet ({count})",
+        "quiet_offline": "{name} ({days}d offline)",
+        "quiet_no_damage": "{name} (0 dmg this week)",
+        "and_more": "and {count} more",
+        "footer": "Fighters = members with a fight skill build · pill state read at report time",
+        "footer_missing": "⚠️ {count} member(s) could not be fetched",
+        "tip_no_order": "No MU order is active; set one so fighters know where to pill and hit tomorrow.",
+        "tip_no_pill": "{count} fighter(s) did not pill today while the MU had an active order.",
+        "tip_shared_window": "{needed}/{total} fighters can pill by {hour}:00 {tz}; agree on a shared pill time from then.",
+        "tip_spread": "Today's pills were spread over {hours} different hours; a shared window hits harder.",
+        "tip_to_economy": "{count} member(s) reset to economy; they can't reset back to fight before {date}.",
+        "tip_no_help": "{count} fighter(s) asked for no MU help today; that's free health, best used while pilled."
+    },
+    "mu_weekly": {
+        "author": "📊 {mu} · Weekly Report",
+        "date_format": "%b %d",
+        "reset_format": "%A %H:%M %Z",
+        "description": "Game week **{start} – {end}** (resets {reset})",
+        "rank": "Rank #{rank}",
+        "damage_title": "⚔️ Damage",
+        "battles_title": "🗺️ Battles",
+        "battles_value": "**{ended}** ended\n{won} won · {lost} lost",
+        "battles_unpaid": "{count} unpaid · {share}% dmg",
+        "earned_title": "💰 Earned",
+        "earned_value": "**{total}**\nBounty ~{bounty}\nContracts ~{contracts}",
+        "earned_per_1k": "{amount} per 1k dmg",
+        "contracts_title": "📜 Contracts (per 1k)",
+        "contracts_won": "**{count}** won · {value}",
+        "contracts_perk": "{perk} (start {start})",
+        "contracts_lost": "{count} lost · ours {ours}\nWinners {winners}",
+        "reputation_title": "🎖️ Reputation",
+        "treasury_title": "🏦 Treasury",
+        "wealth": "Wealth **{value}**",
+        "transactions_unavailable": "Transactions unavailable",
+        "donations": "+{amount} from {donors} donors",
+        "items": "items",
+        "bought": "−{amount} bought ({item})",
+        "sold": "+{amount} sold",
+        "open_orders": "{count} orders · {invested} invested",
+        "activity_title": "👥 Activity",
+        "activity_fought": "**{active}/{members}** fought",
+        "activity_new": "{count} new",
+        "activity_help": "{help} help · {per_member}/member\n{no_help} gave no help",
+        "spread_title": "📈 Damage spread",
+        "spread_value": "Median {median}\nAvg {average}\n{low} below {percent}% of avg",
+        "top_fighters_title": "🏅 Top fighters",
+        "nobody_fought": "nobody fought",
+        "biggest_battle_title": "🔥 Biggest battle",
+        "battle_line": "[{title}]({link}) · {damage} damage · {money} earned · {outcome}",
+        "outcome_won": "won",
+        "outcome_lost": "lost",
+        "new_members_title": "🆕 New members ({count})",
+        "idle_title": "💤 No damage this week ({count})",
+        "and_more": "and {count} more",
+        "tips_title": "💡 Focus for next week",
+        "tip_idle": "{count} member(s) dealt no damage; check in with them or free up their slots.",
+        "tip_unpaid": "{percent}% of damage earned nothing; prefer battles with a bounty or a contract.",
+        "tip_concentration": "Top {top} fighters did {share}% of the damage; the rest of the MU can add a lot more.",
+        "tip_auctions": "Lost {lost} contract auctions vs {won} won; winners went down to {perk}/1k.",
+        "tip_battles": "Only {won} of {total} battles were won; focus damage on fewer, winnable battles.",
+        "footer": "Battles count once they end · bounty is estimated as battle money minus contract payouts",
+        "footer_incomplete": "⚠️ Some battles could not be fetched, battle numbers may be low"
+    },
+    "damage": {
+        "player_not_found": "❌ Player **{name}** not found.",
+        "data_unavailable": "❌ Game data or market prices could not be loaded. Try again later.",
+        "not_enough_sp": "❌ **{name}** does not have enough skill points ({total}) for {count} companies.",
+        "no_builds": "❌ Could not generate any builds. Try again later.",
+        "title": "⚔️ Pill builds · {name}",
+        "header_player": "**Level** {level} · **{sp} SP** for combat ({reserved} SP on Companies)",
+        "header_bonus": "**Military rank** +{rank}% · **battle bonus** +{battle}% (assumed)",
+        "header_companies": "**Companies** {count} × engine L{level}, +{bonus}% → {pp} PP/day of {product} × {per_pp}/PP = **{income}/day**",
+        "header_no_companies": "**Companies**: none counted",
+        "header_prices": "**Prices**: Pill {pill} · case {case} · elite case {elite} · scrap {scrap} · pool item ~{pool}",
+        "model_title": "How it is calculated",
+        "model_text": "• One Pill a day: you fight only during the 8 h buff, starting with full bars, so you use 1.8 Health bars and 1.8 Hunger bars of food.\n• Gear: average rolls at average market prices, 100 durability, 1 lost per hit (the weapon on every hit, other gear only on hits that are not dodged). Every weapon except the Knife uses 1 ammo per hit.\n• Returns: cases at market price (Loot Chance per hit that is not a miss, elite = 1/100 of that), broken gear gives 1/3 of its scrap, round/battle pool items (1 per 200k + 1 per 500k damage), company engine output.\n• Damage is an estimate (miss = ½ Attack, crit = Attack × (1 + Crit Damage)). Respec, travel and bounties are not included.",
+        "bracket_title": "💰 ≤ {bracket}/1k · {damage} damage/day ({cost}/1k)",
+        "bracket_unreachable_title": "💰 Cheapest build · {damage} damage/day ({cost}/1k)",
+        "bracket_unreachable": "No build gets down to ≤ {brackets}/1k with these settings; this one has the lowest net cost per 1k damage found.",
+        "bracket_same": "Same build as the ≤ {bracket}/1k budget: no build deals more damage within this cost.",
+        "field_skills": "📊 Skills",
+        "field_gear": "🛡️ Equipment (average price)",
+        "field_consumables": "🎒 Consumables per day",
+        "field_combat": "⚔️ Combat",
+        "field_costs": "💸 Costs per day",
+        "field_returns": "💵 Returns per day",
+        "field_net": "🏦 Net",
+        "pill_line": "💊 Pill ×1 · {cost}",
+        "ammo_line": "🔫 {name} ×{count} · {cost}",
+        "no_ammo": "🔫 No ammo",
+        "food_line": "🍖 {name} ×{count} · {cost}",
+        "no_food": "🍖 No food",
+        "combat": "**{per_hit}** damage per hit × **{hits}** hits\nAttack {attack} · Precision {precision}%\nCrit {crit}% × {crit_damage}% crit damage\nArmor {armor} → {armor_pct}% · Dodge {dodge} → {dodge_pct}%\nHealth {health} · Hunger {hunger} · Loot {loot}%\nHealth per hit {health_per_hit}",
+        "costs": "Pill {pill} · Ammo {ammo} · Food {food}\nGear wear {gear}\n**Total {total}**",
+        "returns": "Cases {cases} → {case_value}\nElite cases {elite} → {elite_value}\nScrap {scrap} → {scrap_value}\nPool loot ~{pool} items → {pool_value}\nCompanies {companies}\n**Total {total}**",
+        "net": "**{net}/day** → **{cost} per 1k damage**",
+        "footer": "SP used {used}/{sp} · economy skills left at 0",
+        "gear_none": "none",
+        "skills": {
+            "attack": "Attack",
+            "precision": "Precision",
+            "criticalChance": "Crit chance",
+            "criticalDamages": "Crit damage",
+            "armor": "Armor",
+            "dodge": "Dodge",
+            "health": "Health",
+            "hunger": "Hunger",
+            "lootChance": "Loot"
+        },
+        "slots": {
+            "weapon": "Weapon",
+            "helmet": "Helmet",
+            "gloves": "Gloves",
+            "chest": "Chest",
+            "pants": "Pants",
+            "boots": "Boots"
+        },
+        "weapons": {
+            "knife": "Knife",
+            "gun": "Gun",
+            "rifle": "Rifle",
+            "sniper": "Sniper",
+            "tank": "Tank",
+            "jet": "Jet"
+        },
+        "rarities": {
+            "common": "Common",
+            "uncommon": "Uncommon",
+            "rare": "Rare",
+            "epic": "Epic",
+            "legendary": "Legendary",
+            "mythic": "Mythic"
+        },
+        "stat_short": {
+            "attack": "{value} atk",
+            "criticalChance": "{value}% crit",
+            "criticalDamages": "+{value}% crit dmg",
+            "precision": "+{value}% prec",
+            "armor": "{value} armor",
+            "dodge": "{value} dodge"
+        },
+        "ammo": {
+            "lightAmmo": "Light ammo",
+            "ammo": "Ammo",
+            "heavyAmmo": "Heavy ammo"
+        },
+        "food": {
+            "bread": "Bread",
+            "steak": "Steak",
+            "cookedFish": "Cooked fish"
+        },
+        "products": {
+            "grain": "Grain",
+            "limestone": "Limestone",
+            "iron": "Iron",
+            "lead": "Lead",
+            "coca": "Coca",
+            "petroleum": "Petroleum",
+            "wood": "Wood",
+            "livestock": "Livestock",
+            "fish": "Fish",
+            "bread": "Bread",
+            "steak": "Steak",
+            "cookedFish": "Cooked fish",
+            "concrete": "Concrete",
+            "steel": "Steel",
+            "oil": "Oil",
+            "paper": "Paper",
+            "lightAmmo": "Light ammo",
+            "ammo": "Ammo",
+            "heavyAmmo": "Heavy ammo",
+            "cocain": "Pill"
+        }
+    }
+}
