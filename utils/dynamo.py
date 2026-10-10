@@ -12,6 +12,7 @@ _USERS_TABLE_NAME = config.get("DYNAMO_USERS_TABLE", "warera-ro-discordbot_prod_
 _DIPLOMACIES_TABLE_NAME = config.get("DYNAMO_DIPLOMACIES_TABLE", "warera-ro-discordbot_prod_diplomacies")
 _NAPS_TABLE_NAME = config.get("DYNAMO_NAPS_TABLE", "warera-ro-discordbot_prod_naps")
 _GUILD_SETTINGS_TABLE_NAME = config.get("DYNAMO_GUILD_SETTINGS_TABLE", "warera-ro-discordbot_prod_guild_settings")
+_JOB_SUBSCRIPTIONS_TABLE_NAME = config.get("DYNAMO_JOB_SUBSCRIPTIONS_TABLE", "warera-ro-discordbot_prod_job_subscriptions")
 
 # Module-level cached resource to avoid re-creating sessions on every call
 _resource = None
@@ -44,6 +45,10 @@ def _naps():
 
 def _guild_settings():
     return _get_resource().Table(_GUILD_SETTINGS_TABLE_NAME)
+
+
+def _job_subscriptions():
+    return _get_resource().Table(_JOB_SUBSCRIPTIONS_TABLE_NAME)
 
 
 def _parse_diplomacy_list(raw) -> List:
@@ -327,6 +332,73 @@ def set_guild_language(guild_id, language: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Job subscriptions  (hash key: subscription = "<job>:<target_id>", range key: discord_id)
+# ---------------------------------------------------------------------------
+
+def _subscription_key(job: str, target_id: str) -> str:
+    return f"{job}:{target_id}"
+
+
+def _subscription_record(item: Dict) -> Dict:
+    return {
+        "job": item.get("job"),
+        "target_id": item.get("target_id"),
+        "discord_id": item.get("discord_id"),
+        "api_id": item.get("api_id"),
+        "created_at": item.get("created_at"),
+    }
+
+
+def add_job_subscription(job: str, target_id: str, discord_id, api_id: Optional[str], created_at: Optional[str] = None) -> bool:
+    try:
+        _job_subscriptions().put_item(
+            Item={
+                "subscription": _subscription_key(job, target_id),
+                "discord_id": str(discord_id),
+                "job": job,
+                "target_id": str(target_id),
+                "api_id": api_id,
+                "created_at": created_at,
+            },
+            ConditionExpression="attribute_not_exists(discord_id)",
+        )
+        return True
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+            return False
+        raise
+
+
+def remove_job_subscription(job: str, target_id: str, discord_id) -> bool:
+    resp = _job_subscriptions().delete_item(
+        Key={"subscription": _subscription_key(job, target_id), "discord_id": str(discord_id)},
+        ReturnValues="ALL_OLD",
+    )
+    return bool(resp.get("Attributes"))
+
+
+def get_job_subscribers(job: str, target_id: str) -> List[Dict]:
+    items: List[Dict] = []
+    kwargs = {"KeyConditionExpression": Key("subscription").eq(_subscription_key(job, target_id))}
+    while True:
+        resp = _job_subscriptions().query(**kwargs)
+        items.extend(resp.get("Items", []))
+        if "LastEvaluatedKey" not in resp:
+            break
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+    return [_subscription_record(item) for item in items]
+
+
+def get_user_job_subscriptions(discord_id, job: Optional[str] = None) -> List[Dict]:
+    resp = _job_subscriptions().query(
+        IndexName="discord_id-index",
+        KeyConditionExpression=Key("discord_id").eq(str(discord_id)),
+    )
+    records = [_subscription_record(item) for item in resp.get("Items", [])]
+    return [r for r in records if job is None or r["job"] == job]
+
+
+# ---------------------------------------------------------------------------
 # Table provisioning
 # ---------------------------------------------------------------------------
 
@@ -335,6 +407,7 @@ def ensure_tables(
     diplomacies_table: str = _DIPLOMACIES_TABLE_NAME,
     naps_table: str = _NAPS_TABLE_NAME,
     guild_settings_table: str = _GUILD_SETTINGS_TABLE_NAME,
+    job_subscriptions_table: str = _JOB_SUBSCRIPTIONS_TABLE_NAME,
     region: Optional[str] = None,
 ) -> bool:
     """Ensure both users and diplomacies tables exist in DynamoDB.
@@ -489,6 +562,46 @@ def ensure_tables(
             )
             client.get_waiter("table_exists").wait(
                 TableName=guild_settings_table, WaiterConfig={"Delay": 2, "MaxAttempts": 25}
+            )
+            created_any = True
+        except ClientError as ce:
+            if ce.response.get("Error", {}).get("Code") == "ResourceInUseException":
+                created_any = True
+            else:
+                raise
+
+    # ------------------------------------------------------------------
+    # Job subscriptions table  (hash key: subscription "<job>:<target_id>", range key: discord_id)
+    # GSI: discord_id-index (a member's own subscriptions)
+    # ------------------------------------------------------------------
+    try:
+        client.describe_table(TableName=job_subscriptions_table)
+        created_any = True
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") != "ResourceNotFoundException":
+            raise
+        try:
+            client.create_table(
+                TableName=job_subscriptions_table,
+                AttributeDefinitions=[
+                    {"AttributeName": "subscription", "AttributeType": "S"},
+                    {"AttributeName": "discord_id", "AttributeType": "S"},
+                ],
+                KeySchema=[
+                    {"AttributeName": "subscription", "KeyType": "HASH"},
+                    {"AttributeName": "discord_id", "KeyType": "RANGE"},
+                ],
+                GlobalSecondaryIndexes=[
+                    {
+                        "IndexName": "discord_id-index",
+                        "KeySchema": [{"AttributeName": "discord_id", "KeyType": "HASH"}],
+                        "Projection": {"ProjectionType": "ALL"},
+                    },
+                ],
+                BillingMode="PAY_PER_REQUEST",
+            )
+            client.get_waiter("table_exists").wait(
+                TableName=job_subscriptions_table, WaiterConfig={"Delay": 2, "MaxAttempts": 25}
             )
             created_any = True
         except ClientError as ce:

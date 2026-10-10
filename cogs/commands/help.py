@@ -23,6 +23,7 @@ _COMMAND_IDS: List[str] = [
     "discorless",
     "inactive_players",
     "mu_stray",
+    "subscriptions",
     "pills",
     "promotions",
     "top_user_weekly_damages",

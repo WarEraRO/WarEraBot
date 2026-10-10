@@ -81,6 +81,19 @@ def init_db() -> None:
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS job_subscriptions (
+                job TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                discord_id TEXT NOT NULL,
+                api_id TEXT,
+                created_at TEXT,
+                PRIMARY KEY (job, target_id, discord_id)
+            )
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_job_subscriptions_discord_id ON job_subscriptions(discord_id)")
         conn.commit()
 
 
@@ -402,3 +415,67 @@ def set_guild_language(guild_id: int | str, language: str) -> None:
             (str(guild_id), language),
         )
         conn.commit()
+
+
+def add_job_subscription(job: str, target_id: str, discord_id: int | str, api_id: str | None, created_at: str | None = None) -> bool:
+    """Subscribe a Discord member to a job's pings for one target (e.g. an MU id). False if already subscribed."""
+    if _USE_DYNAMO:
+        return dynamo.add_job_subscription(job, target_id, discord_id, api_id, created_at)
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT OR IGNORE INTO job_subscriptions (job, target_id, discord_id, api_id, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (job, str(target_id), str(discord_id), api_id, created_at),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def remove_job_subscription(job: str, target_id: str, discord_id: int | str) -> bool:
+    """Returns True if the subscription existed and was removed."""
+    if _USE_DYNAMO:
+        return dynamo.remove_job_subscription(job, target_id, discord_id)
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM job_subscriptions WHERE job = ? AND target_id = ? AND discord_id = ?",
+            (job, str(target_id), str(discord_id)),
+        )
+        deleted = cur.rowcount
+        conn.commit()
+        return deleted > 0
+
+
+def get_job_subscribers(job: str, target_id: str) -> list[Dict]:
+    """Every subscription to a job for one target."""
+    if _USE_DYNAMO:
+        return dynamo.get_job_subscribers(job, target_id)
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT job, target_id, discord_id, api_id, created_at FROM job_subscriptions WHERE job = ? AND target_id = ?",
+            (job, str(target_id)),
+        )
+        return [dict(row) for row in cur.fetchall()]
+
+
+def get_user_job_subscriptions(discord_id: int | str, job: str | None = None) -> list[Dict]:
+    """A member's subscriptions, optionally only those of one job."""
+    if _USE_DYNAMO:
+        return dynamo.get_user_job_subscriptions(discord_id, job)
+    with _connect() as conn:
+        cur = conn.cursor()
+        if job is None:
+            cur.execute(
+                "SELECT job, target_id, discord_id, api_id, created_at FROM job_subscriptions WHERE discord_id = ?",
+                (str(discord_id),),
+            )
+        else:
+            cur.execute(
+                "SELECT job, target_id, discord_id, api_id, created_at FROM job_subscriptions WHERE discord_id = ? AND job = ?",
+                (str(discord_id), job),
+            )
+        return [dict(row) for row in cur.fetchall()]

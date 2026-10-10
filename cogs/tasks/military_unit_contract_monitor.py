@@ -15,9 +15,12 @@ from utils.api import (
     get_military_unit,
     get_round,
     get_shared_session,
+    get_users_info,
     get_won_mercenary_auctions,
 )
 from utils.common import country_flag, get_mu_destination
+from utils.computational import is_economy_build
+from utils.db import get_job_subscribers
 from utils.i18n import Translator, get_translator
 
 logger = logging.getLogger(__name__)
@@ -39,6 +42,14 @@ DEFAULT_TICK_POINTS = {1: 1, 100: 2, 200: 3, 300: 4, 400: 5, 500: 6}
 DEFAULT_ROUNDS_TO_WIN = 2
 
 SIDE_ICONS = {"attacker": "⚔️", "defender": "🛡️"}
+
+# job name in the job_subscriptions table; the target is the MU id (see cogs/commands/subscriptions.py)
+SUBSCRIPTION_JOB = "mu_contracts"
+# a subscriber is pinged unless they are on an economy build or cannot fight: below one hit of health (~10)
+# with no hunger left to eat food (1 per item), or in a debuff
+MIN_HEALTH_TO_FIGHT = 10
+MIN_HUNGER_TO_EAT = 1
+MESSAGE_CONTENT_LIMIT = 2000
 
 
 def format_amount(value, unknown: str = "unknown") -> str:
@@ -84,6 +95,47 @@ def parse_iso(value) -> datetime | None:
         return None
 
 
+def contract_units() -> dict[str, dict]:
+    """MU id -> config entry for the MUs that get contract embeds: those with a channelId or a contracts
+    thread (the embed goes to the thread when set)."""
+    return {
+        str(unit["id"]): unit
+        for unit in config.get("military_units", [])
+        if unit.get("id") and (unit.get("channelId") or (unit.get("threadIds") or {}).get("contractsId"))
+    }
+
+
+def _bar_value(skill) -> float:
+    try:
+        return float((skill or {}).get("currentBarValue") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def can_fight(user: dict, now: datetime) -> bool:
+    """False when the player has no stats (health < 10 and hunger < 1) or is in a debuff."""
+    skills = user.get("skills") or {}
+    if _bar_value(skills.get("health")) < MIN_HEALTH_TO_FIGHT and _bar_value(skills.get("hunger")) < MIN_HUNGER_TO_EAT:
+        return False
+    debuff_end = parse_iso((user.get("buffs") or {}).get("debuffEndAt"))
+    return not (debuff_end and debuff_end > now)
+
+
+def mention_chunks(mentions: list[str], limit: int = MESSAGE_CONTENT_LIMIT) -> list[str]:
+    """Mentions joined by spaces into message contents of at most `limit` characters."""
+    chunks: list[str] = []
+    current = ""
+    for mention in mentions:
+        if current and len(current) + 1 + len(mention) > limit:
+            chunks.append(current)
+            current = mention
+        else:
+            current = f"{current} {mention}" if current else mention
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 class MilitaryUnitContractMonitorJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -103,12 +155,7 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
         if guild is None:
             return
 
-        # only MUs with a channelId or a contracts thread get contract embeds, posted in the thread when set
-        units = {
-            str(unit["id"]): unit
-            for unit in config.get("military_units", [])
-            if unit.get("id") and (unit.get("channelId") or (unit.get("threadIds") or {}).get("contractsId"))
-        }
+        units = contract_units()
         if not units:
             return
 
@@ -142,19 +189,51 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
             if channel is None:
                 logger.warning("Contracts channel/thread for MU %s not found", unit.get("friendlyName"))
                 continue
+            embed = await self._build_embed(contract, unit, session, tr)
+            mentions = mention_chunks(await self._subscriber_mentions(str(unit["id"]), session))
             try:
-                embed = await self._build_embed(contract, unit, session, tr)
-                await channel.send(embed=embed)
+                await channel.send(
+                    content=mentions[0] if mentions else None,
+                    embed=embed,
+                    allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True),
+                )
             except discord.DiscordException:
                 logger.exception("Failed to post contract %s for MU %s", contract_id, unit.get("friendlyName"))
                 continue
             self._remember(contract)
+            for content in mentions[1:]:
+                try:
+                    await channel.send(content=content, allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True))
+                except discord.DiscordException:
+                    logger.exception("Failed to ping subscribers of contract %s", contract_id)
 
         await self._prune_posted(session)
 
     @mu_contract_monitor.before_loop
     async def before_mu_contract_monitor(self):
         await self.bot.wait_until_ready()
+
+    async def _subscriber_mentions(self, mu_id: str, session) -> list[str]:
+        """Mentions of the MU's subscribers who are still in the MU, not on an economy build and able to fight."""
+        try:
+            subscriptions = await asyncio.to_thread(get_job_subscribers, SUBSCRIPTION_JOB, mu_id)
+        except Exception:
+            logger.exception("Could not read contract subscribers of MU %s", mu_id)
+            return []
+        api_ids = {str(s["discord_id"]): str(s["api_id"]) for s in subscriptions if s.get("api_id")}
+        if not api_ids:
+            return []
+        # one batched request; a subscriber whose stats could not be fetched is not pinged
+        users = await get_users_info(api_ids.values(), session)
+        now = datetime.now(timezone.utc)
+        return [
+            f"<@{discord_id}>"
+            for discord_id, api_id in api_ids.items()
+            if (user := users.get(api_id))
+            and str(user.get("mu") or "") == mu_id
+            and not is_economy_build(user)
+            and can_fight(user, now)
+        ]
 
     def _remember(self, contract: dict):
         self._posted[str(contract["_id"])] = {
