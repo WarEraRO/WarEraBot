@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timezone
 from config import config
-from utils.api import get_user, get_shared_session
+from utils.api import get_shared_session, get_users_by_name
 from utils.i18n import Translator, get_translator
 
 _INACTIVE_THRESHOLD_SECONDS = 3 * 24 * 3600
@@ -170,11 +170,10 @@ class MuStray(commands.Cog):
         no_mu: list[str] = []
         inactive: list[str] = []
 
+        # one batched lookup for all members instead of one or more requests per member
+        users = await get_users_by_name([member.display_name for member in members], session)
         for member in members:
-            try:
-                user = await get_user(member.display_name, session)
-            except Exception:
-                user = None
+            user = users.get(member.display_name)
             if not user:
                 continue
 

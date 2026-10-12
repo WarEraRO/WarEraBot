@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timezone
 from config import config
-from utils.api import get_user, get_shared_session
+from utils.api import get_shared_session, get_users_by_name
 from utils.computational import triangular
 from utils.i18n import Translator, get_translator
 
@@ -167,9 +167,11 @@ class Promotions(commands.Cog):
         data_issues = []
 
         session = await get_shared_session()
+        # one batched lookup for all members instead of one or more requests per member
+        users = await get_users_by_name([member.display_name for member in members], session)
         for member in members:
             try:
-                user = await get_user(member.display_name, session)
+                user = users.get(member.display_name)
                 if not user:
                     data_issues.append((member.display_name, tr("promotions.no_api_data")))
                     continue

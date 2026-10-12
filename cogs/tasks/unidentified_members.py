@@ -1,5 +1,5 @@
 from discord.ext import commands, tasks
-from utils.api import get_shared_session, get_user, get_user_info
+from utils.api import get_shared_session, get_user_info, get_users_by_name
 from utils.db import init_db, save_user, find_api_id_by_display_name, find_api_id_by_discord_username, find_api_id_by_discord_id
 from utils.i18n import Translator, get_translator
 from config import config
@@ -35,8 +35,10 @@ class UnidentifiedMembersJob(commands.Cog):
         unidentified = []
         session = await get_shared_session()
         tr = await get_translator(guild)
+        # One batched lookup for all members instead of one or more requests per member
+        users = await get_users_by_name([member.display_name for member in members], session)
         for member in members:
-            user = await get_user(member.display_name, session)
+            user = users.get(member.display_name)
             if user is None:
                 # try to find api_id in local DB by display name or discord username
                 try:

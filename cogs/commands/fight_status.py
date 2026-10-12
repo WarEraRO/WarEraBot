@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timezone
-from utils.api import get_user, get_fight_status, get_military_units, get_shared_session
+from utils.api import fight_status_from_user, get_military_units, get_shared_session, get_users_by_name, get_users_info
 from utils.i18n import Translator, get_translator
 from config import config
 
@@ -98,12 +98,10 @@ class FightStatus(commands.Cog):
 
     async def _fetch_infos_for_discord_members(self, members: list[discord.Member], session) -> list[dict]:
         infos: list[dict] = []
+        # one batched lookup for all members; each status is built from the user already fetched
+        warera_users = await get_users_by_name([member.display_name for member in members], session)
         for member in members:
-            warera_user = None
-            try:
-                warera_user = await get_user(member.display_name, session)
-            except Exception:
-                warera_user = None
+            warera_user = warera_users.get(member.display_name)
 
             if _is_inactive_user(warera_user):
                 continue
@@ -112,10 +110,7 @@ class FightStatus(commands.Cog):
             if warera_user:
                 warera_id = warera_user.get('_id') or warera_user.get('id')
                 if warera_id:
-                    try:
-                        info = await get_fight_status(str(warera_id), session, member)
-                    except Exception:
-                        info = None
+                    info = fight_status_from_user(str(warera_id), warera_user, member)
 
             if not info:
                 info = await self._fallback_info_for_member(member)
@@ -144,16 +139,16 @@ class FightStatus(commands.Cog):
 
         members = chosen.get('members') or []
         infos: list[dict] = []
+        # one batched request for every member
+        users = await get_users_info([str(m) for m in members if m], session)
         for m in members:
             user_id = m
 
             if not user_id:
                 continue
 
-            try:
-                info = await get_fight_status(str(user_id), session, None, False)
-            except Exception:
-                info = None
+            user = users.get(str(user_id))
+            info = fight_status_from_user(str(user_id), user, None, False) if user else None
 
             # if not info:
             #     info = await self._fallback_info_for_remote(str(user_id), m if isinstance(m, dict) else None)

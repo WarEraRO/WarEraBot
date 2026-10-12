@@ -15,7 +15,7 @@ from utils.api import (
     get_military_unit,
     get_mu_members,
     get_shared_session,
-    get_user_info,
+    get_users_info,
 )
 from utils.common import country_with_flag, to_local
 from utils.computational import is_economy_build
@@ -38,7 +38,6 @@ OFFLINE_AFTER = timedelta(hours=24)
 RESKILL_WINDOW = timedelta(hours=24)
 # share of fighters that should be able to pill at the suggested shared pill time
 SHARED_WINDOW_PERCENT = 80
-USER_CONCURRENCY = 5
 # an MU has at most 25 members, so lists normally show everyone
 NAMES_SHOWN = 25
 ORDERS_SHOWN = 3
@@ -174,10 +173,6 @@ class MilitaryUnitDailyReportJob(commands.Cog):
         except discord.HTTPException:
             return None
 
-    async def _fetch_user(self, user_id: str, session, semaphore: asyncio.Semaphore) -> dict | None:
-        async with semaphore:
-            return await get_user_info(user_id, session)
-
     def _pill_state(self, user: dict, now: datetime, settings: dict) -> dict:
         """Pill phase of a user: {"phase": "buff" | "debuff" | None, "pilled_at", "ready_at"}.
 
@@ -231,10 +226,9 @@ class MilitaryUnitDailyReportJob(commands.Cog):
             logger.info("Skipping daily report for MU %s: %s weekly damage", mu_name, _fmt_short(weekly_damage))
             return None
 
-        semaphore = asyncio.Semaphore(USER_CONCURRENCY)
-        users = await asyncio.gather(
-            *(self._fetch_user(str(member.get("user")), session, semaphore) for member in members)
-        )
+        # one batched request for every member
+        users_by_id = await get_users_info([str(member.get("user")) for member in members], session)
+        users = [users_by_id.get(str(member.get("user"))) for member in members]
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         rows = []
         for member, user in zip(members, users):

@@ -9,14 +9,13 @@ from discord.ext import commands
 
 from cogs.tasks.military_unit_daily_report import PILL_CODE, _parse_iso, _pill_settings
 from config import config
-from utils.api import get_game_config, get_military_unit, get_mu_members, get_shared_session, get_user_info
+from utils.api import get_game_config, get_military_unit, get_military_units_by_ids, get_mu_members, get_shared_session, get_users_info
 from utils.common import to_local
 from utils.i18n import get_translator
 from utils.computational import is_economy_build
 
 logger = logging.getLogger(__name__)
 
-USER_CONCURRENCY = 5
 GAME_CONFIG_TTL = 3600
 MU_NAMES_TTL = 3600
 # per embed, kept below Discord's 4096 description cap; longer lists continue in another embed
@@ -91,8 +90,9 @@ class Pills(commands.Cog):
         async def _refresh():
             session = await get_shared_session()
             unit_ids = _unit_ids()
-            results = await asyncio.gather(*(get_military_unit(mu_id, session) for mu_id in unit_ids))
-            for mu_id, military_unit in zip(unit_ids, results):
+            military_units = await get_military_units_by_ids(unit_ids, session)
+            for mu_id in unit_ids:
+                military_unit = military_units.get(mu_id)
                 # a failed fetch keeps the name already known
                 if isinstance(military_unit, dict) and military_unit.get("name"):
                     self._mu_names[mu_id] = str(military_unit["name"])
@@ -116,10 +116,6 @@ class Pills(commands.Cog):
         # falls back to the default pill durations when gameConfig could not be fetched
         return _pill_settings(self._game_config)
 
-    async def _fetch_user(self, user_id: str, session, semaphore: asyncio.Semaphore) -> dict | None:
-        async with semaphore:
-            return await get_user_info(user_id, session)
-
     @app_commands.command(name="pills", description="Show who is pilled, in debuff or not pilled in a military unit.")
     @app_commands.describe(military_unit="Military unit (one of the units configured for this server)")
     async def pills(self, interaction: discord.Interaction, military_unit: str):
@@ -142,10 +138,9 @@ class Pills(commands.Cog):
             await interaction.followup.send(tr("pills.members_unavailable"), ephemeral=True)
             return
 
-        semaphore = asyncio.Semaphore(USER_CONCURRENCY)
-        users = await asyncio.gather(
-            *(self._fetch_user(str(member.get("user")), session, semaphore) for member in members)
-        )
+        # one batched request for every member
+        users_by_id = await get_users_info([str(member.get("user")) for member in members], session)
+        users = [users_by_id.get(str(member.get("user"))) for member in members]
         now = datetime.now(timezone.utc)
 
         pilled: list[tuple[datetime, datetime, str]] = []

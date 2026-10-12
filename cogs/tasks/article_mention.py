@@ -40,7 +40,8 @@ class ArticleMentionJob(commands.Cog):
     async def article_mention(self):
         """Post newly discovered articles that mention Romania."""
         session = await get_shared_session()
-        articles = await get_articles(session)
+        # only the newest ARTICLE_LIMIT are read, so the rest of the feed is not paged through
+        articles = await get_articles(session, max_items=ARTICLE_LIMIT)
         if not articles:
             return
 

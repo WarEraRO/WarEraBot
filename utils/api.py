@@ -180,6 +180,18 @@ async def get_military_units_by_ids(mu_ids, session):
     mus = await _get_batch(session, 'mu.getById', [{'muId': mu_id} for mu_id in ids])
     return {mu_id: mu for mu_id, mu in zip(ids, mus) if mu}
 
+async def get_countries_by_ids(country_ids, session):
+    """Batched country.getCountryById: {countryId: country} for the ids that resolved."""
+    ids = list(dict.fromkeys(country_ids))
+    countries = await _get_batch(session, 'country.getCountryById', [{'countryId': country_id} for country_id in ids])
+    return {country_id: country for country_id, country in zip(ids, countries) if country}
+
+async def get_country_governments(country_ids, session):
+    """Batched government.getByCountryId: {countryId: government} for the ids that resolved."""
+    ids = list(dict.fromkeys(country_ids))
+    governments = await _get_batch(session, 'government.getByCountryId', [{'countryId': country_id} for country_id in ids])
+    return {country_id: government for country_id, government in zip(ids, governments) if government}
+
 async def _search_users_by_name(usernames, session):
     """Resolve uncached usernames with batched search + getUserLite; exact matches go into PLAYER_CACHE."""
     names = list(dict.fromkeys(usernames))
@@ -279,7 +291,17 @@ async def get_fight_status(userId: str, session, member: discord.Member | None =
         api_result = await get_user_info(userId, session, base_url=base_url)
         if not api_result:
             return None
-        
+        return fight_status_from_user(userId, api_result, member, eco)
+    except Exception as e:
+        logger.exception('get_fight_status failed for %s: %s', userId, e)
+        return None
+
+def fight_status_from_user(userId: str, api_result: dict, member: discord.Member | None = None, eco=True) -> dict | None:
+    """get_fight_status() for a user.getUserLite result that was already fetched (no request).
+
+    Returns the same dict, or None for an economy build when `eco` is False or on failure.
+    """
+    try:
         if not eco:
             economy_skill_points = 0
             fight_skill_points = 0
@@ -630,7 +652,19 @@ async def get_country_users(countryId, session, base_url="https://api2.warera.io
         logger.exception('get_country_users failed: %s', e)
         return None
     
-async def get_user_transactions(userId, transactionType, session, base_url="https://api2.warera.io/trpc/transaction.getPaginatedTransactions"):
+def _page_ends_before(page_items, created_after) -> bool:
+    """True when the last item of a newest-first page was created before `created_after` (ISO string)."""
+    if created_after is None or not page_items:
+        return False
+    last_created_at = page_items[-1].get('createdAt')
+    return isinstance(last_created_at, str) and last_created_at < created_after
+
+async def get_user_transactions(userId, transactionType, session, base_url="https://api2.warera.io/trpc/transaction.getPaginatedTransactions", created_after=None):
+    """A user's transactions of one type, newest first. Requires an API key.
+
+    With `created_after` (ISO string), paging stops after the first page that reaches older transactions;
+    every transaction created at or after it is still returned, and some older ones may be too.
+    """
     try:
         input_data = {"limit": 100, "userId": userId, "transactionType": transactionType}
         params = {"input": json.dumps(input_data)}
@@ -641,8 +675,10 @@ async def get_user_transactions(userId, transactionType, session, base_url="http
         data = mus.get('result', {}).get('data') or {}
         items = data.get('items') or []
         next_cursor = data.get('nextCursor')
+        # sorted by createdAt descending [observed 2026-10-12 across pages], so later pages are all older
+        reached_older = _page_ends_before(items, created_after)
 
-        while next_cursor:
+        while next_cursor and not reached_older:
             input_data['cursor'] = next_cursor
             params = {"input": json.dumps(input_data)}
             mus = await _get_with_retry(session, base_url, params=params)
@@ -652,13 +688,18 @@ async def get_user_transactions(userId, transactionType, session, base_url="http
             new_items = data.get('items') or []
             items += new_items
             next_cursor = data.get('nextCursor')
+            reached_older = _page_ends_before(new_items, created_after)
 
         return items
     except Exception as e:
         logger.exception('get_user_transactions failed: %s', e)
         return None
     
-async def get_articles(session, base_url="https://api2.warera.io/trpc/article.getArticlesPaginated"):
+async def get_articles(session, base_url="https://api2.warera.io/trpc/article.getArticlesPaginated", max_items=None):
+    """Newest articles first, from every page, or only until `max_items` articles were fetched.
+
+    With `max_items`, the first `max_items` items are the same as without it; the list may be longer.
+    """
     try:
         input_data = {"limit": 100, "type": "last"}
         params = {"input": json.dumps(input_data)}
@@ -670,7 +711,7 @@ async def get_articles(session, base_url="https://api2.warera.io/trpc/article.ge
         items = data.get('items') or []
         next_cursor = data.get('nextCursor')
 
-        while next_cursor:
+        while next_cursor and (max_items is None or len(items) < max_items):
             input_data['cursor'] = next_cursor
             params = {"input": json.dumps(input_data)}
             mus = await _get_with_retry(session, base_url, params=params)

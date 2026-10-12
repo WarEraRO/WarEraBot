@@ -11,8 +11,8 @@ from utils.api import (
     get_all_countries,
     get_country_users,
     get_shared_session,
-    get_user_info,
     get_user_transactions,
+    get_users_info,
 )
 from utils.i18n import Translator, get_translator
 
@@ -216,10 +216,12 @@ class TopUserWeeklyDonations(commands.Cog):
 
         try:
             async with semaphore:
+                # transactions before the week started are never counted, so paging stops there
                 transactions = await get_user_transactions(
                     user_id,
                     "donation",
                     session,
+                    created_after=start.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
                 )
         except Exception:
             logger.exception("Failed to fetch donations for user %s", user_id)
@@ -294,18 +296,11 @@ class TopUserWeeklyDonations(commands.Cog):
         }
 
         donors = _top_donors(users, totals)
-        resolved_users = await asyncio.gather(
-            *(
-                get_user_info(
-                    user.get("_id") or user.get("userId") or user.get("id"),
-                    session,
-                )
-                for user, _ in donors
-            )
-        )
+        donor_ids = [user.get("_id") or user.get("userId") or user.get("id") for user, _ in donors]
+        resolved_users = await get_users_info(donor_ids, session)
         resolved_donors = [
-            (resolved_user or user, total)
-            for (user, total), resolved_user in zip(donors, resolved_users)
+            (resolved_users.get(user_id) or user, total)
+            for (user, total), user_id in zip(donors, donor_ids)
         ]
 
         embed = _build_embed(

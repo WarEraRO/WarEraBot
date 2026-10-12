@@ -4,12 +4,12 @@ import re
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 
+import aiohttp
 import discord
 from aiohttp import ClientError
 from discord.ext import commands, tasks
 
 from config import config
-from utils.api import get_shared_session
 
 
 logger = logging.getLogger(__name__)
@@ -32,13 +32,30 @@ REDDIT_HEADERS = {
 }
 
 class RedditMonitorJob(commands.Cog):
+    """Announce new r/RomaniaWarEra submissions in the configured Reddit channel."""
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.notified_posts: dict[str, float] = {}
+        self._session: aiohttp.ClientSession | None = None
         self.reddit_monitor.start()
 
-    def cog_unload(self):
+    async def cog_unload(self):
+        """Stop the polling loop and close the cog's Reddit HTTP session."""
         self.reddit_monitor.cancel()
+        if self._session is not None and not self._session.closed:
+            await self._session.close()
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Return this cog's Reddit-only HTTP session, creating it if needed.
+
+        Reddit requests must not use ``utils.api.get_shared_session()``: that
+        session carries the WarEra ``X-API-Key`` header on every request and
+        would leak the key to a third-party host.
+        """
+        if self._session is None or self._session.closed:
+            self._session = aiohttp.ClientSession()
+        return self._session
 
     @tasks.loop(minutes=REDDIT_CHECK_INTERVAL_MINUTES)
     async def reddit_monitor(self):
@@ -88,7 +105,7 @@ class RedditMonitorJob(commands.Cog):
             self._trim_notified_posts()
 
     async def _fetch_recent_posts(self) -> list[dict]:
-        session = await get_shared_session()
+        session = await self._get_session()
         params = {"limit": str(POST_LIMIT), "raw_json": "1"}
 
         for url in REDDIT_JSON_URLS:
@@ -121,7 +138,7 @@ class RedditMonitorJob(commands.Cog):
         return posts
 
     async def _fetch_recent_posts_from_rss(self) -> list[dict]:
-        session = await get_shared_session()
+        session = await self._get_session()
         params = {"limit": str(POST_LIMIT)}
         headers = {
             **REDDIT_HEADERS,

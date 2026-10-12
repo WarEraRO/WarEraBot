@@ -1,5 +1,5 @@
 from discord.ext import commands, tasks
-from utils.api import get_shared_session, get_military_unit, get_user_info
+from utils.api import get_shared_session, get_military_units_by_ids, get_users_info
 from utils.db import init_db, save_user, get_record_by_api_id, find_api_id_by_discord_id
 from utils.i18n import Translator, get_translator
 from config import config
@@ -33,12 +33,10 @@ class CommanderRolesJob(commands.Cog):
         military_units = config.get('military_units', [])
         commander_ids = set()
 
-        # Gather commander api ids from all military units
+        # Gather commander api ids from all military units (one batched request for every MU)
+        mu_data_by_id = await get_military_units_by_ids([unit['id'] for unit in military_units], session)
         for unit in military_units:
-            try:
-                mu_data = await get_military_unit(unit['id'], session)
-            except Exception:
-                mu_data = None
+            mu_data = mu_data_by_id.get(unit['id'])
             if not mu_data:
                 continue
             try:
@@ -65,7 +63,10 @@ class CommanderRolesJob(commands.Cog):
         added = []
         removed = []
 
-        # For each commander api id, try to find the corresponding guild member
+        # For each commander api id, try to find the corresponding guild member: first from the DB,
+        # then (for those not found) by API username, fetched in one batched request. save_user only
+        # writes the commander's own record, so reading every record first gives the same results.
+        resolved = []
         for api_id in commander_ids:
             try:
                 rec = get_record_by_api_id(api_id)
@@ -84,13 +85,13 @@ class CommanderRolesJob(commands.Cog):
                         member = name_map[discord_username]
                     elif display_name and display_name in display_map:
                         member = display_map[display_name]
+            resolved.append((api_id, member))
 
+        infos = await get_users_info([api_id for api_id, member in resolved if member is None], session)
+        for api_id, member in resolved:
             # If not found via DB, try to resolve via API username and match display_name
             if member is None:
-                try:
-                    info = await get_user_info(api_id, session)
-                except Exception:
-                    continue
+                info = infos.get(api_id)
                 if isinstance(info, dict):
                     username = (info.get('username') or '').lower()
                     if username and username in display_map:
