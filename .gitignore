@@ -219,7 +219,9 @@ __marimo__/
 # claude (nobody is going to see the secret sauce)
 .claude
 .prompts
+.agents
 CLAUDE.md
 
 # garbage
 .discard
+database/
