@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timezone
-from utils.api import fight_status_from_user, get_military_units, get_shared_session, get_users_by_name, get_users_info
+from utils.api import fight_status_from_user, get_military_unit, get_military_units, get_shared_session, get_users_by_name, get_users_info
 from utils.i18n import Translator, get_translator
 from config import config
 
@@ -117,22 +117,44 @@ class FightStatus(commands.Cog):
             infos.append(info)
         return infos
 
-    async def _fetch_infos_for_military_unit(self, unit_name: str, session) -> list[dict] | None:
-        mus = await get_military_units(session)
-        if not mus:
-            return None
+    @staticmethod
+    def _is_exact_mu_match(mu: dict, unit_name: str) -> bool:
+        return (mu.get('name') or '').strip().lower() == unit_name.strip().lower()
 
-        # try exact match first, then substring
-        chosen = None
-        for mu in mus:
-            if (mu.get('name') or '').strip().lower() == unit_name.strip().lower():
-                chosen = mu
-                break
+    async def _fetch_cached_military_unit(self, unit_name: str, session) -> dict | None:
+        """The MU named exactly `unit_name`, found in the autocomplete cache and fetched fresh with mu.getById.
+
+        Returns None (so the caller lists every MU instead) when the cache is empty or older than its
+        TTL, has no exact match, the fetch fails, or the MU's current name no longer matches.
+        """
+        if not self._mu_cache.get('items') or time.time() - (self._mu_cache.get('fetched_at') or 0.0) > self._mu_ttl:
+            return None
+        cached = next((mu for mu in self._mu_cache['items'] if self._is_exact_mu_match(mu, unit_name)), None)
+        if not cached or not cached.get('_id'):
+            return None
+        mu = await get_military_unit(cached['_id'], session)
+        if not isinstance(mu, dict) or not self._is_exact_mu_match(mu, unit_name):
+            return None
+        return mu
+
+    async def _fetch_infos_for_military_unit(self, unit_name: str, session) -> list[dict] | None:
+        # an exact name (what autocomplete offers) costs one request; anything else pages through every MU
+        chosen = await self._fetch_cached_military_unit(unit_name, session)
         if chosen is None:
+            mus = await get_military_units(session)
+            if not mus:
+                return None
+
+            # try exact match first, then substring
             for mu in mus:
-                if unit_name.strip().lower() in (mu.get('name') or '').strip().lower():
+                if self._is_exact_mu_match(mu, unit_name):
                     chosen = mu
                     break
+            if chosen is None:
+                for mu in mus:
+                    if unit_name.strip().lower() in (mu.get('name') or '').strip().lower():
+                        chosen = mu
+                        break
 
         if not chosen:
             return []

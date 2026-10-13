@@ -1,3 +1,4 @@
+import asyncio
 from discord.ext import commands, tasks
 from utils.api import get_shared_session, get_military_units_by_ids, get_users_info
 from utils.db import init_db, save_user, get_record_by_api_id, find_api_id_by_discord_id
@@ -69,7 +70,7 @@ class CommanderRolesJob(commands.Cog):
         resolved = []
         for api_id in commander_ids:
             try:
-                rec = get_record_by_api_id(api_id)
+                rec = await asyncio.to_thread(get_record_by_api_id, api_id)
             except Exception:
                 continue
 
@@ -97,7 +98,7 @@ class CommanderRolesJob(commands.Cog):
                     if username and username in display_map:
                         member = display_map[username]
                         try:
-                            save_user(member.name, member.display_name, api_id, member.id)
+                            await asyncio.to_thread(save_user, member.name, member.display_name, api_id, member.id)
                         except Exception:
                             pass
 

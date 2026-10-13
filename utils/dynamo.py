@@ -112,13 +112,46 @@ def save_user(
 
 
 def find_api_id_by_discord_id(discord_id) -> Optional[str]:
-    """Scan users table for a matching discord_id (no GSI required)."""
-    resp = _users().scan(
-        FilterExpression=Attr("discord_id").eq(str(discord_id)),
-        ProjectionExpression="api_id",
-    )
-    items = resp.get("Items", [])
-    return items[0]["api_id"] if items else None
+    """Scan users table for a matching discord_id (no GSI required).
+
+    Returns the api_id of the first match in scan order, or None. A scan page stops at 1 MB
+    before the filter is applied, so pages are followed until a match is found.
+    """
+    kwargs = {
+        "FilterExpression": Attr("discord_id").eq(str(discord_id)),
+        "ProjectionExpression": "api_id",
+    }
+    while True:
+        resp = _users().scan(**kwargs)
+        items = resp.get("Items", [])
+        if items:
+            return items[0]["api_id"]
+        if "LastEvaluatedKey" not in resp:
+            return None
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+
+def get_api_ids_by_discord_id() -> Dict[str, str]:
+    """Map every stored discord_id to its api_id with one paginated scan of the users table.
+
+    When several records share a discord_id, the first one in scan order wins, which is the
+    record find_api_id_by_discord_id returns for that id.
+    """
+    kwargs = {
+        "FilterExpression": Attr("discord_id").exists(),
+        "ProjectionExpression": "api_id, discord_id",
+    }
+    out: Dict[str, str] = {}
+    while True:
+        resp = _users().scan(**kwargs)
+        for item in resp.get("Items", []):
+            discord_id = item.get("discord_id")
+            # find_api_id_by_discord_id only matches string values
+            if isinstance(discord_id, str):
+                out.setdefault(discord_id, item["api_id"])
+        if "LastEvaluatedKey" not in resp:
+            return out
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
 def find_api_id_by_display_name(display_name: str) -> Optional[str]:

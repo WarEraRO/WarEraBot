@@ -130,6 +130,24 @@ def find_api_id_by_discord_id(discord_id: int | str) -> Optional[str]:
         return row['api_id'] if row else None
 
 
+def get_api_ids_by_discord_id() -> Dict[str, str]:
+    """Return {discord_id: api_id} for every user record that has a Discord id, in one read.
+
+    For each id it gives the same api_id as find_api_id_by_discord_id, so a job that resolves
+    many members can read the table once instead of once per member (in DynamoDB mode each
+    find_api_id_by_discord_id call is a full-table scan).
+    """
+    if _USE_DYNAMO:
+        return dynamo.get_api_ids_by_discord_id()
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT discord_id, api_id FROM users WHERE discord_id IS NOT NULL")
+        out: Dict[str, str] = {}
+        for row in cur.fetchall():
+            out.setdefault(row['discord_id'], row['api_id'])
+        return out
+
+
 def find_api_id_by_display_name(display_name: str) -> Optional[str]:
     if _USE_DYNAMO:
         return dynamo.find_api_id_by_display_name(display_name)

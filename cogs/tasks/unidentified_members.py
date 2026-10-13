@@ -1,6 +1,7 @@
+import asyncio
 from discord.ext import commands, tasks
 from utils.api import get_shared_session, get_user_info, get_users_by_name
-from utils.db import init_db, save_user, find_api_id_by_display_name, find_api_id_by_discord_username, find_api_id_by_discord_id
+from utils.db import init_db, save_user, find_api_id_by_display_name, find_api_id_by_discord_username, find_api_id_by_discord_id, get_api_ids_by_discord_id
 from utils.i18n import Translator, get_translator
 from config import config
 import discord
@@ -16,7 +17,24 @@ class UnidentifiedMembersJob(commands.Cog):
 
     def cog_unload(self):
         self.unidentified_members.cancel()
-    
+
+    @staticmethod
+    def _find_api_id(member, api_ids_by_discord_id: dict | None, saved_api_ids: set) -> str | None:
+        """The member's API id from the local DB (by Discord id, display name, then username), or None.
+
+        Blocking. The Discord-id step reads `api_ids_by_discord_id`, a snapshot taken before this run's
+        saves, unless it is None or names a record saved since: a save rewrites that record's
+        discord_id, so the table is read again for it. Saves can't add a match for another member's
+        Discord id, so a miss in the snapshot stays a miss.
+        """
+        if api_ids_by_discord_id is None:
+            api_id = find_api_id_by_discord_id(member.id)
+        else:
+            api_id = api_ids_by_discord_id.get(str(member.id))
+            if api_id in saved_api_ids:
+                api_id = find_api_id_by_discord_id(member.id)
+        return api_id or find_api_id_by_display_name(member.display_name) or find_api_id_by_discord_username(member.name)
+
     @tasks.loop(hours=6)
     async def unidentified_members(self):
         """Parses all members of the server that hold the citizen role and checks
@@ -37,12 +55,21 @@ class UnidentifiedMembersJob(commands.Cog):
         tr = await get_translator(guild)
         # One batched lookup for all members instead of one or more requests per member
         users = await get_users_by_name([member.display_name for member in members], session)
+        # Discord-id mappings, read once (only if some member needs the DB fallback) instead of per member
+        api_ids_by_discord_id = None
+        if any(users.get(member.display_name) is None for member in members):
+            try:
+                api_ids_by_discord_id = await asyncio.to_thread(get_api_ids_by_discord_id)
+            except Exception:
+                api_ids_by_discord_id = None  # per-member lookups, as before
+        # api ids whose record this run rewrote (see _find_api_id)
+        saved_api_ids = set()
         for member in members:
             user = users.get(member.display_name)
             if user is None:
                 # try to find api_id in local DB by display name or discord username
                 try:
-                    api_id = find_api_id_by_discord_id(member.id) or find_api_id_by_display_name(member.display_name) or find_api_id_by_discord_username(member.name)
+                    api_id = await asyncio.to_thread(self._find_api_id, member, api_ids_by_discord_id, saved_api_ids)
                     if api_id:
                         info = await get_user_info(api_id, session)
                         if info:
@@ -56,7 +83,8 @@ class UnidentifiedMembersJob(commands.Cog):
                                     # ignore failures (permissions, hierarchy, etc.)
                                     pass
                             # update stored mapping with the current discord username and latest display name
-                            save_user(member.name, new_display or member.display_name, api_id, member.id)
+                            saved_api_ids.add(api_id)
+                            await asyncio.to_thread(save_user, member.name, new_display or member.display_name, api_id, member.id)
                             continue
                 except Exception:
                     pass
@@ -65,7 +93,8 @@ class UnidentifiedMembersJob(commands.Cog):
                 try:
                     api_id = user.get('_id') if isinstance(user, dict) else None
                     if api_id:
-                        save_user(member.name, member.display_name, api_id, member.id)
+                        saved_api_ids.add(api_id)
+                        await asyncio.to_thread(save_user, member.name, member.display_name, api_id, member.id)
                 except Exception as e:
                     pass
                     unidentified.append(member)

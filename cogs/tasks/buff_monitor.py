@@ -1,6 +1,7 @@
+import asyncio
 from discord.ext import commands, tasks
 from utils.api import get_shared_session, get_user, get_user_info, get_users_by_name, get_users_info
-from utils.db import init_db, find_api_id_by_display_name, find_api_id_by_discord_username, find_api_id_by_discord_id, save_user
+from utils.db import init_db, find_api_id_by_display_name, find_api_id_by_discord_username, find_api_id_by_discord_id, get_api_ids_by_discord_id, save_user
 from utils.i18n import get_translator
 from config import config
 from datetime import datetime, timezone, timedelta
@@ -29,10 +30,18 @@ class BuffMonitorJob(commands.Cog):
     def cog_unload(self):
         self.buff_monitor.cancel()
 
-    def _resolve_api_id(self, member) -> str | None:
-        """The member's API id from the local DB (by Discord id, display name, then username), or None."""
+    def _resolve_api_id(self, member, api_ids_by_discord_id: dict | None = None) -> str | None:
+        """The member's API id from the local DB (by Discord id, display name, then username), or None.
+
+        Blocking. `api_ids_by_discord_id` is a get_api_ids_by_discord_id() snapshot used for the
+        Discord-id step instead of one table read per member; it is only valid until the next save_user.
+        """
         try:
-            return find_api_id_by_discord_id(member.id) or find_api_id_by_display_name(member.display_name) or find_api_id_by_discord_username(member.name)
+            if api_ids_by_discord_id is not None:
+                api_id = api_ids_by_discord_id.get(str(member.id))
+            else:
+                api_id = find_api_id_by_discord_id(member.id)
+            return api_id or find_api_id_by_display_name(member.display_name) or find_api_id_by_discord_username(member.name)
         except Exception:
             return None
 
@@ -64,7 +73,14 @@ class BuffMonitorJob(commands.Cog):
 
         # Prefetch every user this run will look at in batched requests (instead of one or more requests
         # per member). The loop below is unchanged except that it reads these results.
-        resolved_ids = [self._resolve_api_id(member) for member in members]
+        # The Discord-id mappings are read in one go; nothing is saved before every member is resolved.
+        try:
+            api_ids_by_discord_id = await asyncio.to_thread(get_api_ids_by_discord_id)
+        except Exception:
+            api_ids_by_discord_id = None  # per-member lookups, as before
+        resolved_ids = await asyncio.to_thread(
+            lambda: [self._resolve_api_id(member, api_ids_by_discord_id) for member in members]
+        )
         to_fetch = []
         for api_id in resolved_ids:
             entry = self.buff_check_cache.get(api_id) if api_id else None
@@ -84,7 +100,7 @@ class BuffMonitorJob(commands.Cog):
 
         for member, resolved_id in zip(members, resolved_ids):
                 stale = saved_keys and not saved_keys.isdisjoint(self._db_keys(member, resolved_id))
-                api_id = self._resolve_api_id(member) if stale else resolved_id
+                api_id = await asyncio.to_thread(self._resolve_api_id, member) if stale else resolved_id
 
                 # If we already know the next time to check this API id, skip for now
                 if api_id:
@@ -116,7 +132,7 @@ class BuffMonitorJob(commands.Cog):
                         if api_id:
                             saved_keys.update(self._db_keys(member, api_id))
                             try:
-                                save_user(member.name, member.display_name, api_id, member.id)
+                                await asyncio.to_thread(save_user, member.name, member.display_name, api_id, member.id)
                             except Exception:
                                 pass
 
