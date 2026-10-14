@@ -21,6 +21,8 @@ class NAPMonitorJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.reported_violations: set[str] = set()
+        # violations found by the first successful check after a restart are recorded without posting
+        self._seeded = False
         try:
             init_db()
         except Exception:
@@ -50,7 +52,11 @@ class NAPMonitorJob(commands.Cog):
 
     @tasks.loop(hours=NAP_MONITOR_INTERVAL_HOURS)
     async def monitor_nap(self):
-        """Check active battles for country or MU orders against configured NAPs."""
+        """Check active battles for country or MU orders against configured NAPs.
+
+        The first check that fetches the battles after a restart only records the current
+        violations, so violations reported before the restart are not reported again.
+        """
         guild = self.bot.get_guild(config["guild"])
         if guild is None:
             return
@@ -58,6 +64,8 @@ class NAPMonitorJob(commands.Cog):
         naps = self.naps
         if not naps:
             self.reported_violations.clear()
+            # nothing can have been reported; violations of NAPs added later must not be seeded away
+            self._seeded = True
             return
 
         session = await get_shared_session()
@@ -78,6 +86,7 @@ class NAPMonitorJob(commands.Cog):
             nap_pair_ids[pair] = (first_id, second_id)
 
         if not nap_pairs:
+            self._seeded = True
             return
 
         country_names: dict[str, str] = {}
@@ -189,6 +198,13 @@ class NAPMonitorJob(commands.Cog):
                         "pair": pair,
                     })
 
+        if not self._seeded:
+            self.reported_violations.update(self._violation_token(violation) for violation in violations)
+            self._seeded = True
+            logger.info("NAP monitor seeded with %d violations", len(violations))
+            self._prune_reported(active_battle_ids)
+            return
+
         if not violations:
             self._prune_reported(active_battle_ids)
             return
@@ -200,11 +216,7 @@ class NAPMonitorJob(commands.Cog):
 
         new_violations = []
         for violation in violations:
-            token = (
-                f"{violation['battle_id']}:{violation['side']}:"
-                f"{violation['source_type']}:{violation['source_id']}:"
-                f"{violation['opponent_country']}"
-            )
+            token = self._violation_token(violation)
             if token in self.reported_violations:
                 continue
             violation["token"] = token
@@ -256,6 +268,15 @@ class NAPMonitorJob(commands.Cog):
                 self.reported_violations.add(violation["token"])
 
         self._prune_reported(active_battle_ids)
+
+    @staticmethod
+    def _violation_token(violation: dict) -> str:
+        """The key under which a violation is remembered as reported; it starts with the battle id."""
+        return (
+            f"{violation['battle_id']}:{violation['side']}:"
+            f"{violation['source_type']}:{violation['source_id']}:"
+            f"{violation['opponent_country']}"
+        )
 
     def _prune_reported(self, active_battle_ids: set[str]):
         self.reported_violations = {

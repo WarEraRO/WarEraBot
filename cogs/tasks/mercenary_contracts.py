@@ -11,6 +11,8 @@ class MercenaryContractsJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
         # track displayed mercenary auctions: auction_id -> token (updatedAt/currentPayout)
         self.displayed_auctions: dict = {}
+        # auctions active at the first successful run after a restart are recorded without posting
+        self._seeded = False
         self.bot = bot
         try:
             init_db()
@@ -26,6 +28,9 @@ class MercenaryContractsJob(commands.Cog):
         """Checks active mercenary contract auctions and posts new/changed ones.
 
         Message format: "<country_name> posted a <initialPerK>/<budget> contract for <forCountrySide> side."
+
+        The first run that fetches the auctions after a restart only records the active ones,
+        so auctions posted before the restart are not posted again.
         """
         guild = self.bot.get_guild(config['guild'])
         if guild is None:
@@ -38,6 +43,14 @@ class MercenaryContractsJob(commands.Cog):
             auctions = None
 
         if not auctions:
+            return
+
+        if not self._seeded:
+            # same token the posting loop below records
+            for a in auctions:
+                if a.get('_id') and a.get('status') == 'active':
+                    self.displayed_auctions[a['_id']] = a.get('updatedAt') or a.get('createdAt') or a.get('currentPayout')
+            self._seeded = True
             return
 
         channel = guild.get_channel(config.get('channels', {}).get('contracts')) if guild else None
