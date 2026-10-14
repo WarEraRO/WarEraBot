@@ -28,6 +28,8 @@ _COMMAND_IDS: List[str] = [
     "fight_wealth",
     "mu_order_alignment",
     "mu_positions",
+    "mu_readiness",
+    "loot_targets",
     "promotions",
     "top_user_weekly_damages",
     "top_user_weekly_donations",

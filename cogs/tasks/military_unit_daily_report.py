@@ -141,6 +141,27 @@ def _pill_settings(game_config: dict | None) -> dict:
     }
 
 
+def pill_state(user: dict, now: datetime, settings: dict) -> dict:
+    """Pill phase of a user: {"phase": "buff" | "debuff" | None, "pilled_at", "ready_at"}.
+
+    The pill time is derived from when the buff or debuff ends, using the durations from gameConfig
+    (`settings` from `_pill_settings`).
+    """
+    buffs = user.get("buffs") or {}
+    # older responses had no codes, so an end time without codes is taken as a pill
+    buff_end = _parse_iso(buffs.get("buffEndAt")) if PILL_CODE in (buffs.get("buffCodes") or [PILL_CODE]) else None
+    debuff_end = _parse_iso(buffs.get("debuffEndAt")) if PILL_CODE in (buffs.get("debuffCodes") or [PILL_CODE]) else None
+    if buff_end and buff_end > now:
+        return {"phase": "buff", "pilled_at": buff_end - settings["buff"], "ready_at": buff_end + settings["debuff"]}
+    if debuff_end and debuff_end > now:
+        return {
+            "phase": "debuff",
+            "pilled_at": debuff_end - settings["debuff"] - settings["buff"],
+            "ready_at": debuff_end,
+        }
+    return {"phase": None, "pilled_at": None, "ready_at": now}
+
+
 class MilitaryUnitDailyReportJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -206,23 +227,8 @@ class MilitaryUnitDailyReportJob(commands.Cog):
             return None
 
     def _pill_state(self, user: dict, now: datetime, settings: dict) -> dict:
-        """Pill phase of a user: {"phase": "buff" | "debuff" | None, "pilled_at", "ready_at"}.
-
-        The pill time is derived from when the buff or debuff ends, using the durations from gameConfig.
-        """
-        buffs = user.get("buffs") or {}
-        # older responses had no codes, so an end time without codes is taken as a pill
-        buff_end = _parse_iso(buffs.get("buffEndAt")) if PILL_CODE in (buffs.get("buffCodes") or [PILL_CODE]) else None
-        debuff_end = _parse_iso(buffs.get("debuffEndAt")) if PILL_CODE in (buffs.get("debuffCodes") or [PILL_CODE]) else None
-        if buff_end and buff_end > now:
-            return {"phase": "buff", "pilled_at": buff_end - settings["buff"], "ready_at": buff_end + settings["debuff"]}
-        if debuff_end and debuff_end > now:
-            return {
-                "phase": "debuff",
-                "pilled_at": debuff_end - settings["debuff"] - settings["buff"],
-                "ready_at": debuff_end,
-            }
-        return {"phase": None, "pilled_at": None, "ready_at": now}
+        """Pill phase of a user; see `pill_state`."""
+        return pill_state(user, now, settings)
 
     async def _build_embeds(
         self,

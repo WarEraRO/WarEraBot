@@ -70,6 +70,8 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.fight_wealth")
         await self.load_extension("cogs.commands.mu_order_alignment")
         await self.load_extension("cogs.commands.mu_positions")
+        await self.load_extension("cogs.commands.mu_readiness")
+        await self.load_extension("cogs.commands.loot_targets")
         await self.load_extension("cogs.commands.subscriptions")
         await self.load_extension("cogs.commands.inactive_players")
         await self.load_extension("cogs.commands.promotions")

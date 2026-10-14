@@ -150,6 +150,14 @@
                 "name": "/mu_positions military_unit [battle]",
                 "desc": "Unde se află membrii unei unități militare configurate (cu sugestii). Fără `battle`: membrii grupați pe regiunea curentă, bătăliile active care se pot lupta din fiecare regiune și câți membri sunt în poziție pentru fiecare bătălie cu ordin de la MU sau de la România. Cu `battle` (cu sugestii, întâi ordinele MU și ale României, sau un link de bătălie): cine e în poziție pentru tabăra ordinului MU (altfel a României), cine stă unde se poate lovi doar pentru cealaltă tabără și restul, ordonați după distanță, cu costul drumului în stamina și petrol (10 stamina pe regiune, 2 petrol pe fiecare regiune neacoperită de stamina) și 🏠 când drumul gratuit acasă îi duce acolo. Răspunsul e postat în canal; nimeni nu primește mențiune."
             },
+            "mu_readiness": {
+                "name": "/mu_readiness military_unit",
+                "desc": "Lista de verificare a comandantului pentru o unitate militară configurată (cu sugestii): starea cartierului general, dacă ordinele MU urmează România, luptătorii în poziție pentru fiecare ordin MU, ultimul contract câștigat pe o bătălie activă, pastile, viață și foame, ajutor MU (și luptătorii cu buff care încă pot cere), echipament fără armă sau la cel mult 20% durabilitate, turneul MU cât e deschis (înscriere, limită de raritate) și liderii online în ultimele 24h. ⚠️ numără doar probleme obiective. Stocul de petrol și hârtie și progresul contractului nu sunt vizibile pentru bot. Răspunsul e postat în canal; nimeni nu primește mențiune."
+            },
+            "loot_targets": {
+                "name": "/loot_targets battle [military_unit] [pool]",
+                "desc": "Previzualizare live a pool-ului de loot al unei bătălii (cu sugestii sau un link). Itemele din pool se dau după locul în clasamentul combinat de damage al ambelor tabere, cel mai valoros locului 1. Pentru fiecare membru al unităților militare configurate (sau al `military_unit`) care a lovit în bătălie: locul, damage-ul și itemul pe care l-ar primi acum, damage-ul pentru locul următor și damage-ul până la cel mai apropiat loc cu o raritate mai bună (🤝 când îl ține un coleg). Arată și câți jucători de sub ei ar trebui să-i depășească până să coboare la o raritate mai slabă, cu damage-ul necesar fiecăruia, plus damage-ul necesar pentru fiecare raritate. `pool`: runda curentă (implicit) sau toată bătălia. E o imagine de moment: pool-ul crește și locurile se schimbă. Răspunsul e postat în canal; nimeni nu primește mențiune."
+            },
             "promotions": {
                 "name": "/promotions",
                 "desc": "Verifică dacă membrii noi pot fi promovați. Arată Candidați la promovare, Probleme de luptă, Inactivi și Probleme de date — butoanele de filtrare comută între categorii."
@@ -450,6 +458,92 @@
         "cost_oil": "⚡ {stamina} + 🛢️ {oil} petrol",
         "free_home": "🏠 drum gratuit acasă",
         "footer_battle": "Deplasare: {stamina} stamina pe regiune, {oil} petrol pe fiecare regiune neacoperită de stamina · 🏭 build de economie"
+    },
+    "mu_readiness": {
+        "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
+        "fetch_failed": "Unitatea militară, bătăliile active sau lista de țări nu au putut fi preluate. Încearcă din nou mai târziu.",
+        "title": "🛡️ {mu} · Pregătire",
+        "verdict_issues": "⚠️ De rezolvat: **{count}**",
+        "verdict_ok": "✅ Nimic de rezolvat",
+        "roster": "👥 Membri: **{members}**/{capacity} · ⚔️ Luptători: **{fighters}** · 🏭 Economie: **{economy}**",
+        "footer": "Luptători = build de luptă · ⚠️ numără ordinele care nu urmează România, HQ inactiv cu ordine, armele lipsă, echipamentul la cel mult {percent}% durabilitate și problemele de turneu · stocul de petrol și hârtie al MU și progresul contractului nu sunt vizibile pentru bot",
+        "hq_title": "🏢 Cartier general",
+        "hq_none": "Fără cartier general",
+        "hq_active": "✅ Nivel {level} activ",
+        "hq_activating": "⏳ Nivel {level} în activare · activ la {time}",
+        "hq_disabled": "Nivel {level} dezactivat",
+        "hq_details": " · +{bonus}% damage · 🛢️ {oil}/h ({oil_day}/zi)",
+        "orders_title": "📌 Ordine",
+        "orders_ok": "✅ Ordine MU care urmează {country}: **{count}**",
+        "orders_wrong": "⚠️ Ordine MU care nu urmează {country}: **{count}** din {total} · vezi /mu_order_alignment",
+        "orders_none": "Niciun ordin MU · ordine {country}: **{count}**",
+        "orders_missing": "📭 Ordine {country} fără ordin MU: **{count}**",
+        "positions_title": "📍 Luptători în poziție",
+        "position": "📍 **{count}**/{fighters} în {region}",
+        "position_anywhere": "📍 Se luptă de oriunde: **{count}** luptători",
+        "contract_title": "📜 Ultimul contract",
+        "contract_none": "Niciun contract câștigat pe o bătălie activă",
+        "contract_terms": "Min. **{minimum}** damage · {per_k} la 1k · plată {payout}",
+        "contract_won": "Câștigat acum {ago}",
+        "pills_title": "💊 Pastile",
+        "pills": "🔥 Cu buff: **{buffed}** · 🟢 Pot lua: **{ready}** · ⏳ Debuff: **{debuff}**",
+        "next_pill": "Prima pastilă posibilă: {time}",
+        "stats_title": "❤️ Viață și foame",
+        "stats": "Pot lupta acum: **{can_fight}**/{fighters} · 🔋 Bare pline (regen pierdut): **{full}**",
+        "help_title": "🤝 Ajutor MU",
+        "help": "Pot cere ajutor acum: **{count}**/{fighters}",
+        "help_buffed": "💊 Cu buff și pot cere acum: {names}",
+        "gear_title": "🛡️ Echipament",
+        "gear_ok": "✅ Toți cei {fighters} luptători au armă, nimic aproape stricat",
+        "no_fighters": "Niciun membru cu build de luptă",
+        "gear_no_weapon": "⚠️ Fără armă echipată: {names}",
+        "gear_low": "⚠️ La cel mult {percent}% durabilitate: {names}",
+        "slot": {
+            "weapon": "armă",
+            "helmet": "cască",
+            "chest": "piept",
+            "pants": "pantaloni",
+            "boots": "bocanci",
+            "gloves": "mănuși"
+        },
+        "tournament_title": "🏆 Turneu MU",
+        "tournament_registered": "✅ Înscrisă",
+        "tournament_not_registered": "⚠️ Neînscrisă (proprietarul sau comandanții, până vineri 18:00 UTC)",
+        "tournament_start": "începe {time}",
+        "tournament_rules": "Raritate maximă **{rarity}** · bonus de skill **{skill}**",
+        "tournament_over_cap": "⚠️ Peste limita de raritate (loviturile sunt refuzate): {names}",
+        "leaders_title": "🎖️ Lideri",
+        "leaders": "Proprietar și comandanți online în ultimele 24h: **{online}**/{total}"
+    },
+    "loot_targets": {
+        "invalid_battle": "Bătălie necunoscută. Alege una din listă sau lipește linkul bătăliei.",
+        "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
+        "fetch_failed": "Bătălia, unitățile militare sau clasamentul nu au putut fi preluate. Încearcă din nou mai târziu.",
+        "title": "🎁 Ținte de loot",
+        "scope_round": "pool-ul rundei curente",
+        "scope_battle": "pool-ul întregii bătălii",
+        "pool_complete": "👥 În clasament: **{ranked}** · cu item acum: **{with_item}**",
+        "pool_partial": "👥 Primii **{ranked}** citiți · cu item: **{with_item}**",
+        "battle_ended": "🏁 Bătălia s-a încheiat: aceasta e distribuirea finală.",
+        "thresholds": "Damage pentru cel puțin:",
+        "member": "`#{rank}` **{name}** · {damage} · {item}",
+        "top": "🥇 primul în clasament",
+        "next_rank": "#{rank} +{damage}",
+        "better": "{item} la #{rank} +{damage}",
+        "enter_pool": "intră în pool: {item} la #{rank} +{damage}",
+        "best_rarity": "deja cea mai bună raritate",
+        "fall": {
+            "one": "⬇️ {item} dacă te depășește {count} jucător de sub tine: {damages}",
+            "few": "⬇️ {item} dacă te depășesc {count} jucători de sub tine: {damages}",
+            "other": "⬇️ {item} dacă te depășesc {count} de jucători de sub tine: {damages}"
+        },
+        "fall_safe": "⬇️ nimeni din clasament de sub tine nu îți poate lua raritatea",
+        "no_item": "fără item",
+        "unranked": "Fără loc în acest pool: {count}",
+        "beyond_pages": "Sub partea citită a clasamentului: {count}",
+        "mu_title": "🎖️ {mu} ({count})",
+        "no_members": "Niciun membru listat nu a lovit în această bătălie.",
+        "footer": "Previzualizare live a pool-ului din clasamentul combinat de damage (ambele tabere), locul 1 ia itemul cel mai valoros · ⬆️ +damage depășește acel loc dacă rămâne pe loc · ⬇️ itemul la care cobori și cât îi trebuie fiecărui jucător de sub tine ca să te depășească · pool-ul crește și locurile se schimbă · {teammate} îl ține un coleg"
     },
     "pills": {
         "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
@@ -914,6 +1008,18 @@
             "params": {
                 "military_unit": "Unitatea militară (una dintre cele configurate pe acest server)",
                 "battle": "Bătălie activă (cu sugestii sau un link); lasă gol ca să vezi unde sunt membrii"
+            }
+        },
+        "mu_readiness": {
+            "description": "Lista comandantului pentru o unitate militară: HQ, ordine, poziții, contract, pastile, ajutor, echipament.",
+            "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
+        },
+        "loot_targets": {
+            "description": "Arată itemul din pool pe care l-ar lua fiecare membru MU și damage-ul pentru unul mai bun.",
+            "params": {
+                "battle": "Bătălia (cu sugestii sau un link)",
+                "military_unit": "Unitatea militară (implicit: toate unitățile configurate pe acest server)",
+                "pool": "Ce pool de loot se verifică (implicit: al rundei curente)"
             }
         },
         "subscribe": {
