@@ -155,8 +155,8 @@
                 "desc": "Lista de verificare a comandantului pentru o unitate militară configurată (cu sugestii): starea cartierului general, dacă ordinele MU urmează România, luptătorii în poziție pentru fiecare ordin MU, ultimul contract câștigat pe o bătălie activă, pastile, viață și foame, ajutor MU (și luptătorii cu buff care încă pot cere), echipament fără armă sau la cel mult 20% durabilitate, turneul MU cât e deschis (înscriere, limită de raritate) și liderii online în ultimele 24h. ⚠️ numără doar probleme obiective. Stocul de petrol și hârtie și progresul contractului nu sunt vizibile pentru bot. Răspunsul e postat în canal; nimeni nu primește mențiune."
             },
             "loot_targets": {
-                "name": "/loot_targets battle [military_unit] [pool]",
-                "desc": "Previzualizare live a pool-ului de loot al unei bătălii (cu sugestii sau un link). Itemele din pool se dau după locul în clasamentul combinat de damage al ambelor tabere, cel mai valoros locului 1. Pentru fiecare membru al unităților militare configurate (sau al `military_unit`) care a lovit în bătălie: locul, damage-ul și itemul pe care l-ar primi acum, damage-ul pentru locul următor și damage-ul până la cel mai apropiat loc cu o raritate mai bună (🤝 când îl ține un coleg). Arată și câți jucători de sub ei ar trebui să-i depășească până să coboare la o raritate mai slabă, cu damage-ul necesar fiecăruia, plus damage-ul necesar pentru fiecare raritate. `pool`: runda curentă (implicit) sau toată bătălia. E o imagine de moment: pool-ul crește și locurile se schimbă. Răspunsul e postat în canal; nimeni nu primește mențiune."
+                "name": "/loot_targets battle [military_unit]",
+                "desc": "Previzualizare live a pool-urilor de loot ale unei bătălii (cu sugestii sau un link): pool-ul rundei curente și pool-ul întregii bătălii, arătate împreună pentru că un jucător concurează pentru amândouă în același timp. Itemele din pool se dau după locul în clasamentul combinat de damage al ambelor tabere, cel mai valoros locului 1. Pentru fiecare membru al unităților militare configurate (sau al `military_unit`) care a lovit în bătălie, în fiecare pool: locul, damage-ul și itemul pe care l-ar primi acum, damage-ul pentru locul următor și damage-ul până la cel mai apropiat loc cu o raritate mai bună (🤝 când îl ține un coleg). Arată și câți jucători de sub ei ar trebui să-i depășească până să coboare la o raritate mai slabă, cu damage-ul necesar fiecăruia, plus damage-ul necesar pentru fiecare raritate. E o imagine de moment: pool-ul crește și locurile se schimbă. Răspunsul e postat în canal; nimeni nu primește mențiune."
             },
             "promotions": {
                 "name": "/promotions",
@@ -520,13 +520,15 @@
         "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
         "fetch_failed": "Bătălia, unitățile militare sau clasamentul nu au putut fi preluate. Încearcă din nou mai târziu.",
         "title": "🎁 Ținte de loot",
-        "scope_round": "pool-ul rundei curente",
-        "scope_battle": "pool-ul întregii bătălii",
-        "pool_complete": "👥 În clasament: **{ranked}** · cu item acum: **{with_item}**",
-        "pool_partial": "👥 Primii **{ranked}** citiți · cu item: **{with_item}**",
+        "pool_round": "🔄 Runda {number}",
+        "pool_battle": "🏟️ Bătălia",
+        "pool_summary_complete": "{pool} · în clasament: **{ranked}** · cu item acum: **{with_item}**",
+        "pool_summary_partial": "{pool} · primii **{ranked}** citiți · cu item: **{with_item}**",
         "battle_ended": "🏁 Bătălia s-a încheiat: aceasta e distribuirea finală.",
         "thresholds": "Damage pentru cel puțin:",
-        "member": "`#{rank}` **{name}** · {damage} · {item}",
+        "pool_line": "{pool} · `#{rank}` · {damage} · {item}",
+        "pool_missing": "{pool} · fără damage în acest pool",
+        "pool_beyond": "{pool} · sub partea citită a clasamentului",
         "top": "🥇 primul în clasament",
         "next_rank": "#{rank} +{damage}",
         "better": "{item} la #{rank} +{damage}",
@@ -539,8 +541,7 @@
         },
         "fall_safe": "⬇️ nimeni din clasament de sub tine nu îți poate lua raritatea",
         "no_item": "fără item",
-        "unranked": "Fără loc în acest pool: {count}",
-        "beyond_pages": "Sub partea citită a clasamentului: {count}",
+        "unranked": "Au lovit în bătălie, dar nu apar în clasamentele citite: {count}",
         "mu_title": "🎖️ {mu} ({count})",
         "no_members": "Niciun membru listat nu a lovit în această bătălie.",
         "footer": "Previzualizare live a pool-ului din clasamentul combinat de damage (ambele tabere), locul 1 ia itemul cel mai valoros · ⬆️ +damage depășește acel loc dacă rămâne pe loc · ⬇️ itemul la care cobori și cât îi trebuie fiecărui jucător de sub tine ca să te depășească · pool-ul crește și locurile se schimbă · {teammate} îl ține un coleg"
@@ -1015,11 +1016,10 @@
             "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
         },
         "loot_targets": {
-            "description": "Arată itemul din pool pe care l-ar lua fiecare membru MU și damage-ul pentru unul mai bun.",
+            "description": "Itemele din pool-ul rundei și al bătăliei pentru membrii MU și damage-ul pentru unele mai bune.",
             "params": {
                 "battle": "Bătălia (cu sugestii sau un link)",
-                "military_unit": "Unitatea militară (implicit: toate unitățile configurate pe acest server)",
-                "pool": "Ce pool de loot se verifică (implicit: al rundei curente)"
+                "military_unit": "Unitatea militară (implicit: toate unitățile configurate pe acest server)"
             }
         },
         "subscribe": {

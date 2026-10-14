@@ -5,8 +5,9 @@ damage ranking, the most valuable item to rank 1. `battleRanking.getRanking` wit
 entry, the `lootItem` that rank would get now, so it is a live pool preview: rarity never rises going down the
 ranking [observed 2026-10-14 on 3 battles], and ranks past the pool's size have no item.
 
-For each member of the configured MUs (or one MU) the command shows their rank, damage and current item, the
-damage to pass the next rank, and the damage to reach the closest rank holding a better rarity (🤝 when a
+Each round's pool is handed out at the end of that round and the battle's pool at the end of the battle, so a
+player competes for both at once and the command shows both. For each member of the configured MUs (or one MU),
+in each pool, it shows their rank, damage and current item, the damage to pass the next rank, and the damage to reach the closest rank holding a better rarity (🤝 when a
 teammate of a configured MU holds it, so climbing there only swaps items inside the team), and how many players
 below would have to pass them, with the damage each needs, before they drop to a lower rarity. The pool grows as
 damage is dealt and ranks move, so the gaps are a snapshot. Read-only: the reply is posted in the channel and
@@ -237,24 +238,13 @@ class LootTargets(commands.Cog):
 
     @app_commands.command(
         name="loot_targets",
-        description="Show the pool item each MU member would get from a battle and the damage a better one needs.",
+        description="Show the round and battle pool items each MU member would get and the damage a better one needs.",
     )
     @app_commands.describe(
         battle="Battle (autocomplete, or a battle link)",
         military_unit="Military unit (default: every unit configured for this server)",
-        pool="Which loot pool to check (default: the current round's)",
     )
-    @app_commands.choices(pool=[
-        app_commands.Choice(name="Current round", value="round"),
-        app_commands.Choice(name="Whole battle", value="battle"),
-    ])
-    async def loot_targets_command(
-        self,
-        interaction: discord.Interaction,
-        battle: str,
-        military_unit: str | None = None,
-        pool: app_commands.Choice[str] | None = None,
-    ):
+    async def loot_targets_command(self, interaction: discord.Interaction, battle: str, military_unit: str | None = None):
         tr = await get_translator(interaction.guild_id)
         match = BATTLE_ID_RE.search((battle or "").strip())
         if not match:
@@ -267,7 +257,6 @@ class LootTargets(commands.Cog):
             if mu_filter is None:
                 await interaction.response.send_message(tr("loot_targets.unknown_unit"), ephemeral=True)
                 return
-        scope_kind = pool.value if pool else "round"
         await interaction.response.defer()
 
         session = await get_shared_session()
@@ -288,16 +277,16 @@ class LootTargets(commands.Cog):
         member_mu = {str(user_id): mu_id for mu_id, mu in military_units.items() for user_id in mu.get("members") or []}
         listed = {user_id: mu_id for user_id, mu_id in member_mu.items() if mu_filter in (None, mu_id)}
 
-        if scope_kind == "battle":
-            scope = {"battleId": battle_id}
-        else:
-            round_id = battle_data.get("currentRound") or (battle_data.get("rounds") or [None])[-1]
-            if isinstance(round_id, dict):
-                round_id = round_id.get("_id")
-            scope = {"roundId": str(round_id)} if round_id else {"battleId": battle_id}
-            scope_kind = "round" if round_id else "battle"
+        # the current round's pool (the last round's once the battle ended) and the whole battle's pool
+        rounds = [str(round_id) for round_id in battle_data.get("rounds") or []]
+        round_id = battle_data.get("currentRound") or (rounds[-1] if rounds else None)
+        if isinstance(round_id, dict):
+            round_id = round_id.get("_id")
+        round_id = str(round_id) if round_id else None
+        round_number = rounds.index(round_id) + 1 if round_id in rounds else max(1, len(rounds))
+        scopes = ([("round", {"roundId": round_id})] if round_id else []) + [("battle", {"battleId": battle_id})]
 
-        # members who hit the battle at all; a member with no hits is not looked for in the ranking
+        # members who hit the battle at all; a member with no hits is not looked for in the rankings
         summaries = await get_battle_loot_summaries(battle_id, list(listed), session)
         hitters = {user_id for user_id, summary in summaries.items() if (summary.get("hits") or summary.get("totalDmg"))}
 
@@ -314,17 +303,29 @@ class LootTargets(commands.Cog):
             rarities = [rarity for rarity in rarities if rarity >= 0]
             return not rarities or _rarity_index(items[-1], game_items) < min(rarities)
 
-        ranking = await get_ranking_pages(scope, "damage", "user", "merged", session, stop=found_all, max_pages=MAX_RANKING_PAGES)
-        if ranking is None:
+        # both pools are read at once, each stopping on its own; a member who hit only earlier rounds is never
+        # found in the round ranking, so that read can run to its end or to MAX_RANKING_PAGES
+        rankings = await asyncio.gather(*(
+            get_ranking_pages(scope, "damage", "user", "merged", session, stop=found_all, max_pages=MAX_RANKING_PAGES)
+            for _, scope in scopes
+        ))
+        if any(ranking is None for ranking in rankings):
             await interaction.followup.send(tr("loot_targets.fetch_failed"), ephemeral=True)
             return
-        items, complete = ranking
-        found = [str(item.get("user")) for item in items if str(item.get("user")) in listed]
-        users = await get_users_info(found, session) if found else {}
+        pools = [
+            {
+                "label": tr("loot_targets.pool_round", number=round_number) if kind == "round" else tr("loot_targets.pool_battle"),
+                "items": items,
+                "complete": complete,
+                "index_of": {str(entry.get("user")): index for index, entry in enumerate(items)},
+            }
+            for (kind, _), (items, complete) in zip(scopes, rankings)
+        ]
+        found = {user_id for pool in pools for user_id in pool["index_of"] if user_id in listed}
+        users = await get_users_info(list(found), session) if found else {}
 
         embeds = self._build_embeds(
-            battle_data, scope_kind, items, complete, listed, member_mu, hitters, users, mu_filter,
-            game_items, datetime.now(timezone.utc), tr,
+            battle_data, pools, listed, member_mu, hitters, users, mu_filter, game_items, datetime.now(timezone.utc), tr
         )
         for message_embeds in _messages(embeds):
             await interaction.followup.send(embeds=message_embeds)
@@ -349,16 +350,17 @@ class LootTargets(commands.Cog):
         rarity = (game_items.get(str(code)) or {}).get("rarity")
         return f"{RARITY_EMOJI.get(rarity, '❔')} {code}"
 
-    def _member_line(
-        self, index: int, items: list[dict], complete: bool, member_mu: dict, users: dict, game_items: dict, tr: Translator
-    ) -> str:
-        """Lines for one member: rank, damage and item; the next rank and the closest better rarity; and,
-        when they hold an item, who below could push them to a lower rarity."""
-        entry = items[index]
+    def _pool_lines(self, pool: dict, index: int, member_mu: dict, game_items: dict, tr: Translator) -> list[str]:
+        """The lines of one member in one pool.
+
+        Rank, damage and item; the next rank and the closest better rarity; and, when they hold an item,
+        who below could push them to a lower rarity.
+        """
+        items, entry = pool["items"], pool["items"][index]
         user_id = str(entry.get("user"))
-        name = discord.utils.escape_markdown(str((users.get(user_id) or {}).get("username") or tr("common.unknown")))
         head = tr(
-            "loot_targets.member", rank=entry.get("rank"), name=name, damage=_fmt_short(entry.get("value")), item=self._item(entry, game_items, tr)
+            "loot_targets.pool_line",
+            pool=pool["label"], rank=entry.get("rank"), damage=_fmt_short(entry.get("value")), item=self._item(entry, game_items, tr),
         )
         targets = loot_targets(items, index, game_items)
         parts = []
@@ -375,7 +377,7 @@ class LootTargets(commands.Cog):
         elif _rarity_index(entry, game_items) == len(RARITY_ORDER) - 1:
             parts.append(tr("loot_targets.best_rarity"))
         lines = [head, "⬆️ " + " · ".join(parts)]
-        risk = loot_risk(items, index, game_items, complete)
+        risk = loot_risk(items, index, game_items, pool["complete"])
         if risk and risk.get("safe"):
             lines.append(tr("loot_targets.fall_safe"))
         elif risk:
@@ -383,14 +385,25 @@ class LootTargets(commands.Cog):
             # every player's need is listed up to 3; beyond that the closest and the furthest
             shown = ", ".join(damages) if len(damages) <= 3 else f"{damages[0]} … {damages[-1]}"
             lines.append(tr.plural("loot_targets.fall", len(damages), item=self._item(risk["fall_to"], game_items, tr), damages=shown))
+        return lines
+
+    def _member_block(self, user_id: str, pools: list[dict], member_mu: dict, users: dict, game_items: dict, tr: Translator) -> str:
+        """The member's name, then their lines in each pool (round first, then battle)."""
+        name = discord.utils.escape_markdown(str((users.get(user_id) or {}).get("username") or tr("common.unknown")))
+        lines = [f"**{name}**"]
+        for pool in pools:
+            index = pool["index_of"].get(user_id)
+            if index is None:
+                # with the whole ranking read they dealt no damage in this pool; otherwise they are further down
+                lines.append(tr("loot_targets.pool_missing" if pool["complete"] else "loot_targets.pool_beyond", pool=pool["label"]))
+            else:
+                lines += self._pool_lines(pool, index, member_mu, game_items, tr)
         return "\n".join(lines)
 
     def _build_embeds(
         self,
         battle: dict,
-        scope_kind: str,
-        items: list[dict],
-        complete: bool,
+        pools: list[dict],
         listed: dict[str, str],
         member_mu: dict[str, str],
         hitters: set[str],
@@ -400,36 +413,40 @@ class LootTargets(commands.Cog):
         now: datetime,
         tr: Translator,
     ) -> list[discord.Embed]:
-        """The pool summary in the description, then one section per MU with its members in rank order."""
-        with_item = sum(1 for entry in items if _rarity_index(entry, game_items) >= 0)
-        lines = [
-            self._battle_title(battle, tr) + " · " + tr(f"loot_targets.scope_{scope_kind}"),
-            tr("loot_targets.pool_complete" if complete else "loot_targets.pool_partial", ranked=len(items), with_item=with_item),
-        ]
+        """Both pools' size and rarity thresholds in the description, then one section per MU, members in rank order."""
+        lines = [self._battle_title(battle, tr)]
         if not battle.get("isActive"):
             lines.append(tr("loot_targets.battle_ended"))
-        thresholds = rarity_thresholds(items, complete, game_items)
-        if thresholds:
-            lines.append(tr("loot_targets.thresholds") + " " + " · ".join(
-                f"{RARITY_EMOJI[rarity]} >{_fmt_short(value)}" for rarity, value in thresholds
-            ))
+        for pool in pools:
+            items = pool["items"]
+            with_item = sum(1 for entry in items if _rarity_index(entry, game_items) >= 0)
+            key = "loot_targets.pool_summary_complete" if pool["complete"] else "loot_targets.pool_summary_partial"
+            lines.append(tr(key, pool=pool["label"], ranked=len(items), with_item=with_item))
+            thresholds = rarity_thresholds(items, pool["complete"], game_items)
+            if thresholds:
+                lines.append(tr("loot_targets.thresholds") + " " + " · ".join(
+                    f"{RARITY_EMOJI[rarity]} >{_fmt_short(value)}" for rarity, value in thresholds
+                ))
         description = "\n".join(lines)
 
-        index_of = {str(entry.get("user")): index for index, entry in enumerate(items)}
+        def rank_key(user_id: str) -> tuple:
+            # the round pool is decided first, so its rank orders the list; the battle rank breaks ties
+            return tuple(pool["index_of"].get(user_id, float("inf")) for pool in pools)
+
         fields: list[tuple[str, str]] = []
         mu_ids = [mu_filter] if mu_filter else sorted({mu_id for mu_id in listed.values()}, key=lambda mu_id: self._mu_names.get(mu_id, mu_id).lower())
         for mu_id in mu_ids:
             members = [user_id for user_id, member_mu_id in listed.items() if member_mu_id == mu_id]
-            ranked = sorted((index_of[user_id] for user_id in members if user_id in index_of))
-            # hit the battle but not found: outside the pages read, or no hits in this round
-            unranked = [user_id for user_id in members if user_id in hitters and user_id not in index_of]
-            if not ranked and not unranked:
+            shown = sorted((user_id for user_id in members if any(user_id in pool["index_of"] for pool in pools)), key=rank_key)
+            # hit the battle but found in neither ranking read
+            unranked = [user_id for user_id in members if user_id in hitters and user_id not in shown]
+            if not shown and not unranked:
                 continue
             mu_name = discord.utils.escape_markdown(self._mu_names.get(mu_id, mu_id))
-            section = [self._member_line(index, items, complete, member_mu, users, game_items, tr) for index in ranked]
+            section = [self._member_block(user_id, pools, member_mu, users, game_items, tr) for user_id in shown]
             if unranked:
-                section.append(tr("loot_targets.unranked" if complete else "loot_targets.beyond_pages", count=len(unranked)))
-            fields += _pack(tr("loot_targets.mu_title", mu=mu_name, count=len(ranked)), section)
+                section.append(tr("loot_targets.unranked", count=len(unranked)))
+            fields += _pack(tr("loot_targets.mu_title", mu=mu_name, count=len(shown)), section)
         if not fields:
             description += "\n" + tr("loot_targets.no_members")
         return self._split(tr("loot_targets.title"), description, fields, tr("loot_targets.footer", teammate=TEAMMATE_MARKER), now)

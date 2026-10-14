@@ -155,8 +155,8 @@
                 "desc": "Commander checklist for a configured military unit (autocomplete): headquarters status, whether MU orders follow Romania's, fighters in position for each MU order, the latest won contract on an active battle, pills, health and hunger, MU help (and buffed fighters who can still ask), gear without a weapon or at or below 20% durability, the MU tournament while one is open (registration, rarity cap) and leaders online in the last 24h. ⚠️ counts only objective problems. Oil and paper stock and contract progress are not visible to the bot. The reply is posted in the channel; nobody is pinged."
             },
             "loot_targets": {
-                "name": "/loot_targets battle [military_unit] [pool]",
-                "desc": "Live loot pool preview for a battle (autocomplete, or a link). Pool items go by rank in the combined damage ranking of both sides, the most valuable to rank 1. For every member of the configured military units (or of `military_unit`) who hit the battle: rank, damage and the item they would get now, the damage to pass the next rank, and the damage to reach the closest rank holding a better rarity (🤝 when a teammate holds it). It also shows how many players below would have to pass them before they drop to a lower rarity, with the damage each one needs, and the damage needed for each rarity. `pool`: current round (default) or whole battle. A snapshot: the pool grows and ranks move. The reply is posted in the channel; nobody is pinged."
+                "name": "/loot_targets battle [military_unit]",
+                "desc": "Live preview of a battle's loot pools (autocomplete, or a link): the current round's pool and the whole battle's pool, shown together because a player competes for both at once. Pool items go by rank in the combined damage ranking of both sides, the most valuable to rank 1. For every member of the configured military units (or of `military_unit`) who hit the battle, in each pool: rank, damage and the item they would get now, the damage to pass the next rank, and the damage to reach the closest rank holding a better rarity (🤝 when a teammate holds it). It also shows how many players below would have to pass them before they drop to a lower rarity, with the damage each one needs, and the damage needed for each rarity. A snapshot: the pool grows and ranks move. The reply is posted in the channel; nobody is pinged."
             },
             "promotions": {
                 "name": "/promotions",
@@ -519,13 +519,15 @@
         "unknown_unit": "Unknown military unit. Pick one from the list.",
         "fetch_failed": "Could not fetch the battle, the military units or the ranking. Try again later.",
         "title": "🎁 Loot targets",
-        "scope_round": "current round pool",
-        "scope_battle": "whole battle pool",
-        "pool_complete": "👥 Ranked: **{ranked}** · with an item now: **{with_item}**",
-        "pool_partial": "👥 Top **{ranked}** read · with an item: **{with_item}**",
+        "pool_round": "🔄 Round {number}",
+        "pool_battle": "🏟️ Battle",
+        "pool_summary_complete": "{pool} · ranked: **{ranked}** · with an item now: **{with_item}**",
+        "pool_summary_partial": "{pool} · top **{ranked}** read · with an item: **{with_item}**",
         "battle_ended": "🏁 The battle has ended: this is the final distribution.",
         "thresholds": "Damage for at least:",
-        "member": "`#{rank}` **{name}** · {damage} · {item}",
+        "pool_line": "{pool} · `#{rank}` · {damage} · {item}",
+        "pool_missing": "{pool} · no damage in this pool",
+        "pool_beyond": "{pool} · below the part of the ranking read",
         "top": "🥇 top of the ranking",
         "next_rank": "#{rank} +{damage}",
         "better": "{item} at #{rank} +{damage}",
@@ -537,8 +539,7 @@
         },
         "fall_safe": "⬇️ nobody ranked below can take your rarity",
         "no_item": "no item",
-        "unranked": "Not ranked in this pool: {count}",
-        "beyond_pages": "Below the part of the ranking read: {count}",
+        "unranked": "Hit the battle but not found in the rankings read: {count}",
         "mu_title": "🎖️ {mu} ({count})",
         "no_members": "No listed member has hit this battle.",
         "footer": "Live pool preview from the combined damage ranking (both sides), rank 1 gets the most valuable item · ⬆️ +damage passes that rank if it stays put · ⬇️ the item you drop to, and what each player below needs to pass you · the pool grows and ranks move · {teammate} a teammate holds it"
