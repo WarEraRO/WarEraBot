@@ -3,6 +3,7 @@ import logging
 import math
 from collections import Counter
 from datetime import datetime, time as dt_time, timedelta, timezone
+from statistics import median
 
 import discord
 from discord.ext import commands, tasks
@@ -15,10 +16,10 @@ from utils.api import (
     get_military_unit,
     get_mu_members,
     get_shared_session,
-    get_users_info,
+    get_users_full,
 )
 from utils.common import country_with_flag, to_local
-from utils.computational import is_economy_build
+from utils.computational import FIGHT_WEALTH_TIERS, fight_wealth, fight_wealth_tier, is_economy_build
 from utils.i18n import Translator, get_translator
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,9 @@ RESKILL_WINDOW = timedelta(hours=24)
 SHARED_WINDOW_PERCENT = 80
 # an MU has at most 25 members, so lists normally show everyone
 NAMES_SHOWN = 25
+# the report names only the richest few of each fight wealth tier; /fight_wealth lists everyone
+FIGHT_WEALTH_SHOWN = 5
+FIGHT_WEALTH_EMOJI = {"gold": "🥇", "silver": "🥈", "bronze": "🥉", "iron": "🔩"}
 ORDERS_SHOWN = 3
 EMBED_FIELD_VALUE_LIMIT = 1024
 # per embed, kept below Discord's 6000 so each part stays readable; longer reports are split into more embeds
@@ -71,6 +75,34 @@ def _fmt_short(value) -> str:
         if abs(value) >= divisor:
             return f"{value / divisor:.1f}{suffix}"
     return f"{round(value)}"
+
+
+def _fmt_threshold(value: float) -> str:
+    """Round tier thresholds: 15K, 5K."""
+    return f"{value / 1000:g}K"
+
+
+def _wealth_tier_label(tier: str, tr: Translator) -> str:
+    """The tier's emoji, translated name and fight wealth range, e.g. `🥈 SILVER 10K–15K`."""
+    names = [name for name, _ in FIGHT_WEALTH_TIERS]
+    index = names.index(tier)
+    low = FIGHT_WEALTH_TIERS[index][1]
+    high = FIGHT_WEALTH_TIERS[index - 1][1] if index else None
+    if high is None:
+        span = f"≥{_fmt_threshold(low)}"
+    elif not low:
+        span = f"<{_fmt_threshold(high)}"
+    else:
+        span = f"{_fmt_threshold(low)}–{_fmt_threshold(high)}"
+    return f"{FIGHT_WEALTH_EMOJI[tier]} {tr(f'fight_wealth.tier.{tier}')} {span}"
+
+
+def _wealth_tier_counts(by_tier: dict[str, list], tr: Translator) -> str:
+    """Members per fight wealth tier on one line: `🥇 GOLD **5** · 🥈 SILVER **3** · …`."""
+    return " · ".join(
+        f"{FIGHT_WEALTH_EMOJI[tier]} {tr(f'fight_wealth.tier.{tier}')} **{len(tier_rows)}**"
+        for tier, tier_rows in by_tier.items()
+    )
 
 
 def _truncate(text: str) -> str:
@@ -203,8 +235,10 @@ class MilitaryUnitDailyReportJob(commands.Cog):
         country_names: dict[str, str],
         tr: Translator,
     ) -> list[discord.Embed] | None:
-        """The MU's daily report as one or more embeds, or None when it has no members or dealt less than
-        MIN_REPORT_DAMAGE this week."""
+        """Build the MU's daily report as one or more embeds, ending with the members' fight wealth tiers.
+
+        Returns None when the MU has no members or dealt less than MIN_REPORT_DAMAGE this week.
+        """
         military_unit, members = await asyncio.gather(
             get_military_unit(mu_id, session),
             get_mu_members(mu_id, session),
@@ -226,8 +260,8 @@ class MilitaryUnitDailyReportJob(commands.Cog):
             logger.info("Skipping daily report for MU %s: %s weekly damage", mu_name, _fmt_short(weekly_damage))
             return None
 
-        # one batched request for every member
-        users_by_id = await get_users_info([str(member.get("user")) for member in members], session)
+        # one batched request for every member; the full user also carries stats.wealth
+        users_by_id = await get_users_full([str(member.get("user")) for member in members], session)
         users = [users_by_id.get(str(member.get("user"))) for member in members]
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         rows = []
@@ -244,6 +278,7 @@ class MilitaryUnitDailyReportJob(commands.Cog):
                 "last_reset_at": _parse_iso(dates.get("lastSkillsResetAt")),
                 "last_help_at": _parse_iso(dates.get("lastHelpAskedAt")),
                 "last_seen_at": _parse_iso(dates.get("lastConnectionAt")),
+                "wealth": fight_wealth(user),
             })
         missing = len(members) - len(rows)
         # biggest hitters first, so the most impactful names are never cut from a list
@@ -286,6 +321,15 @@ class MilitaryUnitDailyReportJob(commands.Cog):
                 full_bars.append((row, bars))
         offline = [row for row in rows if row["last_seen_at"] and now - row["last_seen_at"] >= OFFLINE_AFTER]
         no_damage = [row for row in fighters if not row["weekly"] and row not in offline]
+
+        # fight wealth (all wealth but companies) shows how long members can keep paying for fighting
+        wealthy = sorted((row for row in rows if row["wealth"]), key=lambda row: row["wealth"]["total"], reverse=True)
+        by_tier = {
+            tier: [row for row in wealthy if fight_wealth_tier(row["wealth"]["total"]) == tier]
+            for tier, _ in FIGHT_WEALTH_TIERS
+        }
+        poorest_tier = FIGHT_WEALTH_TIERS[-1][0]
+        poor_fighters = [row for row in by_tier[poorest_tier] if row["economy"] is False]
 
         # EET or EEST for Europe/Bucharest, depending on daylight saving time
         tz_name = to_local(now).tzname()
@@ -338,7 +382,29 @@ class MilitaryUnitDailyReportJob(commands.Cog):
                 False,
             ))
 
-        tips = self._insights(fighters, no_pill, pilled_today, reskilled, orders, battles, no_help, now, settings, tr)
+        wealth = []
+        if wealthy:
+            totals = [row["wealth"]["total"] for row in wealthy]
+            summary = tr("mu_daily.wealth_value", total=_fmt_short(sum(totals)), median=_fmt_short(median(totals)))
+            summary += "\n" + _wealth_tier_counts(by_tier, tr)
+            if len(wealthy) < len(rows):
+                summary += "\n" + tr("mu_daily.wealth_unknown", count=len(rows) - len(wealthy))
+            wealth.append((tr("mu_daily.wealth_title"), summary, False))
+            for tier, tier_rows in by_tier.items():
+                if tier_rows:
+                    wealth.append((
+                        f"{_wealth_tier_label(tier, tr)} ({len(tier_rows)})",
+                        self._name_list(
+                            [f"{row['name']} ({_fmt_short(row['wealth']['total'])})" for row in tier_rows],
+                            tr,
+                            limit=FIGHT_WEALTH_SHOWN,
+                        ),
+                        False,
+                    ))
+
+        tips = self._insights(
+            fighters, no_pill, pilled_today, reskilled, orders, battles, no_help, poor_fighters, now, settings, tr
+        )
         advice = [(tr("mu_daily.tips_title"), "\n".join(f"• {tip}" for tip in tips), False)] if tips else []
 
         readiness = []
@@ -385,7 +451,7 @@ class MilitaryUnitDailyReportJob(commands.Cog):
 
         author = tr("mu_daily.author", mu=mu_name)
         icon_url = military_unit.get("avatarUrl") or None
-        pages = self._paginate([pills, orders_and_skills, advice, readiness], author, description, footer)
+        pages = self._paginate([pills, orders_and_skills, advice, readiness, wealth], author, description, footer)
         embeds = []
         for index, fields in enumerate(pages):
             embed = discord.Embed(
@@ -454,10 +520,11 @@ class MilitaryUnitDailyReportJob(commands.Cog):
                 messages.append([embed])
         return messages
 
-    def _name_list(self, entries: list[str], tr: Translator, separator: str = ", ") -> str:
-        shown = separator.join(entries[:NAMES_SHOWN])
-        if len(entries) > NAMES_SHOWN:
-            shown += separator + tr("mu_daily.and_more", count=len(entries) - NAMES_SHOWN)
+    def _name_list(self, entries: list[str], tr: Translator, separator: str = ", ", limit: int = NAMES_SHOWN) -> str:
+        """The first `limit` entries joined by `separator`, plus "and N more" for the rest."""
+        shown = separator.join(entries[:limit])
+        if len(entries) > limit:
+            shown += separator + tr("mu_daily.and_more", count=len(entries) - limit)
         return shown
 
     def _orders_text(
@@ -497,10 +564,12 @@ class MilitaryUnitDailyReportJob(commands.Cog):
         orders: list[tuple[dict, str]],
         battles: list[dict] | None,
         no_help: list[dict],
+        poor_fighters: list[dict],
         now: datetime,
         settings: dict,
         tr: Translator,
     ) -> list[str]:
+        """Short advice for tomorrow; `poor_fighters` are fighters in the lowest fight wealth tier."""
         tips = []
         if battles is not None and not orders:
             tips.append(tr("mu_daily.tip_no_order"))
@@ -530,6 +599,13 @@ class MilitaryUnitDailyReportJob(commands.Cog):
             )
         if no_help:
             tips.append(tr("mu_daily.tip_no_help", count=len(no_help)))
+        if poor_fighters:
+            tips.append(tr(
+                "mu_daily.tip_poor_fighters",
+                count=len(poor_fighters),
+                tier=tr(f"fight_wealth.tier.{FIGHT_WEALTH_TIERS[-1][0]}"),
+                threshold=_fmt_threshold(FIGHT_WEALTH_TIERS[-2][1]),
+            ))
         return tips
 
 

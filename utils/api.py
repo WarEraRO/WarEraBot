@@ -174,6 +174,16 @@ async def get_users_info(user_ids, session):
     users = await _get_batch(session, 'user.getUserLite', [{'userId': uid} for uid in ids])
     return {uid: user for uid, user in zip(ids, users) if user}
 
+async def get_users_full(user_ids, session):
+    """Batched user.getUserById: {userId: user} for the ids that resolved.
+
+    Same request cost as get_users_info. The full user carries the getUserLite fields the bot reads
+    (skills, buffs, dates, leveling, mu) plus stats.wealth, region and location [observed 2026-10-14].
+    """
+    ids = list(dict.fromkeys(user_ids))
+    users = await _get_batch(session, 'user.getUserById', [{'userId': uid} for uid in ids])
+    return {uid: user for uid, user in zip(ids, users) if user}
+
 async def get_military_units_by_ids(mu_ids, session):
     """Batched mu.getById: {muId: mu} for the ids that resolved."""
     ids = list(dict.fromkeys(mu_ids))

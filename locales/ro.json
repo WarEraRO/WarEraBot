@@ -138,6 +138,10 @@
                 "name": "/pills military_unit",
                 "desc": "Starea pastilelor într-o unitate militară configurată (cu sugestii): cine are pastilă, grupați după ora la care au luat-o, cine e în debuff, grupați după ora la care se termină (ambele cu timpul rămas), și luptătorii fără pastilă. Orele sunt afișate în fusul orar configurat."
             },
+            "fight_wealth": {
+                "name": "/fight_wealth military_unit",
+                "desc": "Averea de luptă a fiecărui membru dintr-o unitate militară configurată (cu sugestii): bani, iteme, echipament și arme, fără companii. Membrii sunt ordonați de la cel mai bogat și grupați pe niveluri: AUR ≥15K, ARGINT 10K–15K, BRONZ 5K–10K, FIER <5K. Raportul zilnic pentru liderii MU arată câți membri are fiecare nivel și cele mai bogate nume din fiecare."
+            },
             "promotions": {
                 "name": "/promotions",
                 "desc": "Verifică dacă membrii noi pot fi promovați. Arată Candidați la promovare, Probleme de luptă, Inactivi și Probleme de date — butoanele de filtrare comută între categorii."
@@ -355,6 +359,25 @@
         "low_level_fighter": "Nivel <= 15 în modul de luptă",
         "error": "Eroare"
     },
+    "fight_wealth": {
+        "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
+        "members_unavailable": "Membrii unității militare nu au putut fi preluați. Încearcă din nou mai târziu.",
+        "title": "💰 Avere de luptă · {mu}",
+        "summary": "Total **{total}** · medie **{average}** · mediană **{median}**",
+        "no_data": "Averea membrilor nu a putut fi preluată.",
+        "footer": "Avere de luptă = 💵 bani + 📦 iteme + 🛡️ echipament + 🔫 arme, fără companii · 🏭 build de economie",
+        "footer_missing": {
+            "one": "{count} membru nu a putut fi preluat",
+            "few": "{count} membri nu au putut fi preluați",
+            "other": "{count} de membri nu au putut fi preluați"
+        },
+        "tier": {
+            "gold": "AUR",
+            "silver": "ARGINT",
+            "bronze": "BRONZ",
+            "iron": "FIER"
+        }
+    },
     "pills": {
         "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
         "members_unavailable": "Membrii unității militare nu au putut fi preluați. Încearcă din nou mai târziu.",
@@ -545,7 +568,11 @@
         "tip_shared_window": "{needed}/{total} luptători pot lua pastila până la {hour}:00 {tz}; stabiliți o oră comună de pastilă de atunci.",
         "tip_spread": "Pastilele de azi au fost luate la {hours} ore diferite; o fereastră comună lovește mai tare.",
         "tip_to_economy": "Membri resetați pe economie: {count}; nu se pot reseta înapoi pe luptă înainte de {date}.",
-        "tip_no_help": "Luptători care nu au cerut ajutor MU azi: {count}; e viață gratuită, cel mai bine folosită cu pastila activă."
+        "tip_no_help": "Luptători care nu au cerut ajutor MU azi: {count}; e viață gratuită, cel mai bine folosită cu pastila activă.",
+        "tip_poor_fighters": "Luptători {tier} (sub {threshold} avere de luptă): {count}; verifică dacă își mai permit pastile, muniție și mâncare (`/fight_wealth`).",
+        "wealth_title": "💰 Avere de luptă · fără companii",
+        "wealth_value": "Total **{total}** · mediană **{median}** · lista completă: `/fight_wealth`",
+        "wealth_unknown": "⚠️ Membri fără date despre avere: {count}"
     },
     "mu_weekly": {
         "author": "📊 {mu} · Raport săptămânal",
@@ -799,6 +826,10 @@
         "mu_stray": {"description": "Listează jucătorii care nu aparțin niciunei unități militare configurate."},
         "pills": {
             "description": "Arată cine are pastilă, cine e în debuff și cine nu a luat pastila într-o unitate militară.",
+            "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
+        },
+        "fight_wealth": {
+            "description": "Arată averea de luptă (toată averea fără companii) și nivelul membrilor unei unități militare.",
             "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
         },
         "subscribe": {

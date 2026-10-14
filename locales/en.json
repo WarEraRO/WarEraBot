@@ -138,6 +138,10 @@
                 "name": "/pills military_unit",
                 "desc": "Pill status of a configured military unit (autocomplete): who is pilled, grouped by the hour they pilled, who is in debuff, grouped by the hour it ends (both with time left), and fighters not pilled. Hours are shown in the configured timezone."
             },
+            "fight_wealth": {
+                "name": "/fight_wealth military_unit",
+                "desc": "Fight wealth of every member of a configured military unit (autocomplete): money, items, equipment and weapons, companies excluded. Members are ranked richest first and grouped by tier: GOLD ≥15K, SILVER 10K–15K, BRONZE 5K–10K, IRON <5K. The daily report to MU leaders shows the tier counts and the richest names of each tier."
+            },
             "promotions": {
                 "name": "/promotions",
                 "desc": "Check newbie members for promotion eligibility. Shows Promotion Candidates, Fight Issues, Inactive, and Data Issues — filter buttons on the result view switch between categories."
@@ -355,6 +359,24 @@
         "low_level_fighter": "Level <= 15 in fight mode",
         "error": "Exception"
     },
+    "fight_wealth": {
+        "unknown_unit": "Unknown military unit. Pick one from the list.",
+        "members_unavailable": "Could not fetch the military unit members. Try again later.",
+        "title": "💰 Fight wealth · {mu}",
+        "summary": "Total **{total}** · average **{average}** · median **{median}**",
+        "no_data": "No member wealth could be fetched.",
+        "footer": "Fight wealth = 💵 money + 📦 items + 🛡️ equipment + 🔫 weapons, companies excluded · 🏭 economy build",
+        "footer_missing": {
+            "one": "{count} member could not be fetched",
+            "other": "{count} members could not be fetched"
+        },
+        "tier": {
+            "gold": "GOLD",
+            "silver": "SILVER",
+            "bronze": "BRONZE",
+            "iron": "IRON"
+        }
+    },
     "pills": {
         "unknown_unit": "Unknown military unit. Pick one from the list.",
         "members_unavailable": "Could not fetch the military unit members. Try again later.",
@@ -542,7 +564,11 @@
         "tip_shared_window": "{needed}/{total} fighters can pill by {hour}:00 {tz}; agree on a shared pill time from then.",
         "tip_spread": "Today's pills were spread over {hours} different hours; a shared window hits harder.",
         "tip_to_economy": "{count} member(s) reset to economy; they can't reset back to fight before {date}.",
-        "tip_no_help": "{count} fighter(s) asked for no MU help today; that's free health, best used while pilled."
+        "tip_no_help": "{count} fighter(s) asked for no MU help today; that's free health, best used while pilled.",
+        "tip_poor_fighters": "{count} fighter(s) are {tier} (under {threshold} fight wealth); check they can still afford pills, ammo and food (`/fight_wealth`).",
+        "wealth_title": "💰 Fight wealth · without companies",
+        "wealth_value": "Total **{total}** · median **{median}** · full list: `/fight_wealth`",
+        "wealth_unknown": "⚠️ {count} member(s) without wealth data"
     },
     "mu_weekly": {
         "author": "📊 {mu} · Weekly Report",
