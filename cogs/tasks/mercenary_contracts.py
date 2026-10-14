@@ -1,5 +1,5 @@
 from discord.ext import commands, tasks
-from utils.api import get_shared_session, get_mercenary_auctions, get_country
+from utils.api import get_shared_session, get_mercenary_auctions, get_country, get_countries_by_ids
 from utils.db import init_db
 from utils.i18n import get_translator
 from config import config
@@ -45,8 +45,18 @@ class MercenaryContractsJob(commands.Cog):
             return
         tr = await get_translator(guild)
 
-        # simple cache for country names
+        # simple cache for country names, filled with one batched request for the auctions posted below
         country_cache: dict = {}
+        to_post = [
+            a for a in auctions
+            if a.get('_id') and a.get('status') == 'active'
+            and self.displayed_auctions.get(a.get('_id')) != (a.get('updatedAt') or a.get('createdAt') or a.get('currentPayout'))
+        ]
+        country_ids = [cid for cid in (a.get('country') or a.get('forCountry') for a in to_post) if cid]
+        countries = await get_countries_by_ids(country_ids, session)
+        for cid in country_ids:
+            cobj = countries.get(cid)
+            country_cache[cid] = cobj.get('name') if isinstance(cobj, dict) else str(cid)
         async def resolve_country(cid):
             if not cid:
                 return tr('common.unknown')

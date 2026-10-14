@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from config import config
-from utils.api import get_user, get_shared_session, get_all_countries, get_country
+from utils.api import get_users_by_name, get_shared_session, get_all_countries, get_country
 from utils.i18n import Translator, get_translator
 
 _PAGE_SIZE = 15
@@ -101,11 +101,10 @@ class CountryStrays(commands.Cog):
 
         issues: list[tuple] = []
 
+        # one batched lookup for all members instead of one or more requests per member
+        users = await get_users_by_name([member.display_name for member in members], session)
         for member in members:
-            try:
-                user = await get_user(member.display_name, session)
-            except Exception:
-                user = None
+            user = users.get(member.display_name)
             if not user:
                 continue
 

@@ -1,10 +1,9 @@
 from discord.ext import commands, tasks
-from utils.api import get_shared_session, get_active_battles, get_country
+from utils.api import get_shared_session, get_active_battles, get_countries_by_ids
 from utils.db import init_db
 from utils.i18n import get_translator
 from config import config
 from datetime import datetime, timezone
-import asyncio
 
 # how often the bounty monitor runs (minutes)
 BOUNTY_MONITOR_INTERVAL_MINUTES = 1
@@ -86,36 +85,21 @@ class BountyMonitorJob(commands.Cog):
         if not battles_with_bounty:
             return
 
-        # Fetch country names for all referenced country ids
+        # Fetch country names for all referenced country ids (one batched request)
         country_cache: dict = {}
-        async def resolve_country(cid):
-            if not cid:
-                return None
-            if cid in country_cache:
-                return country_cache[cid]
-            try:
-                cobj = await get_country(cid, session)
-            except Exception:
-                cobj = None
-            if isinstance(cobj, dict):
-                name = cobj.get('name') or cid
-            else:
-                name = cid
-            country_cache[cid] = name
-            return country_cache[cid]
-
-        # Resolve countries used in the selected battles
-        tasks_resolve = []
+        country_ids = []
         for entry in battles_with_bounty:
             b = entry['battle']
             atk_cid = (b.get('attacker') or {}).get('country')
             def_cid = (b.get('defender') or {}).get('country')
             if atk_cid:
-                tasks_resolve.append(resolve_country(atk_cid))
+                country_ids.append(atk_cid)
             if def_cid:
-                tasks_resolve.append(resolve_country(def_cid))
-        # run resolves
-        await asyncio.gather(*tasks_resolve)
+                country_ids.append(def_cid)
+        countries = await get_countries_by_ids(country_ids, session)
+        for cid in country_ids:
+            cobj = countries.get(cid)
+            country_cache[cid] = (cobj.get('name') or cid) if isinstance(cobj, dict) else cid
 
         # For each side with a positive pool, send a single embed if it's new/changed
         channel = guild.get_channel(config.get('channels', {}).get('bounties')) if guild else None

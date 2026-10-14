@@ -9,7 +9,7 @@ from discord.ext import commands
 from utils.api import (
     get_all_countries,
     get_shared_session,
-    get_user_info,
+    get_users_info,
     get_rankings
 )
 from utils.i18n import Translator, get_translator
@@ -385,9 +385,9 @@ class TopUserWeeklyDamages(commands.Cog):
         country_items = _country_items(items, country_ids)
 
         try:
-            users = await asyncio.gather(
-                *(get_user_info(item["user"], session) for item in country_items)
-            )
+            # one batched request per 50 players instead of one request each
+            users_by_id = await get_users_info([item["user"] for item in country_items], session)
+            users = [users_by_id.get(item["user"]) for item in country_items]
         except Exception:
             logger.exception("Failed to resolve weekly damage ranking users")
             users = [None] * len(country_items)

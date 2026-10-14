@@ -16,7 +16,7 @@ from utils.api import (
     get_mu_public_orders,
     get_mu_transactions,
     get_shared_session,
-    get_user_info,
+    get_users_info,
     get_won_mercenary_auctions,
 )
 from utils.common import country_with_flag, get_mu_destination, to_local
@@ -596,10 +596,11 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
 
     async def _resolve_names(self, user_ids: list[str], session, names: dict[str, str]):
         missing = [user_id for user_id in dict.fromkeys(user_ids) if user_id and user_id not in names]
-        users = await asyncio.gather(*(get_user_info(user_id, session) for user_id in missing))
-        for user_id, user in zip(missing, users):
+        # one batched request for every missing name
+        users = await get_users_info(missing, session)
+        for user_id in missing:
             # "" when unknown; shown as a translated "unknown"
-            names[user_id] = str((user or {}).get("username") or "")
+            names[user_id] = str((users.get(user_id) or {}).get("username") or "")
 
 
 async def setup(bot: commands.Bot):

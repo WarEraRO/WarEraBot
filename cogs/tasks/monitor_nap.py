@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands, tasks
 
 from config import config
-from utils.api import get_active_battles, get_military_unit, get_shared_session
+from utils.api import get_active_battles, get_military_unit, get_military_units_by_ids, get_shared_session
 from utils.db import get_all_naps, init_db
 from utils.i18n import get_translator
 
@@ -112,6 +112,27 @@ class NAPMonitorJob(commands.Cog):
             mu_name = str(mu.get("name")) if isinstance(mu, dict) and mu.get("name") else None
             self.mu_cache[mu_id] = (country_id, mu_name, now)
             return country_id, mu_name
+
+        # the MUs the loop below looks up, fetched in one batched request when not cached or expired
+        mu_ids_to_fetch = []
+        now = time.monotonic()
+        for battle in battles:
+            for side, opponent in ((battle.get("attacker") or {}, battle.get("defender") or {}),
+                                   (battle.get("defender") or {}, battle.get("attacker") or {})):
+                if not str(opponent.get("country") or ""):
+                    continue
+                for mu_id in side.get("muOrders") or []:
+                    cached = self.mu_cache.get(str(mu_id)) if mu_id else None
+                    if mu_id and not (cached and now - cached[2] < MU_COUNTRY_CACHE_TTL_SECONDS):
+                        mu_ids_to_fetch.append(str(mu_id))
+        if mu_ids_to_fetch:
+            mus = await get_military_units_by_ids(mu_ids_to_fetch, session)
+            now = time.monotonic()
+            for mu_id in mu_ids_to_fetch:
+                mu = mus.get(mu_id)
+                country_id = str(mu.get("country")) if isinstance(mu, dict) and mu.get("country") else None
+                mu_name = str(mu.get("name")) if isinstance(mu, dict) and mu.get("name") else None
+                self.mu_cache[mu_id] = (country_id, mu_name, now)
 
         violations: list[dict] = []
         active_battle_ids: set[str] = set()

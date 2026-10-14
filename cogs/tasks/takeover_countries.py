@@ -1,6 +1,6 @@
 from discord.ext import commands, tasks
 import discord
-from utils.api import get_shared_session, get_country_government, get_all_countries
+from utils.api import get_shared_session, get_country_governments, get_all_countries
 from utils.db import init_db
 from utils.i18n import Translator, get_translator
 from config import config
@@ -34,11 +34,16 @@ class TakeoverCountriesJob(commands.Cog):
         session = await get_shared_session()
         empty_countries = []
         countries_list = self.countries or []
+        to_check = []
         for country in countries_list:
             if active_countries is not None and len(active_countries) != 0:
                 if country['name'] in active_countries:
                     continue
-            government = await get_country_government(country['_id'], session)
+            to_check.append(country)
+        # one batched request per 50 countries instead of one request per country
+        governments = await get_country_governments([country['_id'] for country in to_check], session)
+        for country in to_check:
+            government = governments.get(country['_id'])
             # country is empty, api displays only _id, country, __v, and congressMembers keys .
             if government is not None and len(government.keys()) == 4 and len(government['congressMembers']) == 0:
                 empty_countries.append((country['name'], country['_id']))

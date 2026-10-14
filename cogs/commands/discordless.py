@@ -1,16 +1,14 @@
 import discord
-import asyncio
 from discord import app_commands
 from discord.ext import commands
 
 from config import config
-from utils.api import get_all_countries, get_country_users, get_shared_session, get_user_info
+from utils.api import get_all_countries, get_country_users, get_shared_session, get_users_info
 from utils.i18n import Translator, get_translator
 
 
 COUNTRY_NAME = "Romania"
 PAGE_SIZE = 15
-USER_INFO_CONCURRENCY = 8
 
 
 def _normalize_name(value: object) -> str:
@@ -120,24 +118,6 @@ class Discordless(commands.Cog):
         self.bot = bot
         self._user_cache: dict[str, dict] = {}
 
-    async def _resolve_user(
-        self,
-        user_ref: dict,
-        session,
-        semaphore: asyncio.Semaphore,
-    ) -> dict | None:
-        user_id = _user_id(user_ref)
-        if not user_id:
-            return None
-        if user_id in self._user_cache:
-            return self._user_cache[user_id]
-
-        async with semaphore:
-            user = await get_user_info(user_id, session)
-        if user:
-            self._user_cache[user_id] = user
-        return user
-
 
     @app_commands.command(
         name="discorless",
@@ -192,13 +172,14 @@ class Discordless(commands.Cog):
             )
             return
         
-        semaphore = asyncio.Semaphore(USER_INFO_CONCURRENCY)
-        resolved_users = await asyncio.gather(
-            *(
-                self._resolve_user(user_ref, session, semaphore)
-                for user_ref in user_refs
-            )
-        )
+        # uncached citizens are fetched in batched requests instead of one request each
+        uncached = [
+            user_id
+            for user_id in (_user_id(user_ref) for user_ref in user_refs)
+            if user_id and user_id not in self._user_cache
+        ]
+        self._user_cache.update(await get_users_info(uncached, session))
+        resolved_users = [self._user_cache.get(_user_id(user_ref)) for user_ref in user_refs]
         users = [user for user in resolved_users if user is not None]
 
         missing = [

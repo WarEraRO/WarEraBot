@@ -15,9 +15,12 @@ from utils.api import (
     get_military_unit,
     get_round,
     get_shared_session,
+    get_users_info,
     get_won_mercenary_auctions,
 )
 from utils.common import country_flag, get_mu_destination
+from utils.computational import is_economy_build
+from utils.db import get_job_subscribers, remove_job_subscription
 from utils.i18n import Translator, get_translator
 
 logger = logging.getLogger(__name__)
@@ -39,6 +42,15 @@ DEFAULT_TICK_POINTS = {1: 1, 100: 2, 200: 3, 300: 4, 400: 5, 500: 6}
 DEFAULT_ROUNDS_TO_WIN = 2
 
 SIDE_ICONS = {"attacker": "⚔️", "defender": "🛡️"}
+
+# job name and target in the job_subscriptions table (see cogs/commands/subscriptions.py). The MU is not
+# stored: a subscriber is pinged for the contracts of whichever configured MU they are in when one is won.
+SUBSCRIPTION_JOB = "mu_contracts"
+SUBSCRIPTION_TARGET = "current_mu"
+# a subscriber is pinged only on a fight build (no skill points counts as economy) and when able to fight:
+# not below one hit of health (~10) with no hunger left to eat food (1 per item), and not in a debuff
+MIN_HEALTH_TO_FIGHT = 10
+MIN_HUNGER_TO_EAT = 1
 
 
 def format_amount(value, unknown: str = "unknown") -> str:
@@ -84,6 +96,32 @@ def parse_iso(value) -> datetime | None:
         return None
 
 
+def contract_units() -> dict[str, dict]:
+    """MU id -> config entry for the MUs that get contract embeds: those with a channelId or a contracts
+    thread (the embed goes to the thread when set)."""
+    return {
+        str(unit["id"]): unit
+        for unit in config.get("military_units", [])
+        if unit.get("id") and (unit.get("channelId") or (unit.get("threadIds") or {}).get("contractsId"))
+    }
+
+
+def _bar_value(skill) -> float:
+    try:
+        return float((skill or {}).get("currentBarValue") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def can_fight(user: dict, now: datetime) -> bool:
+    """False when the player has no stats (health < 10 and hunger < 1) or is in a debuff."""
+    skills = user.get("skills") or {}
+    if _bar_value(skills.get("health")) < MIN_HEALTH_TO_FIGHT and _bar_value(skills.get("hunger")) < MIN_HUNGER_TO_EAT:
+        return False
+    debuff_end = parse_iso((user.get("buffs") or {}).get("debuffEndAt"))
+    return not (debuff_end and debuff_end > now)
+
+
 class MilitaryUnitContractMonitorJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -99,16 +137,17 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
 
     @tasks.loop(minutes=MU_CONTRACT_MONITOR_INTERVAL_MINUTES)
     async def mu_contract_monitor(self):
-        guild = self.bot.get_guild(config["guild"])
+        """Post an embed for each mercenary contract a configured MU has newly won.
+
+        The embed goes to the MU's contracts thread or channel, in one message whose text mentions
+        the subscribers eligible to fight it (see `_subscriber_mentions`). Contracts already won at
+        the first run after a restart are only recorded, not posted.
+        """
+        guild =self.bot.get_guild(config["guild"])
         if guild is None:
             return
 
-        # only MUs with a channelId or a contracts thread get contract embeds, posted in the thread when set
-        units = {
-            str(unit["id"]): unit
-            for unit in config.get("military_units", [])
-            if unit.get("id") and (unit.get("channelId") or (unit.get("threadIds") or {}).get("contractsId"))
-        }
+        units = contract_units()
         if not units:
             return
 
@@ -142,9 +181,15 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
             if channel is None:
                 logger.warning("Contracts channel/thread for MU %s not found", unit.get("friendlyName"))
                 continue
+            embed = await self._build_embed(contract, unit, session, tr)
+            # an MU has at most 25 members (dormitories level 5), so every mention fits in one message
+            mentions = await self._subscriber_mentions(str(unit["id"]), guild, session)
             try:
-                embed = await self._build_embed(contract, unit, session, tr)
-                await channel.send(embed=embed)
+                await channel.send(
+                    content=" ".join(mentions) or None,
+                    embed=embed,
+                    allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True),
+                )
             except discord.DiscordException:
                 logger.exception("Failed to post contract %s for MU %s", contract_id, unit.get("friendlyName"))
                 continue
@@ -155,6 +200,53 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
     @mu_contract_monitor.before_loop
     async def before_mu_contract_monitor(self):
         await self.bot.wait_until_ready()
+
+    async def _subscriber_mentions(self, mu_id: str, guild: discord.Guild, session) -> list[str]:
+        """Mentions of the contract subscribers who are in the MU, on a fight build and able to fight.
+
+        Subscribers who have left the server are not pinged and their subscriptions are dropped.
+        """
+        try:
+            subscriptions = await asyncio.to_thread(get_job_subscribers, SUBSCRIPTION_JOB, SUBSCRIPTION_TARGET)
+        except Exception:
+            logger.exception("Could not read contract subscribers")
+            return []
+        subscriptions = await self._drop_departed(subscriptions, guild)
+        api_ids = {str(s["discord_id"]): str(s["api_id"]) for s in subscriptions if s.get("api_id")}
+        if not api_ids:
+            return []
+        # one batched request; a subscriber whose stats could not be fetched is not pinged
+        users = await get_users_info(api_ids.values(), session)
+        now = datetime.now(timezone.utc)
+        return [
+            f"<@{discord_id}>"
+            for discord_id, api_id in api_ids.items()
+            if (user := users.get(api_id))
+            and str(user.get("mu") or "") == mu_id
+            and is_economy_build(user) is False
+            and can_fight(user, now)
+        ]
+
+    async def _drop_departed(self, subscriptions: list[dict], guild: discord.Guild) -> list[dict]:
+        """The subscriptions of members still in the guild; the others are removed from the database.
+
+        Membership is only judged once the guild's member list is fully cached (`guild.chunked`),
+        so a member missing from a partial cache is neither skipped nor unsubscribed.
+        """
+        if not guild.chunked:
+            return subscriptions
+        staying = []
+        for subscription in subscriptions:
+            discord_id = str(subscription["discord_id"])
+            if discord_id.isdigit() and guild.get_member(int(discord_id)) is None:
+                try:
+                    await asyncio.to_thread(remove_job_subscription, SUBSCRIPTION_JOB, SUBSCRIPTION_TARGET, discord_id)
+                    logger.info("Dropped the contract subscription of %s, who left the server", discord_id)
+                except Exception:
+                    logger.exception("Could not drop the contract subscription of %s", discord_id)
+                continue
+            staying.append(subscription)
+        return staying
 
     def _remember(self, contract: dict):
         self._posted[str(contract["_id"])] = {

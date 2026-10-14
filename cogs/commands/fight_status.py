@@ -4,7 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timezone
-from utils.api import get_user, get_fight_status, get_military_units, get_shared_session
+from utils.api import fight_status_from_user, get_military_unit, get_military_units, get_shared_session, get_users_by_name, get_users_info
 from utils.i18n import Translator, get_translator
 from config import config
 
@@ -98,12 +98,10 @@ class FightStatus(commands.Cog):
 
     async def _fetch_infos_for_discord_members(self, members: list[discord.Member], session) -> list[dict]:
         infos: list[dict] = []
+        # one batched lookup for all members; each status is built from the user already fetched
+        warera_users = await get_users_by_name([member.display_name for member in members], session)
         for member in members:
-            warera_user = None
-            try:
-                warera_user = await get_user(member.display_name, session)
-            except Exception:
-                warera_user = None
+            warera_user = warera_users.get(member.display_name)
 
             if _is_inactive_user(warera_user):
                 continue
@@ -112,48 +110,67 @@ class FightStatus(commands.Cog):
             if warera_user:
                 warera_id = warera_user.get('_id') or warera_user.get('id')
                 if warera_id:
-                    try:
-                        info = await get_fight_status(str(warera_id), session, member)
-                    except Exception:
-                        info = None
+                    info = fight_status_from_user(str(warera_id), warera_user, member)
 
             if not info:
                 info = await self._fallback_info_for_member(member)
             infos.append(info)
         return infos
 
-    async def _fetch_infos_for_military_unit(self, unit_name: str, session) -> list[dict] | None:
-        mus = await get_military_units(session)
-        if not mus:
-            return None
+    @staticmethod
+    def _is_exact_mu_match(mu: dict, unit_name: str) -> bool:
+        return (mu.get('name') or '').strip().lower() == unit_name.strip().lower()
 
-        # try exact match first, then substring
-        chosen = None
-        for mu in mus:
-            if (mu.get('name') or '').strip().lower() == unit_name.strip().lower():
-                chosen = mu
-                break
+    async def _fetch_cached_military_unit(self, unit_name: str, session) -> dict | None:
+        """The MU named exactly `unit_name`, found in the autocomplete cache and fetched fresh with mu.getById.
+
+        Returns None (so the caller lists every MU instead) when the cache is empty or older than its
+        TTL, has no exact match, the fetch fails, or the MU's current name no longer matches.
+        """
+        if not self._mu_cache.get('items') or time.time() - (self._mu_cache.get('fetched_at') or 0.0) > self._mu_ttl:
+            return None
+        cached = next((mu for mu in self._mu_cache['items'] if self._is_exact_mu_match(mu, unit_name)), None)
+        if not cached or not cached.get('_id'):
+            return None
+        mu = await get_military_unit(cached['_id'], session)
+        if not isinstance(mu, dict) or not self._is_exact_mu_match(mu, unit_name):
+            return None
+        return mu
+
+    async def _fetch_infos_for_military_unit(self, unit_name: str, session) -> list[dict] | None:
+        # an exact name (what autocomplete offers) costs one request; anything else pages through every MU
+        chosen = await self._fetch_cached_military_unit(unit_name, session)
         if chosen is None:
+            mus = await get_military_units(session)
+            if not mus:
+                return None
+
+            # try exact match first, then substring
             for mu in mus:
-                if unit_name.strip().lower() in (mu.get('name') or '').strip().lower():
+                if self._is_exact_mu_match(mu, unit_name):
                     chosen = mu
                     break
+            if chosen is None:
+                for mu in mus:
+                    if unit_name.strip().lower() in (mu.get('name') or '').strip().lower():
+                        chosen = mu
+                        break
 
         if not chosen:
             return []
 
         members = chosen.get('members') or []
         infos: list[dict] = []
+        # one batched request for every member
+        users = await get_users_info([str(m) for m in members if m], session)
         for m in members:
             user_id = m
 
             if not user_id:
                 continue
 
-            try:
-                info = await get_fight_status(str(user_id), session, None, False)
-            except Exception:
-                info = None
+            user = users.get(str(user_id))
+            info = fight_status_from_user(str(user_id), user, None, False) if user else None
 
             # if not info:
             #     info = await self._fallback_info_for_remote(str(user_id), m if isinstance(m, dict) else None)

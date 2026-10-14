@@ -130,6 +130,10 @@
                 "name": "/mu_stray",
                 "desc": "List MU strays categorised as Wrong MU, No MU, or Inactive Strays. Filter buttons on the result view switch between categories."
             },
+            "subscriptions": {
+                "name": "/subscribe contracts | /unsubscribe contracts",
+                "desc": "Get pinged in your military unit's contracts thread or channel when it wins a mercenary contract. Your Discord account must be linked to your WarEra player, and you must be in one of this server's military units. The unit is not stored: you are pinged for the contracts of whichever unit you are in when one is won, so changing unit needs no new subscription. You are not pinged while you are on an economy build or have no skill points, or cannot fight (health under 10 and no hunger left, or in debuff). Leaving the server removes your subscription. Replies are only visible to you."
+            },
             "pills": {
                 "name": "/pills military_unit",
                 "desc": "Pill status of a configured military unit (autocomplete): who is pilled, grouped by the hour they pilled, who is in debuff, grouped by the hour it ends (both with time left), and fighters not pilled. Hours are shown in the configured timezone."
@@ -194,7 +198,7 @@
             },
             "mu_contract_monitor": {
                 "name": "mu_contract_monitor — every 5 minutes",
-                "desc": "Posts an embed in a military unit's contracts thread (threadIds.contractsId) or channel when that MU wins a mercenary contract: battle, minimum damage, pay per 1k damage, total payout, estimated time left and score."
+                "desc": "Posts an embed in a military unit's contracts thread (threadIds.contractsId) or channel when that MU wins a mercenary contract: battle, minimum damage, pay per 1k damage, total payout, estimated time left and score. Pings the members subscribed with /subscribe contracts who are in that MU at that moment, are on a fight build, have health 10+ or hunger left and are not in debuff. Subscribers who left the server are unsubscribed."
             },
             "monitor_nap": {
                 "name": "monitor_nap - every 1 hour",
@@ -471,6 +475,17 @@
         "description": "Active battle orders were found against configured NAP partners.",
         "mu_fallback": "Military Unit {id}",
         "violation": "{source} has {side} orders against {opponent}.\n[View battle]({link})"
+    },
+    "subscriptions": {
+        "not_linked": "Your Discord account is not linked to a WarEra player yet. The bot links members whose server nickname matches their in-game name every 6 hours; try again later.",
+        "player_not_found": "Could not load your WarEra player. Try again later.",
+        "not_in_unit": "You are not in any military unit that gets contract posts on this server.",
+        "subscribed": "You will be pinged when your military unit wins a mercenary contract. You are in **{mu}** now, whose contracts are posted in {channel}; if you change unit, you are pinged for your new unit's contracts. You are skipped while you are on an economy build or cannot fight (health under 10 and no hunger left, or in debuff). Use `/unsubscribe contracts` to stop.",
+        "already_subscribed": "You are already subscribed to your military unit's contracts (you are in **{mu}** now).",
+        "not_subscribed": "You are not subscribed to mercenary contracts.",
+        "unsubscribed": "You will no longer be pinged for mercenary contracts.",
+        "unit_channel": "the military unit's contracts channel",
+        "failed": "Could not update your subscription. Try again later."
     },
     "mu_contracts": {
         "title": "{country} · Mercenary Auction",
