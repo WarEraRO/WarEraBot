@@ -146,6 +146,10 @@
                 "name": "/mu_order_alignment military_unit",
                 "desc": "Check whether the active battle orders of a configured military unit (autocomplete) follow Romania's country orders. Lists MU orders on the opposite side, MU orders on battles Romania did not order, Romania orders the MU has not copied, aligned orders and tournament orders, with each order's priority level and the battle's place in `/priority list`. The reply is posted in the channel; nobody is pinged."
             },
+            "mu_positions": {
+                "name": "/mu_positions military_unit [battle]",
+                "desc": "Where the members of a configured military unit (autocomplete) stand. Without `battle`: members grouped by current region, the active battles that can be fought from each region, and how many members are in position for each battle the MU or Romania ordered. With `battle` (autocomplete, MU and Romania orders first, or a battle link): who is in position for the side the MU ordered (else Romania's side), who stands where only the other side can be hit, and everyone else sorted by distance with the trip cost in stamina and oil (10 stamina per region, 2 oil per region stamina does not cover) and 🏠 when the free trip home gets them there. The reply is posted in the channel; nobody is pinged."
+            },
             "promotions": {
                 "name": "/promotions",
                 "desc": "Check newbie members for promotion eligibility. Shows Promotion Candidates, Fight Issues, Inactive, and Data Issues — filter buttons on the result view switch between categories."
@@ -405,6 +409,46 @@
             "low": "Low"
         },
         "footer": "{mu} = MU order · 🔴 High 🟡 Medium 🟢 Low · /priority # = place in the bot's priority list"
+    },
+    "mu_positions": {
+        "unknown_unit": "Unknown military unit. Pick one from the list.",
+        "invalid_battle": "Unknown battle. Pick one from the list or paste a battle link.",
+        "fetch_failed": "Could not fetch the military unit, the battle or the map. Try again later.",
+        "battle_not_active": "This battle has ended.",
+        "unknown_region": "unknown region",
+        "anywhere": "anywhere",
+        "title_map": "📍 {mu} · Where members are",
+        "title_battle": "📍 {mu} · Positions",
+        "map_summary": "👥 Members: **{members}** · 📍 Regions: **{regions}**",
+        "members_missing": "❔ Members not fetched: {count}",
+        "ordered_title": "📌 Ordered battles ({count})",
+        "ordered_line": "{battle} · for {side} {markers}\n✅ In position ({region}): **{count}**/{members}",
+        "regions_title": "🗺️ Members by region ({count})",
+        "region_line": "📍 **{region}** · {count}",
+        "battle_here": "⚔️ {battle} · for {side}",
+        "both_sides": "either side",
+        "unknown_location_title": "❔ Location unknown ({count})",
+        "footer_map": "{mu} = MU order · {country} = country order · 🏭 economy build",
+        "battle_header": "{battle} · for {side}",
+        "stand_in": "Stand in **{region}**",
+        "side_from_mu": "Side of the MU order.",
+        "side_from_country": "Side of the {country} order (the MU has no order here).",
+        "side_conflict": "⚠️ {country} ordered the other side; see /mu_order_alignment.",
+        "no_order": "No MU or {country} order on this battle: both sides are shown.",
+        "no_side_region": "The region of the ordered side is unknown: both sides are shown.",
+        "tournament_anywhere": "🏆 Tournament battles are fought from anywhere: every member is in position.",
+        "battle_counts": "✅ In position: **{in_position}** · 🔁 Other side: **{other_side}** · 🚶 Elsewhere: **{elsewhere}**",
+        "in_position_title": "✅ In position ({count})",
+        "other_side_title": "🔁 In {region}, where only the other side can be hit ({count})",
+        "attacker_region_title": "⚔️ In the attacker region, {region} ({count})",
+        "defender_region_title": "🛡️ In the defender region, {region} ({count})",
+        "elsewhere_title": "🚶 Elsewhere ({count})",
+        "elsewhere_plain": "{name} · {region}",
+        "elsewhere_line": "{name} · {region} · {distance} reg. · {cost}",
+        "cost_stamina": "⚡ {stamina}",
+        "cost_oil": "⚡ {stamina} + 🛢️ {oil} oil",
+        "free_home": "🏠 free trip home",
+        "footer_battle": "Travel: {stamina} stamina per region, {oil} oil per region stamina does not cover · 🏭 economy build"
     },
     "pills": {
         "unknown_unit": "Unknown military unit. Pick one from the list.",

@@ -146,6 +146,10 @@
                 "name": "/mu_order_alignment military_unit",
                 "desc": "Verifică dacă ordinele de luptă active ale unei unități militare configurate (cu sugestii) urmează ordinele de țară ale României. Arată ordinele MU pe tabăra opusă, ordinele MU pe bătălii fără ordin de la România, ordinele României pe care MU nu le-a copiat, ordinele aliniate și cele de turneu, cu nivelul de prioritate al fiecărui ordin și locul bătăliei în `/priority list`. Răspunsul e postat în canal; nimeni nu primește mențiune."
             },
+            "mu_positions": {
+                "name": "/mu_positions military_unit [battle]",
+                "desc": "Unde se află membrii unei unități militare configurate (cu sugestii). Fără `battle`: membrii grupați pe regiunea curentă, bătăliile active care se pot lupta din fiecare regiune și câți membri sunt în poziție pentru fiecare bătălie cu ordin de la MU sau de la România. Cu `battle` (cu sugestii, întâi ordinele MU și ale României, sau un link de bătălie): cine e în poziție pentru tabăra ordinului MU (altfel a României), cine stă unde se poate lovi doar pentru cealaltă tabără și restul, ordonați după distanță, cu costul drumului în stamina și petrol (10 stamina pe regiune, 2 petrol pe fiecare regiune neacoperită de stamina) și 🏠 când drumul gratuit acasă îi duce acolo. Răspunsul e postat în canal; nimeni nu primește mențiune."
+            },
             "promotions": {
                 "name": "/promotions",
                 "desc": "Verifică dacă membrii noi pot fi promovați. Arată Candidați la promovare, Probleme de luptă, Inactivi și Probleme de date — butoanele de filtrare comută între categorii."
@@ -406,6 +410,46 @@
             "low": "Scăzută"
         },
         "footer": "{mu} = ordin MU · 🔴 Ridicată 🟡 Medie 🟢 Scăzută · /priority # = locul în lista de priorități a botului"
+    },
+    "mu_positions": {
+        "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
+        "invalid_battle": "Bătălie necunoscută. Alege una din listă sau lipește linkul bătăliei.",
+        "fetch_failed": "Unitatea militară, bătălia sau harta nu au putut fi preluate. Încearcă din nou mai târziu.",
+        "battle_not_active": "Această bătălie s-a încheiat.",
+        "unknown_region": "regiune necunoscută",
+        "anywhere": "oriunde",
+        "title_map": "📍 {mu} · Unde sunt membrii",
+        "title_battle": "📍 {mu} · Poziții",
+        "map_summary": "👥 Membri: **{members}** · 📍 Regiuni: **{regions}**",
+        "members_missing": "❔ Membri nepreluați: {count}",
+        "ordered_title": "📌 Bătălii cu ordin ({count})",
+        "ordered_line": "{battle} · pentru {side} {markers}\n✅ În poziție ({region}): **{count}**/{members}",
+        "regions_title": "🗺️ Membri pe regiuni ({count})",
+        "region_line": "📍 **{region}** · {count}",
+        "battle_here": "⚔️ {battle} · pentru {side}",
+        "both_sides": "oricare tabără",
+        "unknown_location_title": "❔ Locație necunoscută ({count})",
+        "footer_map": "{mu} = ordin MU · {country} = ordin de țară · 🏭 build de economie",
+        "battle_header": "{battle} · pentru {side}",
+        "stand_in": "Stai în **{region}**",
+        "side_from_mu": "Tabăra ordinului MU.",
+        "side_from_country": "Tabăra ordinului {country} (MU nu are ordin aici).",
+        "side_conflict": "⚠️ {country} a dat ordin pentru cealaltă tabără; vezi /mu_order_alignment.",
+        "no_order": "Niciun ordin MU sau {country} pe această bătălie: sunt arătate ambele tabere.",
+        "no_side_region": "Regiunea taberei cu ordin e necunoscută: sunt arătate ambele tabere.",
+        "tournament_anywhere": "🏆 Bătăliile de turneu se luptă de oriunde: toți membrii sunt în poziție.",
+        "battle_counts": "✅ În poziție: **{in_position}** · 🔁 Cealaltă tabără: **{other_side}** · 🚶 În altă parte: **{elsewhere}**",
+        "in_position_title": "✅ În poziție ({count})",
+        "other_side_title": "🔁 În {region}, de unde se poate lovi doar pentru cealaltă tabără ({count})",
+        "attacker_region_title": "⚔️ În regiunea atacatorului, {region} ({count})",
+        "defender_region_title": "🛡️ În regiunea apărătorului, {region} ({count})",
+        "elsewhere_title": "🚶 În altă parte ({count})",
+        "elsewhere_plain": "{name} · {region}",
+        "elsewhere_line": "{name} · {region} · {distance} reg. · {cost}",
+        "cost_stamina": "⚡ {stamina}",
+        "cost_oil": "⚡ {stamina} + 🛢️ {oil} petrol",
+        "free_home": "🏠 drum gratuit acasă",
+        "footer_battle": "Deplasare: {stamina} stamina pe regiune, {oil} petrol pe fiecare regiune neacoperită de stamina · 🏭 build de economie"
     },
     "pills": {
         "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
@@ -864,6 +908,13 @@
         "mu_order_alignment": {
             "description": "Verifică dacă ordinele de luptă ale unei unități militare urmează ordinele de țară ale României.",
             "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
+        },
+        "mu_positions": {
+            "description": "Arată unde stau membrii unei unități militare, în general sau pentru o bătălie.",
+            "params": {
+                "military_unit": "Unitatea militară (una dintre cele configurate pe acest server)",
+                "battle": "Bătălie activă (cu sugestii sau un link); lasă gol ca să vezi unde sunt membrii"
+            }
         },
         "subscribe": {
             "description": "Primește mențiuni de la o sarcină a botului.",

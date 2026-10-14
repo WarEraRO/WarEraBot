@@ -27,6 +27,7 @@ _COMMAND_IDS: List[str] = [
     "pills",
     "fight_wealth",
     "mu_order_alignment",
+    "mu_positions",
     "promotions",
     "top_user_weekly_damages",
     "top_user_weekly_donations",
