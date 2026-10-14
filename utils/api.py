@@ -196,6 +196,22 @@ async def get_countries_by_ids(country_ids, session):
     countries = await _get_batch(session, 'country.getCountryById', [{'countryId': country_id} for country_id in ids])
     return {country_id: country for country_id, country in zip(ids, countries) if country}
 
+async def get_battle_orders(battle_sides, session):
+    """Batched battleOrder.getByBattle: {(battleId, side): [order]} for the (battleId, side) pairs that resolved.
+
+    Each order carries `country` or `mu`, `priority` (low/medium/high) and `rank`/`text`; rank and text
+    are filled in only for citizens of the ordering country or members of the ordering MU [spec].
+    """
+    pairs = list(dict.fromkeys(battle_sides))
+    orders = await _get_batch(session, 'battleOrder.getByBattle', [{'battleId': battle_id, 'side': side} for battle_id, side in pairs])
+    return {pair: items for pair, items in zip(pairs, orders) if isinstance(items, list)}
+
+async def get_regions_by_ids(region_ids, session):
+    """Batched region.getById: {regionId: region} for the ids that resolved."""
+    ids = list(dict.fromkeys(region_ids))
+    regions = await _get_batch(session, 'region.getById', [{'regionId': region_id} for region_id in ids])
+    return {region_id: region for region_id, region in zip(ids, regions) if region}
+
 async def get_country_governments(country_ids, session):
     """Batched government.getByCountryId: {countryId: government} for the ids that resolved."""
     ids = list(dict.fromkeys(country_ids))

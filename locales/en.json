@@ -142,6 +142,10 @@
                 "name": "/fight_wealth military_unit",
                 "desc": "Fight wealth of every member of a configured military unit (autocomplete): money, items, equipment and weapons, companies excluded. Members are ranked richest first and grouped by tier: GOLD ≥15K, SILVER 10K–15K, BRONZE 5K–10K, IRON <5K. The daily report to MU leaders shows the tier counts and the richest names of each tier."
             },
+            "mu_order_alignment": {
+                "name": "/mu_order_alignment military_unit",
+                "desc": "Check whether the active battle orders of a configured military unit (autocomplete) follow Romania's country orders. Lists MU orders on the opposite side, MU orders on battles Romania did not order, Romania orders the MU has not copied, aligned orders and tournament orders, with each order's priority level and the battle's place in `/priority list`. The reply is posted in the channel; nobody is pinged."
+            },
             "promotions": {
                 "name": "/promotions",
                 "desc": "Check newbie members for promotion eligibility. Shows Promotion Candidates, Fight Issues, Inactive, and Data Issues — filter buttons on the result view switch between categories."
@@ -376,6 +380,31 @@
             "bronze": "BRONZE",
             "iron": "IRON"
         }
+    },
+    "mu_alignment": {
+        "unknown_unit": "Unknown military unit. Pick one from the list.",
+        "fetch_failed": "Could not fetch the active battles or the country list. Try again later.",
+        "title": "🧭 {mu} · Order alignment",
+        "verdict_issues": "⚠️ MU orders not following {country}: **{count}** of {total}",
+        "verdict_aligned": "✅ Every MU order follows {country}.",
+        "verdict_tournament_only": "🏆 The MU only has tournament orders.",
+        "verdict_no_mu_orders": "📭 The MU has no active order.",
+        "verdict_none": "No active orders from {country} or the MU.",
+        "counts": "{country} orders: **{country_count}** · 🎖️ MU orders: **{mu_count}**",
+        "opposite_title": "❌ Opposite side ({count})",
+        "not_ordered_title": "⚠️ Not ordered by {country} ({count})",
+        "missing_title": "📭 {country} orders without an MU order ({count})",
+        "aligned_title": "✅ Aligned ({count})",
+        "tournament_title": "🏆 Tournament ({count})",
+        "for_side": "for {side}",
+        "ordered_for": "{who} for {side}",
+        "priority_number": "/priority #{number}",
+        "priority": {
+            "high": "High",
+            "medium": "Medium",
+            "low": "Low"
+        },
+        "footer": "{mu} = MU order · 🔴 High 🟡 Medium 🟢 Low · /priority # = place in the bot's priority list"
     },
     "pills": {
         "unknown_unit": "Unknown military unit. Pick one from the list.",

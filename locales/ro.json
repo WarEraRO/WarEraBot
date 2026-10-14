@@ -142,6 +142,10 @@
                 "name": "/fight_wealth military_unit",
                 "desc": "Averea de luptă a fiecărui membru dintr-o unitate militară configurată (cu sugestii): bani, iteme, echipament și arme, fără companii. Membrii sunt ordonați de la cel mai bogat și grupați pe niveluri: AUR ≥15K, ARGINT 10K–15K, BRONZ 5K–10K, FIER <5K. Raportul zilnic pentru liderii MU arată câți membri are fiecare nivel și cele mai bogate nume din fiecare."
             },
+            "mu_order_alignment": {
+                "name": "/mu_order_alignment military_unit",
+                "desc": "Verifică dacă ordinele de luptă active ale unei unități militare configurate (cu sugestii) urmează ordinele de țară ale României. Arată ordinele MU pe tabăra opusă, ordinele MU pe bătălii fără ordin de la România, ordinele României pe care MU nu le-a copiat, ordinele aliniate și cele de turneu, cu nivelul de prioritate al fiecărui ordin și locul bătăliei în `/priority list`. Răspunsul e postat în canal; nimeni nu primește mențiune."
+            },
             "promotions": {
                 "name": "/promotions",
                 "desc": "Verifică dacă membrii noi pot fi promovați. Arată Candidați la promovare, Probleme de luptă, Inactivi și Probleme de date — butoanele de filtrare comută între categorii."
@@ -377,6 +381,31 @@
             "bronze": "BRONZ",
             "iron": "FIER"
         }
+    },
+    "mu_alignment": {
+        "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
+        "fetch_failed": "Bătăliile active sau lista de țări nu au putut fi preluate. Încearcă din nou mai târziu.",
+        "title": "🧭 {mu} · Aliniere ordine",
+        "verdict_issues": "⚠️ Ordine MU care nu urmează {country}: **{count}** din {total}",
+        "verdict_aligned": "✅ Toate ordinele MU urmează {country}.",
+        "verdict_tournament_only": "🏆 MU are doar ordine de turneu.",
+        "verdict_no_mu_orders": "📭 MU nu are niciun ordin activ.",
+        "verdict_none": "Niciun ordin activ de la {country} sau de la MU.",
+        "counts": "Ordine {country}: **{country_count}** · 🎖️ Ordine MU: **{mu_count}**",
+        "opposite_title": "❌ Tabăra opusă ({count})",
+        "not_ordered_title": "⚠️ Fără ordin de la {country} ({count})",
+        "missing_title": "📭 Ordine {country} fără ordin MU ({count})",
+        "aligned_title": "✅ Aliniate ({count})",
+        "tournament_title": "🏆 Turneu ({count})",
+        "for_side": "pentru {side}",
+        "ordered_for": "{who} pentru {side}",
+        "priority_number": "/priority #{number}",
+        "priority": {
+            "high": "Ridicată",
+            "medium": "Medie",
+            "low": "Scăzută"
+        },
+        "footer": "{mu} = ordin MU · 🔴 Ridicată 🟡 Medie 🟢 Scăzută · /priority # = locul în lista de priorități a botului"
     },
     "pills": {
         "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
@@ -830,6 +859,10 @@
         },
         "fight_wealth": {
             "description": "Arată averea de luptă (toată averea fără companii) și nivelul membrilor unei unități militare.",
+            "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
+        },
+        "mu_order_alignment": {
+            "description": "Verifică dacă ordinele de luptă ale unei unități militare urmează ordinele de țară ale României.",
             "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
         },
         "subscribe": {
