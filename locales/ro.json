@@ -131,8 +131,8 @@
                 "desc": "Listează jucătorii rătăciți din MU, împărțiți în MU greșit, Fără MU și Rătăciți inactivi. Butoanele de filtrare comută între categorii."
             },
             "subscriptions": {
-                "name": "/subscribe contracts [military_unit] | /unsubscribe contracts [military_unit]",
-                "desc": "Primești mențiune în firul sau canalul de contracte al unității tale militare când aceasta câștigă un contract de mercenari. Te poți abona doar la MU-ul în care ești; fără military_unit se folosește MU-ul tău actual. Nu primești mențiune cât ai build de economie sau nu poți lupta (viață sub 10 și fără foame, sau în debuff), ori după ce ai părăsit MU-ul. Dezabonarea fără military_unit elimină toate abonamentele tale la contracte. Răspunsurile sunt vizibile doar pentru tine."
+                "name": "/subscribe contracts | /unsubscribe contracts",
+                "desc": "Primești mențiune în firul sau canalul de contracte al unității tale militare când aceasta câștigă un contract de mercenari. Contul tău de Discord trebuie să fie legat de jucătorul tău WarEra și trebuie să fii într-una dintre unitățile militare ale acestui server. Unitatea nu se salvează: primești mențiune pentru contractele unității în care ești când se câștigă unul, deci la schimbarea unității nu trebuie să te abonezi din nou. Nu primești mențiune cât ai build de economie sau nu ai puncte de skill, ori nu poți lupta (viață sub 10 și fără foame, sau în debuff). Dacă părăsești serverul, abonamentul se șterge. Răspunsurile sunt vizibile doar pentru tine."
             },
             "pills": {
                 "name": "/pills military_unit",
@@ -198,7 +198,7 @@
             },
             "mu_contract_monitor": {
                 "name": "mu_contract_monitor — la fiecare 5 minute",
-                "desc": "Postează un embed în firul de contracte al unității militare (threadIds.contractsId) sau în canalul ei când MU-ul câștigă un contract de mercenari: bătălia, damage-ul minim, plata la 1k damage, plata totală, timpul estimat rămas și scorul. Menționează membrii abonați cu /subscribe contracts care sunt încă în MU, nu au build de economie, au viață 10+ sau foame rămasă și nu sunt în debuff."
+                "desc": "Postează un embed în firul de contracte al unității militare (threadIds.contractsId) sau în canalul ei când MU-ul câștigă un contract de mercenari: bătălia, damage-ul minim, plata la 1k damage, plata totală, timpul estimat rămas și scorul. Menționează membrii abonați cu /subscribe contracts care sunt în acel MU în acel moment, au build de luptă, au viață 10+ sau foame rămasă și nu sunt în debuff. Abonații care au părăsit serverul sunt dezabonați."
             },
             "monitor_nap": {
                 "name": "monitor_nap - la fiecare oră",
@@ -480,15 +480,13 @@
         "violation": "{source} are ordine ({side}) contra {opponent}.\n[Vezi bătălia]({link})"
     },
     "subscriptions": {
-        "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
-        "player_not_found": "Jucătorul tău WarEra nu a fost găsit. Porecla de pe server trebuie să fie identică cu numele din joc.",
+        "not_linked": "Contul tău de Discord nu este încă legat de un jucător WarEra. Botul leagă la fiecare 6 ore membrii a căror poreclă de pe server este identică cu numele din joc; încearcă din nou mai târziu.",
+        "player_not_found": "Jucătorul tău WarEra nu a putut fi încărcat. Încearcă din nou mai târziu.",
         "not_in_unit": "Nu ești în nicio unitate militară pentru care se postează contracte pe acest server.",
-        "not_member": "Nu ești membru în **{mu}**. Te poți abona doar la contractele unității tale militare.",
-        "subscribed": "Vei primi mențiune în {channel} când **{mu}** câștigă un contract de mercenari. Ești sărit cât ai build de economie sau nu poți lupta (viață sub 10 și fără foame, sau în debuff). Folosește `/unsubscribe contracts` ca să te dezabonezi.",
-        "already_subscribed": "Ești deja abonat la contractele MU-ului **{mu}**.",
-        "not_subscribed": "Nu ești abonat la contractele MU-ului **{mu}**.",
-        "no_subscriptions": "Nu ai niciun abonament la contracte.",
-        "unsubscribed": "Nu mai primești mențiuni pentru contractele: {mus}.",
+        "subscribed": "Vei primi mențiune când unitatea ta militară câștigă un contract de mercenari. Acum ești în **{mu}**, ale cărei contracte se postează în {channel}; dacă schimbi unitatea, primești mențiune pentru contractele noii unități. Ești sărit cât ai build de economie sau nu poți lupta (viață sub 10 și fără foame, sau în debuff). Folosește `/unsubscribe contracts` ca să te dezabonezi.",
+        "already_subscribed": "Ești deja abonat la contractele unității tale militare (acum ești în **{mu}**).",
+        "not_subscribed": "Nu ești abonat la contractele de mercenari.",
+        "unsubscribed": "Nu mai primești mențiuni pentru contractele de mercenari.",
         "unit_channel": "canalul de contracte al unității militare",
         "failed": "Abonamentul nu a putut fi actualizat. Încearcă din nou mai târziu."
     },
@@ -806,15 +804,13 @@
         "subscribe": {
             "description": "Primește mențiuni de la o sarcină a botului.",
             "contracts": {
-                "description": "Primește mențiune când unitatea ta militară câștigă un contract de mercenari.",
-                "params": {"military_unit": "Unitatea ta militară (implicit cea în care ești)"}
+                "description": "Primește mențiune când unitatea ta militară câștigă un contract de mercenari."
             }
         },
         "unsubscribe": {
             "description": "Nu mai primi mențiuni de la o sarcină a botului.",
             "contracts": {
-                "description": "Nu mai primi mențiune când o unitate militară câștigă un contract de mercenari.",
-                "params": {"military_unit": "Unitatea militară de la care te dezabonezi (implicit toate)"}
+                "description": "Nu mai primi mențiune când unitatea ta militară câștigă un contract de mercenari."
             }
         },
         "inactive_players": {"description": "Listează jucătorii inactivi de mai mult de 3 zile."},
