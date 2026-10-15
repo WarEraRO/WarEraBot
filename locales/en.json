@@ -134,9 +134,33 @@
                 "name": "/subscribe contracts | /unsubscribe contracts",
                 "desc": "Get pinged in your military unit's contracts thread or channel when it wins a mercenary contract. Your Discord account must be linked to your WarEra player, and you must be in one of this server's military units. The unit is not stored: you are pinged for the contracts of whichever unit you are in when one is won, so changing unit needs no new subscription. You are not pinged while you are on an economy build or have no skill points, or cannot fight (health under 10 and no hunger left, or in debuff). Leaving the server removes your subscription. Replies are only visible to you."
             },
+            "subscriptions_loot": {
+                "name": "/subscribe loot | /unsubscribe loot",
+                "desc": "Get a DM in the last ~10 minutes of each round of a battle you hit, with the round's and the battle's loot pools as `/loot_targets` shows them: your rank, damage and item, what the next rank and a better rarity need, and who below could take your rarity. It also estimates the damage your current gear, battle bonus, health and hunger can still deal, and the best item that damage reaches. Only battles where you hold an item or could reach one are sent. You get nothing while you are on an economy build or have no skill points, or cannot fight (health under 10 and no hunger left, or in debuff). Your Discord account must be linked to your WarEra player, and you must accept DMs from this server's members. Leaving the server removes your subscription. Replies are only visible to you."
+            },
             "pills": {
                 "name": "/pills military_unit",
                 "desc": "Pill status of a configured military unit (autocomplete): who is pilled, grouped by the hour they pilled, who is in debuff, grouped by the hour it ends (both with time left), and fighters not pilled. Hours are shown in the configured timezone."
+            },
+            "fight_wealth": {
+                "name": "/fight_wealth military_unit",
+                "desc": "Fight wealth of every member of a configured military unit (autocomplete): money, items, equipment and weapons, companies excluded. Members are ranked richest first and grouped by tier: GOLD ≥15K, SILVER 10K–15K, BRONZE 5K–10K, IRON <5K. The daily report to MU leaders shows the tier counts and the richest names of each tier."
+            },
+            "mu_order_alignment": {
+                "name": "/mu_order_alignment military_unit",
+                "desc": "Check whether the active battle orders of a configured military unit (autocomplete) follow Romania's country orders. Lists MU orders on the opposite side, MU orders on battles Romania did not order, Romania orders the MU has not copied, aligned orders and tournament orders, with each order's priority level and the battle's place in `/priority list`. The reply is posted in the channel; nobody is pinged."
+            },
+            "mu_positions": {
+                "name": "/mu_positions military_unit [battle]",
+                "desc": "Where the members of a configured military unit (autocomplete) stand. Without `battle`: members grouped by current region, the active battles that can be fought from each region, and how many members are in position for each battle the MU or Romania ordered. With `battle` (autocomplete, MU and Romania orders first, or a battle link): who is in position for the side the MU ordered (else Romania's side), who stands where only the other side can be hit, and everyone else sorted by distance with the trip cost in stamina and oil (10 stamina per region, 2 oil per region stamina does not cover) and 🏠 when the free trip home gets them there. The reply is posted in the channel; nobody is pinged."
+            },
+            "mu_readiness": {
+                "name": "/mu_readiness military_unit",
+                "desc": "Commander checklist for a configured military unit (autocomplete): headquarters status, whether MU orders follow Romania's, fighters in position for each MU order, the latest won contract on an active battle, pills, health and hunger, MU help (and buffed fighters who can still ask), gear without a weapon or at or below 20% durability, the MU tournament while one is open (registration, rarity cap) and leaders online in the last 24h. ⚠️ counts only objective problems. Oil and paper stock and contract progress are not visible to the bot. The reply is posted in the channel; nobody is pinged."
+            },
+            "loot_targets": {
+                "name": "/loot_targets battle [military_unit]",
+                "desc": "Live preview of a battle's loot pools (autocomplete, or a link): the current round's pool and the whole battle's pool, shown together because a player competes for both at once. Pool items go by rank in the combined damage ranking of both sides, the most valuable to rank 1. For every member of the configured military units (or of `military_unit`) who hit the battle, in each pool: rank, damage and the item they would get now, the damage to pass the next rank, and the damage to reach the closest rank holding a better rarity (🤝 when a teammate holds it). It also shows how many players below would have to pass them before they drop to a lower rarity, with the damage each one needs, and the damage needed for each rarity. A snapshot: the pool grows and ranks move. The reply is posted in the channel; nobody is pinged."
             },
             "promotions": {
                 "name": "/promotions",
@@ -199,6 +223,10 @@
             "mu_contract_monitor": {
                 "name": "mu_contract_monitor — every 5 minutes",
                 "desc": "Posts an embed in a military unit's contracts thread (threadIds.contractsId) or channel when that MU wins a mercenary contract: battle, minimum damage, pay per 1k damage, total payout, estimated time left and score. Pings the members subscribed with /subscribe contracts who are in that MU at that moment, are on a fight build, have health 10+ or hunger left and are not in debuff. Subscribers who left the server are unsubscribed."
+            },
+            "loot_alerts": {
+                "name": "loot_alerts — every 2 minutes",
+                "desc": "Runs only while someone is subscribed with /subscribe loot. When an active battle's round can end within 10 minutes (if the leading side wins every tick), DMs each subscriber who hit that battle its round and battle loot pools and the damage they can still deal, when they hold a pool item or could reach one. Subscribers on an economy build, with health under 10 and no hunger left, or in debuff get nothing. Each subscriber is checked once per round; rounds already ending when the bot starts are skipped. Subscribers who left the server are unsubscribed."
             },
             "monitor_nap": {
                 "name": "monitor_nap - every 1 hour",
@@ -355,6 +383,175 @@
         "low_level_fighter": "Level <= 15 in fight mode",
         "error": "Exception"
     },
+    "fight_wealth": {
+        "unknown_unit": "Unknown military unit. Pick one from the list.",
+        "members_unavailable": "Could not fetch the military unit members. Try again later.",
+        "title": "💰 Fight wealth · {mu}",
+        "summary": "Total **{total}** · average **{average}** · median **{median}**",
+        "no_data": "No member wealth could be fetched.",
+        "footer": "Fight wealth = 💵 money + 📦 items + 🛡️ equipment + 🔫 weapons, companies excluded · 🏭 economy build",
+        "footer_missing": {
+            "one": "{count} member could not be fetched",
+            "other": "{count} members could not be fetched"
+        },
+        "tier": {
+            "gold": "GOLD",
+            "silver": "SILVER",
+            "bronze": "BRONZE",
+            "iron": "IRON"
+        }
+    },
+    "mu_alignment": {
+        "unknown_unit": "Unknown military unit. Pick one from the list.",
+        "fetch_failed": "Could not fetch the active battles or the country list. Try again later.",
+        "title": "🧭 {mu} · Order alignment",
+        "verdict_issues": "⚠️ MU orders not following {country}: **{count}** of {total}",
+        "verdict_aligned": "✅ Every MU order follows {country}.",
+        "verdict_tournament_only": "🏆 The MU only has tournament orders.",
+        "verdict_no_mu_orders": "📭 The MU has no active order.",
+        "verdict_none": "No active orders from {country} or the MU.",
+        "counts": "{country} orders: **{country_count}** · 🎖️ MU orders: **{mu_count}**",
+        "opposite_title": "❌ Opposite side ({count})",
+        "not_ordered_title": "⚠️ Not ordered by {country} ({count})",
+        "missing_title": "📭 {country} orders without an MU order ({count})",
+        "aligned_title": "✅ Aligned ({count})",
+        "tournament_title": "🏆 Tournament ({count})",
+        "for_side": "for {side}",
+        "ordered_for": "{who} for {side}",
+        "priority_number": "/priority #{number}",
+        "priority": {
+            "high": "High",
+            "medium": "Medium",
+            "low": "Low"
+        },
+        "footer": "{mu} = MU order · 🔴 High 🟡 Medium 🟢 Low · /priority # = place in the bot's priority list"
+    },
+    "mu_positions": {
+        "unknown_unit": "Unknown military unit. Pick one from the list.",
+        "invalid_battle": "Unknown battle. Pick one from the list or paste a battle link.",
+        "fetch_failed": "Could not fetch the military unit, the battle or the map. Try again later.",
+        "battle_not_active": "This battle has ended.",
+        "unknown_region": "unknown region",
+        "anywhere": "anywhere",
+        "title_map": "📍 {mu} · Where members are",
+        "title_battle": "📍 {mu} · Positions",
+        "map_summary": "👥 Members: **{members}** · 📍 Regions: **{regions}**",
+        "members_missing": "❔ Members not fetched: {count}",
+        "ordered_title": "📌 Ordered battles ({count})",
+        "ordered_line": "{battle} · for {side} {markers}\n✅ In position ({region}): **{count}**/{members}",
+        "regions_title": "🗺️ Members by region ({count})",
+        "region_line": "📍 **{region}** · {count}",
+        "battle_here": "⚔️ {battle} · for {side}",
+        "both_sides": "either side",
+        "unknown_location_title": "❔ Location unknown ({count})",
+        "footer_map": "{mu} = MU order · {country} = country order · 🏭 economy build",
+        "battle_header": "{battle} · for {side}",
+        "stand_in": "Stand in **{region}**",
+        "side_from_mu": "Side of the MU order.",
+        "side_from_country": "Side of the {country} order (the MU has no order here).",
+        "side_conflict": "⚠️ {country} ordered the other side; see /mu_order_alignment.",
+        "no_order": "No MU or {country} order on this battle: both sides are shown.",
+        "no_side_region": "The region of the ordered side is unknown: both sides are shown.",
+        "tournament_anywhere": "🏆 Tournament battles are fought from anywhere: every member is in position.",
+        "battle_counts": "✅ In position: **{in_position}** · 🔁 Other side: **{other_side}** · 🚶 Elsewhere: **{elsewhere}**",
+        "in_position_title": "✅ In position ({count})",
+        "other_side_title": "🔁 In {region}, where only the other side can be hit ({count})",
+        "attacker_region_title": "⚔️ In the attacker region, {region} ({count})",
+        "defender_region_title": "🛡️ In the defender region, {region} ({count})",
+        "elsewhere_title": "🚶 Elsewhere ({count})",
+        "elsewhere_plain": "{name} · {region}",
+        "elsewhere_line": "{name} · {region} · {distance} reg. · {cost}",
+        "cost_stamina": "⚡ {stamina}",
+        "cost_oil": "⚡ {stamina} + 🛢️ {oil} oil",
+        "free_home": "🏠 free trip home",
+        "footer_battle": "Travel: {stamina} stamina per region, {oil} oil per region stamina does not cover · 🏭 economy build"
+    },
+    "mu_readiness": {
+        "unknown_unit": "Unknown military unit. Pick one from the list.",
+        "fetch_failed": "Could not fetch the military unit, the active battles or the country list. Try again later.",
+        "title": "🛡️ {mu} · Readiness",
+        "verdict_issues": "⚠️ To fix: **{count}**",
+        "verdict_ok": "✅ Nothing to fix",
+        "roster": "👥 Members: **{members}**/{capacity} · ⚔️ Fighters: **{fighters}** · 🏭 Economy: **{economy}**",
+        "footer": "Fighters = fight builds · ⚠️ counts orders not following Romania, an inactive HQ with orders, missing weapons, gear at or below {percent}% durability and tournament problems · MU oil and paper stock and contract progress are not visible to the bot",
+        "hq_title": "🏢 Headquarters",
+        "hq_none": "No headquarters",
+        "hq_active": "✅ Level {level} active",
+        "hq_activating": "⏳ Level {level} activating · active at {time}",
+        "hq_disabled": "Level {level} disabled",
+        "hq_details": " · +{bonus}% damage · 🛢️ {oil}/h ({oil_day}/day)",
+        "orders_title": "📌 Orders",
+        "orders_ok": "✅ MU orders following {country}: **{count}**",
+        "orders_wrong": "⚠️ MU orders not following {country}: **{count}** of {total} · see /mu_order_alignment",
+        "orders_none": "No MU order · {country} orders: **{count}**",
+        "orders_missing": "📭 {country} orders without an MU order: **{count}**",
+        "positions_title": "📍 Fighters in position",
+        "position": "📍 **{count}**/{fighters} in {region}",
+        "position_anywhere": "📍 Fought from anywhere: **{count}** fighters",
+        "contract_title": "📜 Latest contract",
+        "contract_none": "No won contract on an active battle",
+        "contract_terms": "Min. **{minimum}** dmg · {per_k} per 1k · payout {payout}",
+        "contract_won": "Won {ago} ago",
+        "pills_title": "💊 Pills",
+        "pills": "🔥 Buffed: **{buffed}** · 🟢 Can pill: **{ready}** · ⏳ Debuff: **{debuff}**",
+        "next_pill": "First pill ready: {time}",
+        "stats_title": "❤️ Health & hunger",
+        "stats": "Can fight now: **{can_fight}**/{fighters} · 🔋 Full bars (regen lost): **{full}**",
+        "help_title": "🤝 MU help",
+        "help": "Can ask for help now: **{count}**/{fighters}",
+        "help_buffed": "💊 Buffed and can ask now: {names}",
+        "gear_title": "🛡️ Gear",
+        "gear_ok": "✅ All {fighters} fighters have a weapon, nothing nearly broken",
+        "no_fighters": "No member on a fight build",
+        "gear_no_weapon": "⚠️ No weapon equipped: {names}",
+        "gear_low": "⚠️ At or below {percent}% durability: {names}",
+        "slot": {
+            "weapon": "weapon",
+            "helmet": "helmet",
+            "chest": "chest",
+            "pants": "pants",
+            "boots": "boots",
+            "gloves": "gloves"
+        },
+        "tournament_title": "🏆 MU tournament",
+        "tournament_registered": "✅ Registered",
+        "tournament_not_registered": "⚠️ Not registered (owner or commanders, before Friday 18:00 UTC)",
+        "tournament_start": "starts {time}",
+        "tournament_rules": "Max rarity **{rarity}** · skill bonus **{skill}**",
+        "tournament_over_cap": "⚠️ Above the rarity cap (hits are refused): {names}",
+        "leaders_title": "🎖️ Leaders",
+        "leaders": "Owner and commanders online in the last 24h: **{online}**/{total}"
+    },
+    "loot_targets": {
+        "invalid_battle": "Unknown battle. Pick one from the list or paste a battle link.",
+        "unknown_unit": "Unknown military unit. Pick one from the list.",
+        "fetch_failed": "Could not fetch the battle, the military units or the ranking. Try again later.",
+        "title": "🎁 Loot targets",
+        "pool_round": "🔄 Round {number}",
+        "pool_battle": "🏟️ Battle",
+        "pool_summary_complete": "{pool} · ranked: **{ranked}** · with an item now: **{with_item}**",
+        "pool_summary_partial": "{pool} · top **{ranked}** read · with an item: **{with_item}**",
+        "battle_ended": "🏁 The battle has ended: this is the final distribution.",
+        "thresholds": "Damage for at least:",
+        "pool_line": "{pool} · `#{rank}` · {damage} · {item}",
+        "pool_missing": "{pool} · no damage in this pool",
+        "pool_beyond": "{pool} · below the part of the ranking read",
+        "top": "🥇 top of the ranking",
+        "next_rank": "#{rank} +{damage}",
+        "better": "{item} at #{rank} +{damage}",
+        "enter_pool": "enter the pool: {item} at #{rank} +{damage}",
+        "best_rarity": "best rarity already",
+        "fall": {
+            "one": "⬇️ {item} if {count} player below passes you: {damages}",
+            "other": "⬇️ {item} if {count} players below pass you: {damages}"
+        },
+        "fall_safe": "⬇️ nobody ranked below can take your rarity",
+        "no_item": "no item",
+        "unranked": "Hit the battle but not found in the rankings read: {count}",
+        "mu_title": "🎖️ {mu} ({count})",
+        "no_members": "No listed member has hit this battle.",
+        "footer": "Live pool preview from the combined damage ranking (both sides), rank 1 gets the most valuable item · ⬆️ +damage passes that rank if it stays put · ⬇️ the item you drop to, and what each player below needs to pass you · the pool grows and ranks move · {teammate} a teammate holds it"
+    },
     "pills": {
         "unknown_unit": "Unknown military unit. Pick one from the list.",
         "members_unavailable": "Could not fetch the military unit members. Try again later.",
@@ -485,7 +682,30 @@
         "not_subscribed": "You are not subscribed to mercenary contracts.",
         "unsubscribed": "You will no longer be pinged for mercenary contracts.",
         "unit_channel": "the military unit's contracts channel",
+        "loot_subscribed": "You will get a DM in the last ~10 minutes of each round of a battle you hit, with the round's and the battle's loot pools: your rank, the item you would get, what a better one needs and the damage your current gear, battle bonus, health and hunger can still deal. Only battles where you hold an item or could reach one are sent. You are skipped while you are on an economy build or cannot fight (health under 10 and no hunger left, or in debuff). Accept DMs from this server's members to receive them. Use `/unsubscribe loot` to stop.",
+        "loot_already_subscribed": "You are already subscribed to loot alerts.",
+        "loot_not_subscribed": "You are not subscribed to loot alerts.",
+        "loot_unsubscribed": "You will no longer get loot alerts.",
         "failed": "Could not update your subscription. Try again later."
+    },
+    "loot_alerts": {
+        "title": "🎁 Loot: round ending soon",
+        "round_ending": "⏳ {pool} can end in {eta} (if the leading side wins every tick)",
+        "battle_ending": "🏁 Winning this round also wins the battle for the side ahead: the battle pool goes out with it",
+        "side_line": "⚔️ Estimate for {side} · bonus {bonus}% ({details})",
+        "side_unknown": "an unknown side",
+        "bonus": {
+            "patriotic": "patriotic",
+            "country_order": "country order",
+            "mu_order": "MU order",
+            "headquarters": "MU HQ"
+        },
+        "bonus_none": "none seen",
+        "damage_line": "💥 ≈{per_hit}/hit · health now ≈{now} ({hits_now} hits) · with food up to ≈{food} ({hits_food} hits)",
+        "reach": "🎯 Within your estimated damage: {item} at #{rank} +{damage}",
+        "reach_upper_bound": "🎯 Within your estimated damage: {item} at #{rank}, at most +{damage}",
+        "no_reach": "🎯 No better rarity within your estimated damage",
+        "footer": "Live pool snapshot: ranks move and a contested round lasts longer · the bonus counts patriotic, orders and MU HQ only (alliance, pacts, enemy, buildings and maluses are not visible) · food counted as the best food · /unsubscribe loot to stop"
     },
     "mu_contracts": {
         "title": "{country} · Mercenary Auction",
@@ -542,7 +762,11 @@
         "tip_shared_window": "{needed}/{total} fighters can pill by {hour}:00 {tz}; agree on a shared pill time from then.",
         "tip_spread": "Today's pills were spread over {hours} different hours; a shared window hits harder.",
         "tip_to_economy": "{count} member(s) reset to economy; they can't reset back to fight before {date}.",
-        "tip_no_help": "{count} fighter(s) asked for no MU help today; that's free health, best used while pilled."
+        "tip_no_help": "{count} fighter(s) asked for no MU help today; that's free health, best used while pilled.",
+        "tip_poor_fighters": "{count} fighter(s) are {tier} (under {threshold} fight wealth); check they can still afford pills, ammo and food (`/fight_wealth`).",
+        "wealth_title": "💰 Fight wealth · without companies",
+        "wealth_value": "Total **{total}** · median **{median}** · full list: `/fight_wealth`",
+        "wealth_unknown": "⚠️ {count} member(s) without wealth data"
     },
     "mu_weekly": {
         "author": "📊 {mu} · Weekly Report",

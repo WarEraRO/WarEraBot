@@ -14,6 +14,8 @@ class BountyMonitorJob(commands.Cog):
         # track displayed bounties: key -> last seen bountyEffectiveAt
         # key format: "{battle_id}:{side}" where side is 'attacker' or 'defender'
         self.displayed_bounties: dict = {}
+        # bounties active at the first successful run after a restart are recorded without posting
+        self._seeded = False
         try:
             init_db()
         except Exception:
@@ -25,9 +27,14 @@ class BountyMonitorJob(commands.Cog):
     
     @tasks.loop(minutes=BOUNTY_MONITOR_INTERVAL_MINUTES)
     async def bounty_monitor(self):
-        """Checks active battles for bounties that are upcoming or currently active
-        (moneyPool != 0 and bountyEffectiveAt present). Sends a summary embed
-        to the public channel when any are found.
+        """Post the active battles' new or changed bounties to the bounties channel.
+
+        A side counts when its moneyPool is above 0, it has a bountyEffectiveAt and it pays at
+        least 0.1 per 1k damage. Each such side gets one plain-text message, sent again only
+        when its bountyEffectiveAt changes.
+
+        The first run that fetches the battles after a restart only records the
+        current bounties, so bounties posted before the restart are not posted again.
         """
         guild = self.bot.get_guild(config['guild'])
         if guild is None:
@@ -81,6 +88,16 @@ class BountyMonitorJob(commands.Cog):
                     'attacker_bounty_at': atk_bounty_at,
                     'defender_bounty_at': def_bounty_at,
                 })
+
+        if not self._seeded:
+            # same keys and values as the posting loop below records
+            for entry in battles_with_bounty:
+                bid = entry['id'] or 'unknown'
+                for side in ('attacker', 'defender'):
+                    if entry[f'{side}_pool'] > 0 and entry[f'{side}_bounty_at']:
+                        self.displayed_bounties[f"{bid}:{side}"] = entry[f'{side}_bounty_at']
+            self._seeded = True
+            return
 
         if not battles_with_bounty:
             return

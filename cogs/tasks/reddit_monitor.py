@@ -37,6 +37,8 @@ class RedditMonitorJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.notified_posts: dict[str, float] = {}
+        # posts fetched by the first successful run after a restart are recorded without posting
+        self._seeded = False
         self._session: aiohttp.ClientSession | None = None
         self.reddit_monitor.start()
 
@@ -59,13 +61,28 @@ class RedditMonitorJob(commands.Cog):
 
     @tasks.loop(minutes=REDDIT_CHECK_INTERVAL_MINUTES)
     async def reddit_monitor(self):
-        """Post newly discovered r/RomaniaWarEra submissions to reddit."""
+        """Post newly discovered r/RomaniaWarEra submissions to reddit.
+
+        The first successful fetch after a restart only records the recent posts, so posts
+        announced before the restart are not announced (and the social role not pinged) again.
+        """
         now = datetime.now(timezone.utc)
         cutoff = now - POST_MAX_AGE
         self._prune_notified_posts(cutoff)
 
         posts = await self._fetch_recent_posts()
         if not posts:
+            return
+
+        if not self._seeded:
+            for post in posts:
+                post_id = str(post.get("id") or "")
+                created_utc = post.get("created_utc")
+                if post_id and isinstance(created_utc, (int, float)) and created_utc >= cutoff.timestamp():
+                    self.notified_posts[post_id] = float(created_utc)
+            self._trim_notified_posts()
+            self._seeded = True
+            logger.info("Reddit monitor seeded with %d posts", len(self.notified_posts))
             return
 
         guild = self.bot.get_guild(config["guild"])

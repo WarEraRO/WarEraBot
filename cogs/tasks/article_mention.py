@@ -31,6 +31,8 @@ class ArticleMentionJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.checked_article_ids: set[str] = set()
+        # articles fetched by the first successful run after a restart are marked checked without posting
+        self._seeded = False
         self.article_mention.start()
 
     def cog_unload(self):
@@ -38,11 +40,23 @@ class ArticleMentionJob(commands.Cog):
 
     @tasks.loop(minutes=ARTICLE_CHECK_INTERVAL_MINUTES)
     async def article_mention(self):
-        """Post newly discovered articles that mention Romania."""
+        """Post newly discovered articles that mention Romania.
+
+        The first successful run after a restart only marks the fetched articles as checked, so
+        mentions posted before the restart are not posted again.
+        """
         session = await get_shared_session()
         # only the newest ARTICLE_LIMIT are read, so the rest of the feed is not paged through
         articles = await get_articles(session, max_items=ARTICLE_LIMIT)
         if not articles:
+            return
+
+        if not self._seeded:
+            self.checked_article_ids.update(
+                str(article["_id"]) for article in articles[:ARTICLE_LIMIT] if article.get("_id")
+            )
+            self._seeded = True
+            logger.info("Article mention monitor seeded with %d articles", len(self.checked_article_ids))
             return
 
         guild = self.bot.get_guild(config["guild"])

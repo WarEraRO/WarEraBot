@@ -44,6 +44,8 @@ class BattleOrderMonitorJob(commands.Cog):
         self._tournaments_cache: dict[str, tuple[dict, float]] = {}
         self._tournament_teams_cache: dict[str, tuple[dict, float]] = {}
         self._lock = asyncio.Lock()
+        # orders found by the first successful check after a restart are listed without posting
+        self._seeded = False
         self.battle_order_monitor.start()
 
     def cog_unload(self):
@@ -58,6 +60,13 @@ class BattleOrderMonitorJob(commands.Cog):
         await self.bot.wait_until_ready()
 
     async def check_orders(self, notify: bool = True) -> int:
+        """Add Romania's new battle orders to the priority list and return how many were added.
+
+        Args:
+            notify: Post each new order to the battle-orders channel. Ignored by the first check
+                that fetches the battles after a restart: it only rebuilds the list, so orders
+                announced before the restart are not announced again.
+        """
         guild = self.bot.get_guild(config["guild"])
         if guild is None:
             return 0
@@ -139,9 +148,12 @@ class BattleOrderMonitorJob(commands.Cog):
                 if token.split(":", 1)[0] in active_battle_ids
             }
 
-        if notify:
+        if notify and self._seeded:
             for entry in new_entries:
                 await self.notify_priority(entry)
+        elif not self._seeded:
+            self._seeded = True
+            logger.info("Battle order monitor seeded with %d orders", len(new_entries))
 
         return len(new_entries)
 

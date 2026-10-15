@@ -21,6 +21,8 @@ class BuffMonitorJob(commands.Cog):
         self.bot = bot
         # cache for buff checks: api_id -> { next_check: datetime, notified_for_end_at: str|None }
         self.buff_check_cache: dict = {}
+        # buffs already expiring at the first run after a restart are marked notified without a DM
+        self._seeded = False
         try:
             init_db()
         except Exception:
@@ -52,10 +54,15 @@ class BuffMonitorJob(commands.Cog):
 
     @tasks.loop(minutes=10)
     async def buff_monitor(self):
-        """Checks fighter members for active buffs and notifies users when their
-        buff is nearing expiration (within NOTIFY_THRESHOLD_MINUTES).
+        """Warn fighter members whose buff is about to expire.
+
+        A member is notified at most once per buff, when it ends within NOTIFY_THRESHOLD_MINUTES
+        and they have health or hunger left (or the top-of-hour regen comes before it ends).
         The method uses an in-memory cache (`self.buff_check_cache`) to avoid
         scanning all fighters every run; entries store the earliest `next_check`.
+        The first run after a restart sends nothing: buffs already within the
+        threshold may have been notified before the restart, so they are only
+        recorded as notified.
         """
         guild = self.bot.get_guild(config['guild'])
         if guild is None:
@@ -209,17 +216,18 @@ class BuffMonitorJob(commands.Cog):
                     # Only send notification when conditions are met and we haven't
                     # already notified for this buff end timestamp.
                     if should_notify and notified_token != buff_end_at:
-                        minutes = max(1, int(remaining_seconds // 60))
-                        text = tr.plural("buff_monitor.expiring", minutes, name=member.display_name)
-                        try:
-                            await member.send(text)
-                        except Exception:
-                            channel = guild.get_channel(config.get('channels', {}).get('public')) if guild else None
-                            if channel:
-                                try:
-                                    await channel.send(f"{member.mention} — {text}")
-                                except Exception:
-                                    pass
+                        if self._seeded:
+                            minutes = max(1, int(remaining_seconds // 60))
+                            text = tr.plural("buff_monitor.expiring", minutes, name=member.display_name)
+                            try:
+                                await member.send(text)
+                            except Exception:
+                                channel = guild.get_channel(config.get('channels', {}).get('public')) if guild else None
+                                if channel:
+                                    try:
+                                        await channel.send(f"{member.mention} — {text}")
+                                    except Exception:
+                                        pass
                         cache_entry['notified_for_end_at'] = buff_end_at
                         cache_entry['next_check'] = buff_dt + timedelta(minutes=1)
                     else:
@@ -237,6 +245,8 @@ class BuffMonitorJob(commands.Cog):
                 cache_entry['notified_for_end_at'] = cache_entry.get('notified_for_end_at')
                 self.buff_check_cache[api_id] = cache_entry
                 seen_api_ids.add(api_id)
+
+        self._seeded = True
 
         # Prune cache entries for API ids we did not see during this run
         to_prune = [k for k in list(self.buff_check_cache.keys()) if k not in seen_api_ids]

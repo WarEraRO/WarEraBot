@@ -140,6 +140,63 @@ async def _fetch_gear_prices(session) -> dict:
     return prices
 
 
+def estimate_fight_damage(user: dict, battle_bonus: float, game_config: dict) -> dict:
+    """Damage the player can still deal now, with their current gear and bars, by the formulas of `Model.evaluate`.
+
+    The API's `skills.<skill>.total` already holds the equipped weapon and gear, ammo, an active Pill or
+    debuff and the military rank, so only the battle bonus (`battle_bonus`, percent, floored at -100%) is
+    applied on top. Hits come from the current Health bar, and with food also from the Hunger bar: one food
+    item per Hunger point, each restoring the best food's `healthRegenPercent` of max Health (the bot cannot
+    see which food the player holds, so that part is an upper bound). Gear durability, ammo stock and
+    regeneration are not counted.
+
+    Returns:
+        {"per_hit", "hits_now", "damage_now", "hits_food", "damage_food"}, where the food figures include
+        the current Health bar.
+    """
+    skills = user.get("skills") or {}
+
+    def total(code: str) -> float:
+        try:
+            return float((skills.get(code) or {}).get("total") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def bar(code: str) -> float:
+        try:
+            return max(0.0, float((skills.get(code) or {}).get("currentBarValue") or 0))
+        except (TypeError, ValueError):
+            return 0.0
+
+    p = min(total("precision"), 100.0) / 100
+    c = min(total("criticalChance"), 100.0) / 100
+    attack = total("attack") * max(0.0, 1 + battle_bonus / 100)
+    per_hit = attack * ((1 - p) * 0.5 + p * (1 + c * total("criticalDamages") / 100))
+
+    health_cost = float((game_config.get("battle") or {}).get("healthCost") or 10)
+    # the same soft cap as Model; it reproduces the API's armor/dodge totalAfterSoftCap [observed 2026-10-15]
+    armor_share = _mitigation(total("armor"), 40.0)
+    dodge_share = _mitigation(total("dodge"), 40.0)
+    health_per_hit = max(1.0, health_cost * (1 - armor_share)) * (1 - dodge_share)
+
+    items = game_config.get("items") or {}
+    food_pct = max(
+        (float(((items.get(code) or {}).get("flatStats") or {}).get("healthRegenPercent") or 0) for code in FOOD_CODES),
+        default=0.0,
+    ) / 100
+    # one food item per whole Hunger point; the bar is a float that can sit just under a whole number
+    foods = math.floor(bar("hunger") + 1e-6)
+    hits_now = bar("health") / health_per_hit
+    hits_food = hits_now + foods * food_pct * total("health") / health_per_hit
+    return {
+        "per_hit": per_hit,
+        "hits_now": hits_now,
+        "damage_now": hits_now * per_hit,
+        "hits_food": hits_food,
+        "damage_food": hits_food * per_hit,
+    }
+
+
 class Model:
     """Everything a build evaluation needs: skill tables, gear options, prices and the player's bonuses."""
 

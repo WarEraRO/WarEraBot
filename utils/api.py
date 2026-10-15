@@ -43,7 +43,8 @@ async def close_shared_session() -> None:
             _shared_session = None
 
 
-async def _get_with_retry(session, url, params=None, max_retries=5, initial_backoff=1.0, backoff_factor=2.0, max_backoff=60.0):
+async def _get_with_retry(session, url, params=None, max_retries=5, initial_backoff=1.0, backoff_factor=2.0, max_backoff=60.0, quiet_statuses=()):
+    # quiet_statuses: client error codes that are an expected answer (e.g. 404 "no hits"); still None, logged at debug
     attempt = 0
     while True:
         try:
@@ -70,7 +71,10 @@ async def _get_with_retry(session, url, params=None, max_retries=5, initial_back
                         body = await response.text()
                     except Exception:
                         body = '<unreadable body>'
-                    logger.error('Client error %s from %s, body=%s', response.status, url, body)
+                    if response.status in quiet_statuses:
+                        logger.debug('Client error %s from %s', response.status, url)
+                    else:
+                        logger.error('Client error %s from %s, body=%s', response.status, url, body)
                     return None
 
                 # Retry on server errors
@@ -145,11 +149,11 @@ async def get_user_info(userId, session, base_url="https://api2.warera.io/trpc/u
 # 50 calls per chunk keeps the URL around 4.5 KB.
 BATCH_CHUNK_SIZE = 50
 
-async def _get_batch(session, procedure, inputs, chunk_size=BATCH_CHUNK_SIZE, base_url="https://api2.warera.io/trpc"):
+async def _get_batch(session, procedure, inputs, chunk_size=BATCH_CHUNK_SIZE, base_url="https://api2.warera.io/trpc", quiet_statuses=()):
     """Run `procedure` once per item of `inputs` using tRPC batching.
 
     Returns a list aligned with `inputs`: each item's `result.data`, or None when that call
-    errored or its chunk failed. Never raises.
+    errored or its chunk failed. Never raises. `quiet_statuses` is passed to _get_with_retry.
     """
     results = []
     for start in range(0, len(inputs), chunk_size):
@@ -157,7 +161,7 @@ async def _get_batch(session, procedure, inputs, chunk_size=BATCH_CHUNK_SIZE, ba
         try:
             url = f"{base_url}/{','.join([procedure] * len(chunk))}"
             params = {"batch": "1", "input": json.dumps({str(i): inp for i, inp in enumerate(chunk)})}
-            data = await _get_with_retry(session, url, params=params)
+            data = await _get_with_retry(session, url, params=params, quiet_statuses=quiet_statuses)
             if not isinstance(data, list) or len(data) != len(chunk):
                 results.extend([None] * len(chunk))
                 continue
@@ -174,6 +178,16 @@ async def get_users_info(user_ids, session):
     users = await _get_batch(session, 'user.getUserLite', [{'userId': uid} for uid in ids])
     return {uid: user for uid, user in zip(ids, users) if user}
 
+async def get_users_full(user_ids, session):
+    """Batched user.getUserById: {userId: user} for the ids that resolved.
+
+    Same request cost as get_users_info. The full user carries the getUserLite fields the bot reads
+    (skills, buffs, dates, leveling, mu) plus stats.wealth, region and location [observed 2026-10-14].
+    """
+    ids = list(dict.fromkeys(user_ids))
+    users = await _get_batch(session, 'user.getUserById', [{'userId': uid} for uid in ids])
+    return {uid: user for uid, user in zip(ids, users) if user}
+
 async def get_military_units_by_ids(mu_ids, session):
     """Batched mu.getById: {muId: mu} for the ids that resolved."""
     ids = list(dict.fromkeys(mu_ids))
@@ -185,6 +199,64 @@ async def get_countries_by_ids(country_ids, session):
     ids = list(dict.fromkeys(country_ids))
     countries = await _get_batch(session, 'country.getCountryById', [{'countryId': country_id} for country_id in ids])
     return {country_id: country for country_id, country in zip(ids, countries) if country}
+
+async def get_battle_orders(battle_sides, session):
+    """Batched battleOrder.getByBattle: {(battleId, side): [order]} for the (battleId, side) pairs that resolved.
+
+    Each order carries `country` or `mu`, `priority` (low/medium/high) and `rank`/`text`; rank and text
+    are filled in only for citizens of the ordering country or members of the ordering MU [spec].
+    """
+    pairs = list(dict.fromkeys(battle_sides))
+    orders = await _get_batch(session, 'battleOrder.getByBattle', [{'battleId': battle_id, 'side': side} for battle_id, side in pairs])
+    return {pair: items for pair, items in zip(pairs, orders) if isinstance(items, list)}
+
+async def get_regions_by_ids(region_ids, session):
+    """Batched region.getById: {regionId: region} for the ids that resolved."""
+    ids = list(dict.fromkeys(region_ids))
+    regions = await _get_batch(session, 'region.getById', [{'regionId': region_id} for region_id in ids])
+    return {region_id: region for region_id, region in zip(ids, regions) if region}
+
+async def get_mu_upgrades(mu_id, upgrade_types, session):
+    """Batched upgrade.getUpgradeByTypeAndEntity for one MU: {upgradeType: upgrade} for the types that resolved.
+
+    MU types are headquarters and dormitories. An upgrade carries level, status (active/disabled)
+    and willBeActiveAt (pending activation) [observed 2026-10-14].
+    """
+    types = list(dict.fromkeys(upgrade_types))
+    upgrades = await _get_batch(session, 'upgrade.getUpgradeByTypeAndEntity', [{'upgradeType': kind, 'muId': mu_id} for kind in types])
+    return {kind: upgrade for kind, upgrade in zip(types, upgrades) if isinstance(upgrade, dict)}
+
+async def get_won_auctions_by_battles(battle_ids, session):
+    """Batched mercenaryContractAuction.getPaginatedAuctions (status won): {battleId: [auction]}, first page only.
+
+    One page holds the 50 newest won contracts of a battle [observed 2026-10-14: the battleId filter works];
+    battles whose call failed are missing from the dict.
+    """
+    ids = list(dict.fromkeys(battle_ids))
+    pages = await _get_batch(session, 'mercenaryContractAuction.getPaginatedAuctions', [{'battleId': battle_id, 'status': 'won', 'limit': 50} for battle_id in ids])
+    return {battle_id: page.get('items') or [] for battle_id, page in zip(ids, pages) if isinstance(page, dict)}
+
+async def get_users_equipment(user_ids, session):
+    """Batched inventory.fetchCurrentEquipment: {userId: equipment} for the ids that resolved.
+
+    Equipment maps slots (weapon, helmet, chest, pants, boots, gloves) to items with code, state and maxState,
+    and `ammo` to the ammo code. A player with nothing equipped returns {}, which the batch reports as missing.
+    """
+    ids = list(dict.fromkeys(user_ids))
+    equipment = await _get_batch(session, 'inventory.fetchCurrentEquipment', [{'userId': user_id} for user_id in ids])
+    return {user_id: items for user_id, items in zip(ids, equipment) if isinstance(items, dict)}
+
+async def get_last_tournament(session, base_url="https://api2.warera.io/trpc/tournament.getLastTournament"):
+    """The most recently created or active tournament (not in the official spec; explorer-documented)."""
+    try:
+        data = await _get_with_retry(session, base_url, params={"input": json.dumps({})})
+        api_result = (data or {}).get("result", {}).get("data")
+        if isinstance(api_result, dict):
+            return api_result
+        return None
+    except Exception as e:
+        logger.exception('get_last_tournament failed: %s', e)
+        return None
 
 async def get_country_governments(country_ids, session):
     """Batched government.getByCountryId: {countryId: government} for the ids that resolved."""
@@ -833,6 +905,45 @@ async def get_battle_ranking(battleId, dataType, rankingType, side, session, bas
     except Exception as e:
         logger.exception('get_battle_ranking failed: %s', e)
         return None
+
+async def get_ranking_pages(scope, data_type, ranking_type, side, session, stop=None, max_pages=None, base_url="https://api2.warera.io/trpc/battleRanking.getRanking"):
+    """battleRanking.getRanking entries from the top for one scope ({"battleId"}, {"roundId"} or {"warId"}).
+
+    Pages are read until `stop(items)` returns True, the ranking ends or `max_pages` pages were read.
+    Returns (items, complete), where complete is True only when the whole ranking was read; None when
+    the first page fails. A later page that fails ends the read with complete False.
+    """
+    try:
+        input_data = {**scope, "dataType": data_type, "type": ranking_type, "side": side, "limit": 100}
+        items, pages = [], 0
+        while True:
+            data = await _get_with_retry(session, base_url, params={"input": json.dumps(input_data)})
+            if not data:
+                return None if not pages else (items, False)
+            page = data.get('result', {}).get('data') or {}
+            items += page.get('items') or []
+            pages += 1
+            next_cursor = page.get('nextCursor')
+            if not next_cursor:
+                return items, True
+            if (stop and stop(items)) or (max_pages and pages >= max_pages):
+                return items, False
+            input_data['cursor'] = next_cursor
+    except Exception as e:
+        logger.exception('get_ranking_pages failed: %s', e)
+        return None
+
+async def get_battle_loot_summaries(battle_id, user_ids, session):
+    """Batched battleLootSummary.getByBattleAndUser: {userId: summary} for the users who hit the battle.
+
+    A user with no hits in the battle gets a 404 [observed], so is missing from the dict, like a failed call.
+    When every user of a batch chunk has no hits the whole request is a 404, which is expected and not logged.
+    """
+    ids = list(dict.fromkeys(user_ids))
+    summaries = await _get_batch(
+        session, 'battleLootSummary.getByBattleAndUser', [{'battleId': battle_id, 'userId': user_id} for user_id in ids], quiet_statuses=(404,)
+    )
+    return {user_id: summary for user_id, summary in zip(ids, summaries) if isinstance(summary, dict)}
 
 # muMember.getByMu is not in the public OpenAPI spec (0.17.4-beta); it is documented by the community
 # explorer (warera.realmarijn.nl) and may change without notice.
