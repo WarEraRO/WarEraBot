@@ -89,6 +89,27 @@ def ticks_to_win_round(leader_points: int, total_points: int, tick_points: dict[
     return ticks
 
 
+def round_eta(round_obj: dict, tick_points: dict[int, int], points_to_win: int, now: datetime) -> timedelta:
+    """Time until the leading side wins the round, assuming it wins every remaining tick.
+
+    It is the earliest the round can end: a contested round lasts longer. The next tick comes at
+    `round_obj.live.nextTickAt` (one tick interval from now when unknown), the rest one interval apart.
+    """
+    attacker_points = (round_obj.get("attacker") or {}).get("points") or 0
+    defender_points = (round_obj.get("defender") or {}).get("points") or 0
+    ticks = ticks_to_win_round(
+        max(attacker_points, defender_points),
+        attacker_points + defender_points,
+        tick_points,
+        points_to_win,
+    )
+    if ticks == 0:
+        return timedelta(0)
+    next_tick_at = parse_iso((round_obj.get("live") or {}).get("nextTickAt"))
+    until_next_tick = max(next_tick_at - now, timedelta(0)) if next_tick_at else TICK_INTERVAL
+    return until_next_tick + (ticks - 1) * TICK_INTERVAL
+
+
 def parse_iso(value) -> datetime | None:
     try:
         return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
@@ -368,20 +389,7 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
 
     def _round_eta(self, round_obj: dict, game_config: dict) -> timedelta:
         """Time until the leading side wins the round, assuming it wins every remaining tick."""
-        attacker_points = (round_obj.get("attacker") or {}).get("points") or 0
-        defender_points = (round_obj.get("defender") or {}).get("points") or 0
-        ticks = ticks_to_win_round(
-            max(attacker_points, defender_points),
-            attacker_points + defender_points,
-            game_config["tick_points"],
-            game_config["points_to_win"],
-        )
-        if ticks == 0:
-            return timedelta(0)
-        next_tick_at = parse_iso((round_obj.get("live") or {}).get("nextTickAt"))
-        now = datetime.now(timezone.utc)
-        until_next_tick = max(next_tick_at - now, timedelta(0)) if next_tick_at else TICK_INTERVAL
-        return until_next_tick + (ticks - 1) * TICK_INTERVAL
+        return round_eta(round_obj, game_config["tick_points"], game_config["points_to_win"], datetime.now(timezone.utc))
 
     async def _get_game_config(self, session) -> dict:
         now = time.monotonic()

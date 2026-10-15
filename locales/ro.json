@@ -134,6 +134,10 @@
                 "name": "/subscribe contracts | /unsubscribe contracts",
                 "desc": "Primești mențiune în firul sau canalul de contracte al unității tale militare când aceasta câștigă un contract de mercenari. Contul tău de Discord trebuie să fie legat de jucătorul tău WarEra și trebuie să fii într-una dintre unitățile militare ale acestui server. Unitatea nu se salvează: primești mențiune pentru contractele unității în care ești când se câștigă unul, deci la schimbarea unității nu trebuie să te abonezi din nou. Nu primești mențiune cât ai build de economie sau nu ai puncte de skill, ori nu poți lupta (viață sub 10 și fără foame, sau în debuff). Dacă părăsești serverul, abonamentul se șterge. Răspunsurile sunt vizibile doar pentru tine."
             },
+            "subscriptions_loot": {
+                "name": "/subscribe loot | /unsubscribe loot",
+                "desc": "Primești un DM în ultimele ~10 minute ale fiecărei runde dintr-o bătălie în care ai lovit, cu pool-urile de loot ale rundei și ale bătăliei, ca în `/loot_targets`: locul, damage-ul și itemul tău, cât îți trebuie pentru locul următor și pentru o raritate mai bună și cine de sub tine îți poate lua raritatea. Estimează și damage-ul pe care îl mai poți da cu echipamentul, bonusul de bătălie, viața și foamea de acum, și cel mai bun item pe care îl atinge. Se trimit doar bătăliile în care ai un item sau poți ajunge la unul. Nu primești nimic cât ai build de economie sau nu ai puncte de skill, ori nu poți lupta (viață sub 10 și fără foame, sau în debuff). Contul tău de Discord trebuie să fie legat de jucătorul tău WarEra și trebuie să accepți DM-uri de la membrii acestui server. Dacă părăsești serverul, abonamentul se șterge. Răspunsurile sunt vizibile doar pentru tine."
+            },
             "pills": {
                 "name": "/pills military_unit",
                 "desc": "Starea pastilelor într-o unitate militară configurată (cu sugestii): cine are pastilă, grupați după ora la care au luat-o, cine e în debuff, grupați după ora la care se termină (ambele cu timpul rămas), și luptătorii fără pastilă. Orele sunt afișate în fusul orar configurat."
@@ -219,6 +223,10 @@
             "mu_contract_monitor": {
                 "name": "mu_contract_monitor — la fiecare 5 minute",
                 "desc": "Postează un embed în firul de contracte al unității militare (threadIds.contractsId) sau în canalul ei când MU-ul câștigă un contract de mercenari: bătălia, damage-ul minim, plata la 1k damage, plata totală, timpul estimat rămas și scorul. Menționează membrii abonați cu /subscribe contracts care sunt în acel MU în acel moment, au build de luptă, au viață 10+ sau foame rămasă și nu sunt în debuff. Abonații care au părăsit serverul sunt dezabonați."
+            },
+            "loot_alerts": {
+                "name": "loot_alerts — la fiecare 2 minute",
+                "desc": "Rulează doar cât există abonați cu /subscribe loot. Când runda unei bătălii active se poate încheia în 10 minute (dacă tabăra din față câștigă fiecare tick), trimite în DM fiecărui abonat care a lovit în acea bătălie pool-urile de loot ale rundei și ale bătăliei și damage-ul pe care îl mai poate da, când are un item din pool sau poate ajunge la unul. Abonații cu build de economie, cu viață sub 10 și fără foame, sau în debuff nu primesc nimic. Fiecare abonat e verificat o dată pe rundă; rundele care se încheie deja când pornește botul sunt sărite. Abonații care au părăsit serverul sunt dezabonați."
             },
             "monitor_nap": {
                 "name": "monitor_nap - la fiecare oră",
@@ -679,7 +687,30 @@
         "not_subscribed": "Nu ești abonat la contractele de mercenari.",
         "unsubscribed": "Nu mai primești mențiuni pentru contractele de mercenari.",
         "unit_channel": "canalul de contracte al unității militare",
+        "loot_subscribed": "Vei primi un DM în ultimele ~10 minute ale fiecărei runde dintr-o bătălie în care ai lovit, cu pool-urile de loot ale rundei și ale bătăliei: locul tău, itemul pe care l-ai primi, cât îți trebuie pentru unul mai bun și damage-ul pe care îl mai poți da cu echipamentul, bonusul de bătălie, viața și foamea de acum. Se trimit doar bătăliile în care ai un item sau poți ajunge la unul. Ești sărit cât ai build de economie sau nu poți lupta (viață sub 10 și fără foame, sau în debuff). Acceptă DM-uri de la membrii acestui server ca să le primești. Folosește `/unsubscribe loot` ca să te dezabonezi.",
+        "loot_already_subscribed": "Ești deja abonat la alertele de loot.",
+        "loot_not_subscribed": "Nu ești abonat la alertele de loot.",
+        "loot_unsubscribed": "Nu mai primești alerte de loot.",
         "failed": "Abonamentul nu a putut fi actualizat. Încearcă din nou mai târziu."
+    },
+    "loot_alerts": {
+        "title": "🎁 Loot: runda se poate încheia curând",
+        "round_ending": "⏳ {pool} se poate încheia în {eta} (dacă tabăra din față câștigă fiecare tick)",
+        "battle_ending": "🏁 Dacă tabăra din față câștigă runda, câștigă și bătălia: se împarte și pool-ul bătăliei",
+        "side_line": "⚔️ Estimare pentru {side} · bonus {bonus}% ({details})",
+        "side_unknown": "o tabără necunoscută",
+        "bonus": {
+            "patriotic": "patriotic",
+            "country_order": "ordin de țară",
+            "mu_order": "ordin MU",
+            "headquarters": "HQ MU"
+        },
+        "bonus_none": "niciunul vizibil",
+        "damage_line": "💥 ≈{per_hit}/lovitură · cu viața de acum ≈{now} ({hits_now} lovituri) · cu mâncare până la ≈{food} ({hits_food} lovituri)",
+        "reach": "🎯 În limita damage-ului estimat: {item} la #{rank} +{damage}",
+        "reach_upper_bound": "🎯 În limita damage-ului estimat: {item} la #{rank}, cel mult +{damage}",
+        "no_reach": "🎯 Nicio raritate mai bună în limita damage-ului estimat",
+        "footer": "Imagine a pool-urilor live: locurile se schimbă, iar o rundă disputată durează mai mult · bonusul include doar patriotic, ordinele și HQ-ul MU (alianța, pactele, inamicul, clădirile și malusurile nu sunt vizibile) · mâncarea e socotită ca cea mai bună · /unsubscribe loot ca să te oprești"
     },
     "mu_contracts": {
         "title": "{country} · Licitație de mercenari",
@@ -1026,12 +1057,18 @@
             "description": "Primește mențiuni de la o sarcină a botului.",
             "contracts": {
                 "description": "Primește mențiune când unitatea ta militară câștigă un contract de mercenari."
+            },
+            "loot": {
+                "description": "Primește DM despre loot-ul tău în ultimele minute ale fiecărei runde în care ai lovit."
             }
         },
         "unsubscribe": {
             "description": "Nu mai primi mențiuni de la o sarcină a botului.",
             "contracts": {
                 "description": "Nu mai primi mențiune când unitatea ta militară câștigă un contract de mercenari."
+            },
+            "loot": {
+                "description": "Nu mai primi DM-uri despre loot-ul tău când se încheie o rundă."
             }
         },
         "inactive_players": {"description": "Listează jucătorii inactivi de mai mult de 3 zile."},

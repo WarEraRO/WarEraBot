@@ -112,6 +112,118 @@ def loot_risk(ranking: list[dict], index: int, game_items: dict, complete: bool)
     return {"fall_to": ranking[fall_index], "damages": damages}
 
 
+def best_reachable(ranking: list[dict], index: int, game_items: dict, budget: float) -> tuple[dict, int] | None:
+    """The best pool item the player at `ranking[index]` can climb to with at most `budget` more damage.
+
+    Passing an entry takes its rank and the item that rank holds now. Values only grow going up, so the scan
+    stops at the first entry out of budget. Assumes everyone else stays put.
+
+    Returns (entry, damage to pass it) for the closest rank of the best rarity within budget that is better
+    than the player's own, or None when no better rarity is within budget.
+    """
+    own_value = ranking[index].get("value") or 0
+    best_rarity, best = _rarity_index(ranking[index], game_items), None
+    for above in reversed(ranking[:index]):
+        damage = max(1, (above.get("value") or 0) - own_value + 1)
+        if damage > budget:
+            break
+        rarity = _rarity_index(above, game_items)
+        # the first rank of a rarity met going up is the cheapest one holding it
+        if rarity > best_rarity:
+            best_rarity, best = rarity, (above, damage)
+    return best
+
+
+def pool_scopes(battle: dict, tr: Translator) -> list[tuple[str, str, dict]]:
+    """(kind, label, ranking scope) of the pools a player competes for in `battle`, round first.
+
+    The round is the current one (the last one once the battle ended); `currentRound` may be an id
+    (battle.getById) or a populated round (battle.getBattles).
+    """
+    rounds = [str(round_id) for round_id in battle.get("rounds") or []]
+    round_id = battle.get("currentRound") or (rounds[-1] if rounds else None)
+    if isinstance(round_id, dict):
+        round_id = round_id.get("_id")
+    round_id = str(round_id) if round_id else None
+    round_number = rounds.index(round_id) + 1 if round_id in rounds else max(1, len(rounds))
+    scopes = [("round", tr("loot_targets.pool_round", number=round_number), {"roundId": round_id})] if round_id else []
+    return scopes + [("battle", tr("loot_targets.pool_battle"), {"battleId": str(battle.get("_id"))})]
+
+
+def battle_title(battle: dict, country_names: dict[str, str], tr: Translator) -> str:
+    """Linked "A vs B" (or "Tournament battle"), with flags from the country names."""
+    unknown = tr("common.unknown")
+    if battle.get("type") == TOURNAMENT_BATTLE_TYPE:
+        title = tr("common.tournament_battle")
+    else:
+        attacker = country_names.get(str((battle.get("attacker") or {}).get("country") or ""))
+        defender = country_names.get(str((battle.get("defender") or {}).get("country") or ""))
+        title = f"{country_with_flag(attacker, left=True, unknown=unknown)} vs {country_with_flag(defender, left=False, unknown=unknown)}"
+    return f"[{title}]({BATTLE_LINK.format(battle.get('_id'))})"
+
+
+def item_label(entry: dict | None, game_items: dict, tr: Translator) -> str:
+    """The pool item of a ranking entry with its rarity emoji (e.g. "🟣 helmet4"); "no item" past the pool."""
+    item = (entry or {}).get("lootItem")
+    code = item.get("code") if isinstance(item, dict) else item
+    if not code:
+        return tr("loot_targets.no_item")
+    rarity = (game_items.get(str(code)) or {}).get("rarity")
+    return f"{RARITY_EMOJI.get(rarity, '❔')} {code}"
+
+
+def pool_summary_lines(pool: dict, game_items: dict, tr: Translator) -> list[str]:
+    """A pool's size, and the damage each of its rarities needs when known."""
+    items = pool["items"]
+    with_item = sum(1 for entry in items if _rarity_index(entry, game_items) >= 0)
+    key = "loot_targets.pool_summary_complete" if pool["complete"] else "loot_targets.pool_summary_partial"
+    lines = [tr(key, pool=pool["label"], ranked=len(items), with_item=with_item)]
+    thresholds = rarity_thresholds(items, pool["complete"], game_items)
+    if thresholds:
+        lines.append(tr("loot_targets.thresholds") + " " + " · ".join(
+            f"{RARITY_EMOJI[rarity]} >{_fmt_short(value)}" for rarity, value in thresholds
+        ))
+    return lines
+
+
+def pool_lines(pool: dict, index: int, teammates: dict, game_items: dict, tr: Translator) -> list[str]:
+    """The lines of one player in one pool.
+
+    Rank, damage and item; the next rank and the closest better rarity (🤝 when a player in `teammates`
+    other than them holds it); and, when they hold an item, who below could push them to a lower rarity.
+    """
+    items, entry = pool["items"], pool["items"][index]
+    user_id = str(entry.get("user"))
+    head = tr(
+        "loot_targets.pool_line",
+        pool=pool["label"], rank=entry.get("rank"), damage=_fmt_short(entry.get("value")), item=item_label(entry, game_items, tr),
+    )
+    targets = loot_targets(items, index, game_items)
+    parts = []
+    better = targets["better"]
+    if targets["next"] is None:
+        parts.append(tr("loot_targets.top"))
+    elif targets["next"] is not better:
+        # when the next rank already holds a better rarity, the better-rarity part says it all
+        parts.append(tr("loot_targets.next_rank", rank=targets["next"].get("rank"), damage=_fmt_short(targets["next_damage"])))
+    if better is not None:
+        teammate = f" {TEAMMATE_MARKER}" if str(better.get("user")) in teammates and str(better.get("user")) != user_id else ""
+        key = "loot_targets.enter_pool" if _rarity_index(entry, game_items) < 0 else "loot_targets.better"
+        parts.append(tr(key, item=item_label(better, game_items, tr), rank=better.get("rank"), damage=_fmt_short(targets["better_damage"])) + teammate)
+    elif _rarity_index(entry, game_items) == len(RARITY_ORDER) - 1:
+        parts.append(tr("loot_targets.best_rarity"))
+    lines = [head, "⬆️ " + " · ".join(parts)]
+    risk = loot_risk(items, index, game_items, pool["complete"])
+    if risk and risk.get("safe"):
+        lines.append(tr("loot_targets.fall_safe"))
+    elif risk:
+        damages = ["+" + _fmt_short(damage) for damage in risk["damages"]]
+        # every player's need is listed up to 3; beyond that the closest and the furthest
+        shown = ", ".join(damages) if len(damages) <= 3 else f"{damages[0]} … {damages[-1]}"
+        lines.append(tr.plural("loot_targets.fall", len(damages), item=item_label(risk["fall_to"], game_items, tr), damages=shown))
+    return lines
+
+
 def rarity_thresholds(ranking: list[dict], complete: bool, game_items: dict) -> list[tuple[str, int]]:
     """(rarity, damage to beat) for each rarity in the pool: the value of the last rank holding it or better.
 
@@ -278,13 +390,7 @@ class LootTargets(commands.Cog):
         listed = {user_id: mu_id for user_id, mu_id in member_mu.items() if mu_filter in (None, mu_id)}
 
         # the current round's pool (the last round's once the battle ended) and the whole battle's pool
-        rounds = [str(round_id) for round_id in battle_data.get("rounds") or []]
-        round_id = battle_data.get("currentRound") or (rounds[-1] if rounds else None)
-        if isinstance(round_id, dict):
-            round_id = round_id.get("_id")
-        round_id = str(round_id) if round_id else None
-        round_number = rounds.index(round_id) + 1 if round_id in rounds else max(1, len(rounds))
-        scopes = ([("round", {"roundId": round_id})] if round_id else []) + [("battle", {"battleId": battle_id})]
+        scopes = pool_scopes(battle_data, tr)
 
         # members who hit the battle at all; a member with no hits is not looked for in the rankings
         summaries = await get_battle_loot_summaries(battle_id, list(listed), session)
@@ -307,19 +413,19 @@ class LootTargets(commands.Cog):
         # found in the round ranking, so that read can run to its end or to MAX_RANKING_PAGES
         rankings = await asyncio.gather(*(
             get_ranking_pages(scope, "damage", "user", "merged", session, stop=found_all, max_pages=MAX_RANKING_PAGES)
-            for _, scope in scopes
+            for _, _, scope in scopes
         ))
         if any(ranking is None for ranking in rankings):
             await interaction.followup.send(tr("loot_targets.fetch_failed"), ephemeral=True)
             return
         pools = [
             {
-                "label": tr("loot_targets.pool_round", number=round_number) if kind == "round" else tr("loot_targets.pool_battle"),
+                "label": label,
                 "items": items,
                 "complete": complete,
                 "index_of": {str(entry.get("user")): index for index, entry in enumerate(items)},
             }
-            for (kind, _), (items, complete) in zip(scopes, rankings)
+            for (_, label, _), (items, complete) in zip(scopes, rankings)
         ]
         found = {user_id for pool in pools for user_id in pool["index_of"] if user_id in listed}
         users = await get_users_info(list(found), session) if found else {}
@@ -331,61 +437,12 @@ class LootTargets(commands.Cog):
             await interaction.followup.send(embeds=message_embeds)
 
     def _battle_title(self, battle: dict, tr: Translator) -> str:
-        """Linked "A vs B" (or "Tournament battle")."""
-        unknown = tr("common.unknown")
-        if battle.get("type") == TOURNAMENT_BATTLE_TYPE:
-            title = tr("common.tournament_battle")
-        else:
-            attacker = self._country_names.get(str((battle.get("attacker") or {}).get("country") or ""))
-            defender = self._country_names.get(str((battle.get("defender") or {}).get("country") or ""))
-            title = f"{country_with_flag(attacker, left=True, unknown=unknown)} vs {country_with_flag(defender, left=False, unknown=unknown)}"
-        return f"[{title}]({BATTLE_LINK.format(battle.get('_id'))})"
-
-    def _item(self, entry: dict | None, game_items: dict, tr: Translator) -> str:
-        """The pool item of a ranking entry with its rarity emoji (e.g. "🟣 helmet4"); "no item" past the pool."""
-        item = (entry or {}).get("lootItem")
-        code = item.get("code") if isinstance(item, dict) else item
-        if not code:
-            return tr("loot_targets.no_item")
-        rarity = (game_items.get(str(code)) or {}).get("rarity")
-        return f"{RARITY_EMOJI.get(rarity, '❔')} {code}"
+        """Linked "A vs B" (or "Tournament battle"); see `battle_title`."""
+        return battle_title(battle, self._country_names, tr)
 
     def _pool_lines(self, pool: dict, index: int, member_mu: dict, game_items: dict, tr: Translator) -> list[str]:
-        """The lines of one member in one pool.
-
-        Rank, damage and item; the next rank and the closest better rarity; and, when they hold an item,
-        who below could push them to a lower rarity.
-        """
-        items, entry = pool["items"], pool["items"][index]
-        user_id = str(entry.get("user"))
-        head = tr(
-            "loot_targets.pool_line",
-            pool=pool["label"], rank=entry.get("rank"), damage=_fmt_short(entry.get("value")), item=self._item(entry, game_items, tr),
-        )
-        targets = loot_targets(items, index, game_items)
-        parts = []
-        better = targets["better"]
-        if targets["next"] is None:
-            parts.append(tr("loot_targets.top"))
-        elif targets["next"] is not better:
-            # when the next rank already holds a better rarity, the better-rarity part says it all
-            parts.append(tr("loot_targets.next_rank", rank=targets["next"].get("rank"), damage=_fmt_short(targets["next_damage"])))
-        if better is not None:
-            teammate = f" {TEAMMATE_MARKER}" if str(better.get("user")) in member_mu and str(better.get("user")) != user_id else ""
-            key = "loot_targets.enter_pool" if _rarity_index(entry, game_items) < 0 else "loot_targets.better"
-            parts.append(tr(key, item=self._item(better, game_items, tr), rank=better.get("rank"), damage=_fmt_short(targets["better_damage"])) + teammate)
-        elif _rarity_index(entry, game_items) == len(RARITY_ORDER) - 1:
-            parts.append(tr("loot_targets.best_rarity"))
-        lines = [head, "⬆️ " + " · ".join(parts)]
-        risk = loot_risk(items, index, game_items, pool["complete"])
-        if risk and risk.get("safe"):
-            lines.append(tr("loot_targets.fall_safe"))
-        elif risk:
-            damages = ["+" + _fmt_short(damage) for damage in risk["damages"]]
-            # every player's need is listed up to 3; beyond that the closest and the furthest
-            shown = ", ".join(damages) if len(damages) <= 3 else f"{damages[0]} … {damages[-1]}"
-            lines.append(tr.plural("loot_targets.fall", len(damages), item=self._item(risk["fall_to"], game_items, tr), damages=shown))
-        return lines
+        """The lines of one member in one pool, every configured MU member counting as a teammate; see `pool_lines`."""
+        return pool_lines(pool, index, member_mu, game_items, tr)
 
     def _member_block(self, user_id: str, pools: list[dict], member_mu: dict, users: dict, game_items: dict, tr: Translator) -> str:
         """The member's name, then their lines in each pool (round first, then battle)."""
@@ -418,15 +475,7 @@ class LootTargets(commands.Cog):
         if not battle.get("isActive"):
             lines.append(tr("loot_targets.battle_ended"))
         for pool in pools:
-            items = pool["items"]
-            with_item = sum(1 for entry in items if _rarity_index(entry, game_items) >= 0)
-            key = "loot_targets.pool_summary_complete" if pool["complete"] else "loot_targets.pool_summary_partial"
-            lines.append(tr(key, pool=pool["label"], ranked=len(items), with_item=with_item))
-            thresholds = rarity_thresholds(items, pool["complete"], game_items)
-            if thresholds:
-                lines.append(tr("loot_targets.thresholds") + " " + " · ".join(
-                    f"{RARITY_EMOJI[rarity]} >{_fmt_short(value)}" for rarity, value in thresholds
-                ))
+            lines += pool_summary_lines(pool, game_items, tr)
         description = "\n".join(lines)
 
         def rank_key(user_id: str) -> tuple:

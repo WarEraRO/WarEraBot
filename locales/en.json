@@ -134,6 +134,10 @@
                 "name": "/subscribe contracts | /unsubscribe contracts",
                 "desc": "Get pinged in your military unit's contracts thread or channel when it wins a mercenary contract. Your Discord account must be linked to your WarEra player, and you must be in one of this server's military units. The unit is not stored: you are pinged for the contracts of whichever unit you are in when one is won, so changing unit needs no new subscription. You are not pinged while you are on an economy build or have no skill points, or cannot fight (health under 10 and no hunger left, or in debuff). Leaving the server removes your subscription. Replies are only visible to you."
             },
+            "subscriptions_loot": {
+                "name": "/subscribe loot | /unsubscribe loot",
+                "desc": "Get a DM in the last ~10 minutes of each round of a battle you hit, with the round's and the battle's loot pools as `/loot_targets` shows them: your rank, damage and item, what the next rank and a better rarity need, and who below could take your rarity. It also estimates the damage your current gear, battle bonus, health and hunger can still deal, and the best item that damage reaches. Only battles where you hold an item or could reach one are sent. You get nothing while you are on an economy build or have no skill points, or cannot fight (health under 10 and no hunger left, or in debuff). Your Discord account must be linked to your WarEra player, and you must accept DMs from this server's members. Leaving the server removes your subscription. Replies are only visible to you."
+            },
             "pills": {
                 "name": "/pills military_unit",
                 "desc": "Pill status of a configured military unit (autocomplete): who is pilled, grouped by the hour they pilled, who is in debuff, grouped by the hour it ends (both with time left), and fighters not pilled. Hours are shown in the configured timezone."
@@ -219,6 +223,10 @@
             "mu_contract_monitor": {
                 "name": "mu_contract_monitor — every 5 minutes",
                 "desc": "Posts an embed in a military unit's contracts thread (threadIds.contractsId) or channel when that MU wins a mercenary contract: battle, minimum damage, pay per 1k damage, total payout, estimated time left and score. Pings the members subscribed with /subscribe contracts who are in that MU at that moment, are on a fight build, have health 10+ or hunger left and are not in debuff. Subscribers who left the server are unsubscribed."
+            },
+            "loot_alerts": {
+                "name": "loot_alerts — every 2 minutes",
+                "desc": "Runs only while someone is subscribed with /subscribe loot. When an active battle's round can end within 10 minutes (if the leading side wins every tick), DMs each subscriber who hit that battle its round and battle loot pools and the damage they can still deal, when they hold a pool item or could reach one. Subscribers on an economy build, with health under 10 and no hunger left, or in debuff get nothing. Each subscriber is checked once per round; rounds already ending when the bot starts are skipped. Subscribers who left the server are unsubscribed."
             },
             "monitor_nap": {
                 "name": "monitor_nap - every 1 hour",
@@ -674,7 +682,30 @@
         "not_subscribed": "You are not subscribed to mercenary contracts.",
         "unsubscribed": "You will no longer be pinged for mercenary contracts.",
         "unit_channel": "the military unit's contracts channel",
+        "loot_subscribed": "You will get a DM in the last ~10 minutes of each round of a battle you hit, with the round's and the battle's loot pools: your rank, the item you would get, what a better one needs and the damage your current gear, battle bonus, health and hunger can still deal. Only battles where you hold an item or could reach one are sent. You are skipped while you are on an economy build or cannot fight (health under 10 and no hunger left, or in debuff). Accept DMs from this server's members to receive them. Use `/unsubscribe loot` to stop.",
+        "loot_already_subscribed": "You are already subscribed to loot alerts.",
+        "loot_not_subscribed": "You are not subscribed to loot alerts.",
+        "loot_unsubscribed": "You will no longer get loot alerts.",
         "failed": "Could not update your subscription. Try again later."
+    },
+    "loot_alerts": {
+        "title": "🎁 Loot: round ending soon",
+        "round_ending": "⏳ {pool} can end in {eta} (if the leading side wins every tick)",
+        "battle_ending": "🏁 Winning this round also wins the battle for the side ahead: the battle pool goes out with it",
+        "side_line": "⚔️ Estimate for {side} · bonus {bonus}% ({details})",
+        "side_unknown": "an unknown side",
+        "bonus": {
+            "patriotic": "patriotic",
+            "country_order": "country order",
+            "mu_order": "MU order",
+            "headquarters": "MU HQ"
+        },
+        "bonus_none": "none seen",
+        "damage_line": "💥 ≈{per_hit}/hit · health now ≈{now} ({hits_now} hits) · with food up to ≈{food} ({hits_food} hits)",
+        "reach": "🎯 Within your estimated damage: {item} at #{rank} +{damage}",
+        "reach_upper_bound": "🎯 Within your estimated damage: {item} at #{rank}, at most +{damage}",
+        "no_reach": "🎯 No better rarity within your estimated damage",
+        "footer": "Live pool snapshot: ranks move and a contested round lasts longer · the bonus counts patriotic, orders and MU HQ only (alliance, pacts, enemy, buildings and maluses are not visible) · food counted as the best food · /unsubscribe loot to stop"
     },
     "mu_contracts": {
         "title": "{country} · Mercenary Auction",
