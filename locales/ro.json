@@ -57,6 +57,38 @@
             "description": "Clientul botului se închide sau s-a deconectat neașteptat."
         }
     },
+    "newbie_welcome": {
+        "title": "👋 Bun venit în comunitatea românească!",
+        "description": "Tocmai ai primit rolul **{role}**. Aici e locul pentru întrebările tale: întreabă orice, jucătorii mai experimentați te ajută.",
+        "citizen_fallback": "Citizen",
+        "nickname": {
+            "name": "🔗 Porecla de pe server",
+            "value": "Porecla ta de pe server trebuie să fie exact numele tău din joc: botul o folosește pentru rolul unității militare și pentru /subscribe. Nu o poți schimba tu, așa că dacă nu se potrivește, spune aici în chat."
+        },
+        "start": {
+            "name": "📈 Primele niveluri",
+            "value": "Pune punctele de skill pe economie până la nivelul 15 și fă-ți misiunile în fiecare zi."
+        },
+        "mus": {
+            "name": "🪖 Intră într-o unitate militară",
+            "intro": "Unitățile acestea au locuri libere acum:",
+            "line": "[{name}]({link}) - {members}/{capacity} - {free}",
+            "free": {
+                "one": "{count} loc liber",
+                "few": "{count} locuri libere",
+                "other": "{count} de locuri libere"
+            },
+            "none": "Întreabă aici în chat ce unitate militară recrutează."
+        },
+        "promotion": {
+            "name": "🎖️ Promovarea la {citizen}",
+            "value": "Membrii activi de la nivelul 20, sau de la nivelul 15 cu build de economie, sunt verificați pentru promovarea la {citizen}."
+        },
+        "help": {
+            "name": "🤖 Comenzile botului",
+            "value": "Folosește /help ca să vezi tot ce poate face botul."
+        }
+    },
     "setlang": {
         "updated": "Limba botului pe acest server este acum **{language}**.",
         "unknown": "Limbă necunoscută: `{language}`. Disponibile: {available}.",
@@ -239,6 +271,10 @@
             "reddit_monitor": {
                 "name": "reddit_monitor - la fiecare 5 minute",
                 "desc": "Verifică r/RomaniaWarEra pentru postări din ultimele 24 de ore și le anunță pe cele noi în canalul de rapoarte."
+            },
+            "newbie_welcome": {
+                "name": "newbie_welcome - la primirea rolului Newbie",
+                "desc": "Când un membru primește rolul Newbie, îl menționează în chatul pentru începători (chats.ro_newbie) cu un mesaj de bun venit: porecla de pe server, primii pași, până la 5 unități militare configurate cu locuri libere (citite live) și promovarea la Citizen. Nu postează nimic la repornire sau pentru membrii care aveau deja rolul."
             }
         }
     },

@@ -53,6 +53,7 @@ _JOB_IDS: List[str] = [
     "monitor_nap",
     "battle_order_monitor",
     "reddit_monitor",
+    "newbie_welcome",
 ]
 
 _COMMANDS_PER_PAGE = 3

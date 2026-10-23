@@ -86,6 +86,8 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.run-job")
         await self.load_extension("cogs.commands.language")
 
+        await self.load_extension("cogs.events.newbie_welcome")
+
         guild = discord.Object(id=config["guild"])
 
         # Initialize shared aiohttp session used by API helpers
