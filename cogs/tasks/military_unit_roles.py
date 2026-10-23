@@ -1,6 +1,7 @@
+import asyncio
 from discord.ext import commands, tasks
-from utils.api import get_shared_session, get_military_units_by_ids, get_user_ids_by_name
-from utils.db import init_db
+from utils.api import get_shared_session, get_military_units_by_ids, get_user_ids_by_name, get_users_info
+from utils.db import init_db, get_api_ids_by_discord_id
 from utils.i18n import Translator, get_translator
 from config import config
 import discord
@@ -19,8 +20,14 @@ class MilitaryUnitRolesJob(commands.Cog):
 
     @tasks.loop(hours=3)
     async def military_unit_roles(self):
-        """Parses all members of the server that hold the citizen role and assigns
-           military unit roles based on the available MU server roles available.
+        """Sync the configured MU server roles of every citizen and newbie member.
+
+           A member linked to a player in the database (by Discord id) is checked
+           against that player's current in-game username: if their server nickname
+           matches it, they get the roles of the MU they belong to or manage and lose
+           the others; if it doesn't, every MU role is removed. Members without a
+           database link are matched by nickname as before. A member whose player
+           could not be loaded this run is left untouched.
         """
         guild = self.bot.get_guild(config['guild'])
         if guild is None:
@@ -36,6 +43,10 @@ class MilitaryUnitRolesJob(commands.Cog):
         session = await get_shared_session()
         tr = await get_translator(guild)
         mu_data_by_id = await get_military_units_by_ids(mu_to_role.keys(), session)
+
+        # A nickname that doesn't match the linked player loses every configured MU
+        # role; that decision needs no MU data, so it also covers MUs that failed to load.
+        configured_roles = {role for role in mu_to_role.values() if role}
 
         # An MU that failed to load is left alone this run: without its member list
         # we would otherwise strip its role from all of its members.
@@ -56,8 +67,20 @@ class MilitaryUnitRolesJob(commands.Cog):
         if newbie:
             members.update(newbie.members)
 
-        # Discord display name -> API user id (cached names cost no request)
-        user_ids = await get_user_ids_by_name([m.display_name for m in members], session)
+        # Discord id -> API user id from the database, read once. If the read fails,
+        # every member is matched by nickname alone.
+        try:
+            linked_ids = await asyncio.to_thread(get_api_ids_by_discord_id)
+        except Exception:
+            linked_ids = {}
+        linked = {m: linked_ids[str(m.id)] for m in members if linked_ids.get(str(m.id))}
+
+        # Current in-game usernames of the linked players (batched). A player missing
+        # here failed to load, so that member is skipped rather than stripped.
+        linked_users = await get_users_info(linked.values(), session) if linked else {}
+
+        # Unlinked members: Discord display name -> API user id (cached names cost no request)
+        user_ids = await get_user_ids_by_name([m.display_name for m in members if m not in linked], session)
 
         # track player display names added/removed per role
         added_members: dict = {}
@@ -66,26 +89,38 @@ class MilitaryUnitRolesJob(commands.Cog):
         # For each member, determine the desired MU-related roles (their current MU
         # plus any MU(s) they own/manage) then add/remove server roles to match.
         for member in members:
-            api_id = user_ids.get(member.display_name)
-            if api_id is None:
-                continue
+            name_matches = True
+            if member in linked:
+                api_id = linked[member]
+                user = linked_users.get(api_id)
+                if not user or not user.get('username'):
+                    continue
+                name_matches = user['username'] == member.display_name
+            else:
+                api_id = user_ids.get(member.display_name)
+                if api_id is None:
+                    continue
 
             # Desired roles set (discord.Role objects)
             desired_roles = set()
 
-            # 1) Current MU role (if the user belongs to one)
-            r = mu_to_role.get(member_mu.get(api_id))
-            if r:
-                desired_roles.add(r)
-
-            # 2) Owner/manager MU roles (if the user's api id is a manager)
-            for owned_mu in owners.get(api_id, set()):
-                r = mu_to_role.get(owned_mu)
+            if name_matches:
+                # 1) Current MU role (if the user belongs to one)
+                r = mu_to_role.get(member_mu.get(api_id))
                 if r:
                     desired_roles.add(r)
 
-            # Roles currently on the member that are MU roles we manage
-            current_mu_roles = {r for r in member.roles if r in managed_roles}
+                # 2) Owner/manager MU roles (if the user's api id is a manager)
+                for owned_mu in owners.get(api_id, set()):
+                    r = mu_to_role.get(owned_mu)
+                    if r:
+                        desired_roles.add(r)
+
+                # Roles currently on the member that are MU roles we manage
+                current_mu_roles = {r for r in member.roles if r in managed_roles}
+            else:
+                # Nickname differs from the linked player's username: drop every MU role
+                current_mu_roles = {r for r in member.roles if r in configured_roles}
 
             # Add roles that are desired but missing
             to_add = [r for r in desired_roles if r not in member.roles]
@@ -102,7 +137,8 @@ class MilitaryUnitRolesJob(commands.Cog):
             roles_to_remove = [r for r in current_mu_roles if r not in desired_roles]
             if roles_to_remove:
                 try:
-                    await member.remove_roles(*roles_to_remove, reason=tr("mu_roles.reason_removed"))
+                    reason = tr("mu_roles.reason_removed") if name_matches else tr("mu_roles.reason_name_mismatch")
+                    await member.remove_roles(*roles_to_remove, reason=reason)
                     for r in roles_to_remove:
                         rname = r.name if r else str(getattr(r, 'id', 'unknown'))
                         removed_members.setdefault(rname, []).append(member.display_name)

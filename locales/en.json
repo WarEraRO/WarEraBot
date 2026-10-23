@@ -225,7 +225,7 @@
             },
             "military_unit_roles": {
                 "name": "military_unit_roles — every 3 hours",
-                "desc": "Assigns Military Unit roles to members based on their in-game MU membership and removes conflicting MU roles. Sends a summary to the reports channel when changes occur."
+                "desc": "Assigns Military Unit roles to members based on their in-game MU membership and removes conflicting MU roles. Members linked to a player whose server nickname doesn't match that player's in-game username lose all MU roles. Sends a summary to the reports channel when changes occur."
             },
             "commander_roles": {
                 "name": "commander_roles — every 3 hours",
@@ -683,7 +683,8 @@
         "added": "Added:",
         "removed": "Removed:",
         "reason_added": "Assigned Military Unit role.",
-        "reason_removed": "Removed unused Military Unit roles."
+        "reason_removed": "Removed unused Military Unit roles.",
+        "reason_name_mismatch": "Server nickname does not match the linked in-game username."
     },
     "unidentified": {
         "check_title": "Unidentified Players Check",

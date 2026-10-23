@@ -226,7 +226,7 @@
             },
             "military_unit_roles": {
                 "name": "military_unit_roles — la fiecare 3 ore",
-                "desc": "Acordă membrilor rolurile de unitate militară după MU-ul din joc și elimină rolurile de MU care nu se potrivesc. Trimite un rezumat în canalul de rapoarte când apar modificări."
+                "desc": "Acordă membrilor rolurile de unitate militară după MU-ul din joc și elimină rolurile de MU care nu se potrivesc. Membrii asociați unui jucător a căror poreclă de pe server diferă de numele din joc pierd toate rolurile de MU. Trimite un rezumat în canalul de rapoarte când apar modificări."
             },
             "commander_roles": {
                 "name": "commander_roles — la fiecare 3 ore",
@@ -688,7 +688,8 @@
         "added": "Adăugați:",
         "removed": "Eliminați:",
         "reason_added": "Rol de unitate militară acordat.",
-        "reason_removed": "Roluri de unitate militară nefolosite eliminate."
+        "reason_removed": "Roluri de unitate militară nefolosite eliminate.",
+        "reason_name_mismatch": "Porecla de pe server nu se potrivește cu numele din joc asociat."
     },
     "unidentified": {
         "check_title": "Verificare jucători neidentificați",
