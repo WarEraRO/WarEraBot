@@ -92,7 +92,8 @@
         },
         "help": {
             "name": "🤖 Comenzile botului",
-            "value": "Folosește /help ca să vezi tot ce poate face botul."
+            "value": "Folosește /help ca să vezi tot ce poate face botul.",
+            "channel": "Folosește comenzile botului, precum /help, doar în {channel}: /help îți arată tot ce poate face botul."
         }
     },
     "setlang": {
@@ -288,7 +289,7 @@
             },
             "newbie_welcome": {
                 "name": "newbie_welcome - la primirea rolului Newbie",
-                "desc": "Când un membru primește rolul Newbie, îl menționează în chatul pentru începători (chats.ro_newbie) cu un mesaj de bun venit: porecla de pe server, primii pași, până la 5 unități militare configurate cu locuri libere (citite live) și promovarea la Citizen. Nu postează nimic la repornire sau pentru membrii care aveau deja rolul."
+                "desc": "Când un membru primește rolul Newbie, îl menționează în chatul pentru începători (chats.ro_newbie) cu un mesaj de bun venit: porecla de pe server, primii pași, până la 5 unități militare configurate cu locuri libere (citite live, fără MU-urile \"fight\"), promovarea la Citizen și unde se folosesc comenzile botului (channels.public_commands). Nu postează nimic la repornire sau pentru membrii care aveau deja rolul."
             }
         }
     },

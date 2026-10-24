@@ -29,7 +29,8 @@
         "articles": 1423735387687223341,
         "government": 1413902684481650778,
         "reddit": 1520780230346805339,
-        "battle-orders": 1413527526604542002
+        "battle-orders": 1413527526604542002,
+        "public_commands": 1482069139282591815
     },
     "military_units": [
         { 
@@ -39,6 +40,7 @@
             "threadIds": {
                 "contractsId": 1557336689347661844
             },
+            "designation": "fight",
             "friendlyName": "LR"
         }, 
         { 
@@ -50,6 +52,7 @@
                 "contractsId": 1557442480142684280,
                 "weeklyReportId": 1557443140561019040
             },
+            "designation": "fight",
             "friendlyName": "Walla"
         },
         { 
@@ -86,6 +89,7 @@
             "threadIds": {
                 "contractsId": 1550456749692026920
             },
+            "designation": "fight",
             "friendlyName": "IOBAG PRAF"
         },
         {
