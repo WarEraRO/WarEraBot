@@ -272,6 +272,10 @@
                 "name": "reddit_monitor - la fiecare 5 minute",
                 "desc": "Verifică r/RomaniaWarEra pentru postări din ultimele 24 de ore și le anunță pe cele noi în canalul de rapoarte."
             },
+            "article_mention": {
+                "name": "article_mention - la fiecare 5 minute",
+                "desc": "Verifică cele mai noi 100 de articole WarEra și postează în canalul de articole fiecare articol nou al unui jucător român (cetățean al României sau membru Citizen/Newbie al acestui server), cu un sfat despre bacșișuri (tips) sub nivelul 25, și fiecare articol al altui jucător care menționează sau etichetează România ori regiunile ei."
+            },
             "newbie_welcome": {
                 "name": "newbie_welcome - la primirea rolului Newbie",
                 "desc": "Când un membru primește rolul Newbie, îl menționează în chatul pentru începători (chats.ro_newbie) cu un mesaj de bun venit: porecla de pe server, primii pași, până la 5 unități militare configurate cu locuri libere (citite live) și promovarea la Citizen. Nu postează nimic la repornire sau pentru membrii care aveau deja rolul."
@@ -659,7 +663,15 @@
         "countries": "Țări"
     },
     "article_mention": {
-        "mentioned": "România a fost menționată în acest articol, poate vrei să arunci o privire."
+        "international": {
+            "description": "🌍 **{player}**, din {country}, a menționat România în acest articol. Merită o privire, ca să aperi țara împotriva propagandei sau ca să încurajezi autorul și să îmbunătățești imaginea României într-un mod prietenos."
+        },
+        "romanian": {
+            "description": "🇷🇴 **{player}**, din comunitatea românească, a publicat un articol nou. Citește-l și susține-l cu un like, un comentariu sau un bacșiș (tip)!",
+            "description_abroad": "🇷🇴 **{player}**, din comunitatea românească (în prezent în {country}), a publicat un articol nou. Citește-l și susține-l cu un like, un comentariu sau un bacșiș (tip)!",
+            "tip_name": "💡 Jucător nou (nivelul {level})",
+            "tip_value": "Bacșișurile (tips) în bani îi ajută pe jucătorii noi ca **{player}** să progreseze mai repede și să rămână implicați în joc."
+        }
     },
     "mercenary_contracts": {
         "posted": "**[CONTRACT]** {country} a publicat un contract {initial}/{budget} pentru {side} — [Vezi bătălia]({link})"
