@@ -654,7 +654,7 @@
         "countries": "Countries"
     },
     "article_mention": {
-        "mentioned": "Romania was mentioned in an article, you might want to check it out -> [{title}]({url})"
+        "mentioned": "Romania was mentioned in this article, you might want to check it out."
     },
     "mercenary_contracts": {
         "posted": "**[CONTRACT]** {country} posted a {initial}/{budget} contract for {side} side — [View Battle]({link})"

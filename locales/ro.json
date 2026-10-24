@@ -659,7 +659,7 @@
         "countries": "Țări"
     },
     "article_mention": {
-        "mentioned": "România a fost menționată într-un articol, poate vrei să arunci o privire -> [{title}]({url})"
+        "mentioned": "România a fost menționată în acest articol, poate vrei să arunci o privire."
     },
     "mercenary_contracts": {
         "posted": "**[CONTRACT]** {country} a publicat un contract {initial}/{budget} pentru {side} — [Vezi bătălia]({link})"
