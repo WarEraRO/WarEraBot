@@ -57,6 +57,37 @@
             "description": "The bot client is closing or disconnected unexpectedly."
         }
     },
+    "newbie_welcome": {
+        "title": "👋 Welcome to the Romanian community!",
+        "description": "You just received the **{role}** role. This chat is the place for your questions: ask anything, more experienced players are here to help.",
+        "citizen_fallback": "Citizen",
+        "nickname": {
+            "name": "🔗 Your server nickname",
+            "value": "Your server nickname must be your exact in-game username: the bot uses it for your military unit role and /subscribe. You can't change it yourself, so if it doesn't match, say so here in the chat."
+        },
+        "start": {
+            "name": "📈 Your first levels",
+            "value": "Put your skill points into economy until level 15 and do your missions every day."
+        },
+        "mus": {
+            "name": "🪖 Join a military unit",
+            "intro": "These units have free spots right now:",
+            "line": "[{name}]({link}) - {members}/{capacity} - {free}",
+            "free": {
+                "one": "{count} space available",
+                "other": "{count} spaces available"
+            },
+            "none": "Ask here in the chat which military unit is recruiting."
+        },
+        "promotion": {
+            "name": "🎖️ Promotion to {citizen}",
+            "value": "Active members from level 20, or from level 15 on an economy build, are checked for promotion to {citizen}."
+        },
+        "help": {
+            "name": "🤖 Bot commands",
+            "value": "Use /help to see everything the bot can do."
+        }
+    },
     "setlang": {
         "updated": "The bot's language for this server is now **{language}**.",
         "unknown": "Unknown language `{language}`. Available: {available}.",
@@ -194,7 +225,7 @@
             },
             "military_unit_roles": {
                 "name": "military_unit_roles — every 3 hours",
-                "desc": "Assigns Military Unit roles to members based on their in-game MU membership and removes conflicting MU roles. Sends a summary to the reports channel when changes occur."
+                "desc": "Assigns Military Unit roles to members based on their in-game MU membership and removes conflicting MU roles. Members linked to a player whose server nickname doesn't match that player's in-game username lose all MU roles. Sends a summary to the reports channel when changes occur."
             },
             "commander_roles": {
                 "name": "commander_roles — every 3 hours",
@@ -239,6 +270,14 @@
             "reddit_monitor": {
                 "name": "reddit_monitor - every 5 minutes",
                 "desc": "Checks r/RomaniaWarEra for posts from the last 24 hours and reports newly seen posts to the reports channel."
+            },
+            "article_mention": {
+                "name": "article_mention - every 5 minutes",
+                "desc": "Checks the 100 newest WarEra articles and posts in the articles channel every new article by a Romanian player (a Romania citizen, or a Citizen/Newbie member of this server), with a tip hint below level 25, and every article by another player that mentions or tags Romania or its regions."
+            },
+            "newbie_welcome": {
+                "name": "newbie_welcome - when the Newbie role is given",
+                "desc": "When a member receives the Newbie role, mentions them in the newbie chat (chats.ro_newbie) with a welcome message: their server nickname, first steps, up to 5 configured military units with free spots (read live) and promotion to Citizen. Posts nothing on a restart or for members who already had the role."
             }
         }
     },
@@ -619,7 +658,15 @@
         "countries": "Countries"
     },
     "article_mention": {
-        "mentioned": "Romania was mentioned in an article, you might want to check it out -> [{title}]({url})"
+        "international": {
+            "description": "🌍 An international player, **{player}** from {country}, mentioned Romania in this article. It might be worth checking it out, to defend our country against propaganda or to encourage the author and improve Romania's image in a friendly manner."
+        },
+        "romanian": {
+            "description": "🇷🇴 A Romanian player, **{player}**, published a new article. Make sure to check it out and support them with a like, a comment or a tip!",
+            "description_abroad": "🇷🇴 A Romanian player, **{player}**, currently residing in {country}, published a new article. Make sure to check it out and support them with a like, a comment or a tip!",
+            "tip_name": "💡 New player (level {level})",
+            "tip_value": "Tips in cash help new players like **{player}** develop faster and keep them engaged in the game."
+        }
     },
     "mercenary_contracts": {
         "posted": "**[CONTRACT]** {country} posted a {initial}/{budget} contract for {side} side — [View Battle]({link})"
@@ -648,7 +695,8 @@
         "added": "Added:",
         "removed": "Removed:",
         "reason_added": "Assigned Military Unit role.",
-        "reason_removed": "Removed unused Military Unit roles."
+        "reason_removed": "Removed unused Military Unit roles.",
+        "reason_name_mismatch": "Server nickname does not match the linked in-game username."
     },
     "unidentified": {
         "check_title": "Unidentified Players Check",

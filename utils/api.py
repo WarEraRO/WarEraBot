@@ -103,27 +103,42 @@ async def _get_with_retry(session, url, params=None, max_retries=5, initial_back
             logger.exception('Unexpected error contacting %s: %s', url, e)
             return None
 
+def _quoted(username):
+    """The search text that asks search.searchAnything for `username` as an exact phrase.
+
+    A plain search is fuzzy and returns at most 5 users, so a short name is often crowded out by
+    longer names containing it ("Tert" returned 5 others, not Tert). Quoted, every one of 257
+    linked server members was found, most as the only result [observed 2026-10-24; not in the spec].
+    """
+    return f'"{username}"'
+
 async def get_user(username, session, base_url="https://api2.warera.io/trpc/search.searchAnything"):
+    """The user whose username is exactly `username`, or None.
+
+    Searches the quoted name first and falls back to the plain name if that finds no exact match.
+    A cached id is fetched without re-checking the username.
+    """
     try:
         if username in PLAYER_CACHE.keys():
             user = await get_user_info(PLAYER_CACHE[username], session)
             return user
 
-        input_data = {'searchText': username}
-        params = {"input": json.dumps(input_data)}
-        data = await _get_with_retry(session, base_url, params=params)
-        if not data:
-            return None
-        api_result = data.get('result', {}).get('data')
-        if not api_result or api_result.get('hasData') is False:
-            return None
-        for userId in api_result.get('userIds', []) or []:
-            user = await get_user_info(userId, session)
-            if user is None:
+        for search_text in (_quoted(username), username):
+            input_data = {'searchText': search_text}
+            params = {"input": json.dumps(input_data)}
+            data = await _get_with_retry(session, base_url, params=params)
+            if not data:
                 continue
-            if username == user.get('username'):
-                PLAYER_CACHE[username] = user.get('_id')
-                return user
+            api_result = data.get('result', {}).get('data')
+            if not api_result or api_result.get('hasData') is False:
+                continue
+            for userId in api_result.get('userIds', []) or []:
+                user = await get_user_info(userId, session)
+                if user is None:
+                    continue
+                if username == user.get('username'):
+                    PLAYER_CACHE[username] = user.get('_id')
+                    return user
         return None
     except Exception as e:
         logger.exception('get_user failed: %s', e)
@@ -265,21 +280,29 @@ async def get_country_governments(country_ids, session):
     return {country_id: government for country_id, government in zip(ids, governments) if government}
 
 async def _search_users_by_name(usernames, session):
-    """Resolve uncached usernames with batched search + getUserLite; exact matches go into PLAYER_CACHE."""
+    """Resolve uncached usernames with batched search + getUserLite; exact matches go into PLAYER_CACHE.
+
+    Names are searched quoted first (see _quoted); only the names that found no exact match are
+    searched again plain.
+    """
     names = list(dict.fromkeys(usernames))
-    searches = await _get_batch(session, 'search.searchAnything', [{'searchText': name} for name in names])
-    candidate_ids = []
-    for search in searches:
-        if search and search.get('hasData') is not False:
-            candidate_ids.extend(search.get('userIds') or [])
-    candidates = await get_users_info(candidate_ids, session)
-    by_username = {user.get('username'): user for user in candidates.values()}
     found = {}
-    for name in names:
-        user = by_username.get(name)
-        if user is not None:
-            PLAYER_CACHE[name] = user.get('_id')
-            found[name] = user
+    for search_text in (_quoted, lambda name: name):
+        missing = [name for name in names if name not in found]
+        if not missing:
+            break
+        searches = await _get_batch(session, 'search.searchAnything', [{'searchText': search_text(name)} for name in missing])
+        candidate_ids = []
+        for search in searches:
+            if search and search.get('hasData') is not False:
+                candidate_ids.extend(search.get('userIds') or [])
+        candidates = await get_users_info(candidate_ids, session)
+        by_username = {user.get('username'): user for user in candidates.values()}
+        for name in missing:
+            user = by_username.get(name)
+            if user is not None:
+                PLAYER_CACHE[name] = user.get('_id')
+                found[name] = user
     return found
 
 async def get_users_by_name(usernames, session):
