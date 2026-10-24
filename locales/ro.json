@@ -57,6 +57,12 @@
             "description": "Clientul botului se închide sau s-a deconectat neașteptat."
         }
     },
+    "join_server": {
+        "reason": "Roluri eliminate la intrarea pe server.",
+        "title": "🧹 Roluri eliminate la intrare",
+        "description": "{member} a intrat pe server cu roluri, care au fost eliminate. La intrare se păstrează doar Unverified.",
+        "roles": "Roluri eliminate"
+    },
     "newbie_welcome": {
         "title": "👋 Bun venit în comunitatea românească!",
         "description": "Tocmai ai primit rolul **{role}**. Aici e locul pentru întrebările tale: întreabă orice, jucătorii mai experimentați te ajută.",
@@ -86,7 +92,8 @@
         },
         "help": {
             "name": "🤖 Comenzile botului",
-            "value": "Folosește /help ca să vezi tot ce poate face botul."
+            "value": "Folosește /help ca să vezi tot ce poate face botul.",
+            "channel": "Folosește comenzile botului, precum /help, doar în {channel}: /help îți arată tot ce poate face botul."
         }
     },
     "setlang": {
@@ -276,9 +283,13 @@
                 "name": "article_mention - la fiecare 5 minute",
                 "desc": "Verifică cele mai noi 100 de articole WarEra și postează în canalul de articole fiecare articol nou al unui jucător român (cetățean al României sau membru Citizen/Newbie al acestui server), cu un sfat despre bacșișuri (tips) sub nivelul 25, și fiecare articol al altui jucător care menționează sau etichetează România ori regiunile ei."
             },
+            "join_server": {
+                "name": "join_server - la intrarea unui membru pe server",
+                "desc": "Când un membru intră sau revine pe server, elimină toate rolurile pe care le are în acel moment, ca un membru care pleacă și revine să nu-și păstreze rolurile vechi. Rolul Unverified (roles.unverified, dat de Carl-bot) rămâne. Rolurile date după intrare rămân. Postează ce a eliminat în canalul de rapoarte."
+            },
             "newbie_welcome": {
                 "name": "newbie_welcome - la primirea rolului Newbie",
-                "desc": "Când un membru primește rolul Newbie, îl menționează în chatul pentru începători (chats.ro_newbie) cu un mesaj de bun venit: porecla de pe server, primii pași, până la 5 unități militare configurate cu locuri libere (citite live) și promovarea la Citizen. Nu postează nimic la repornire sau pentru membrii care aveau deja rolul."
+                "desc": "Când un membru primește rolul Newbie, îl menționează în chatul pentru începători (chats.ro_newbie) cu un mesaj de bun venit: porecla de pe server, primii pași, până la 5 unități militare configurate cu locuri libere (citite live, fără MU-urile \"fight\"), promovarea la Citizen și unde se folosesc comenzile botului (channels.public_commands). Nu postează nimic la repornire sau pentru membrii care aveau deja rolul."
             }
         }
     },
