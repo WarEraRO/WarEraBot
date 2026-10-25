@@ -112,14 +112,17 @@
     },
     "help": {
         "commands_title": "Comenzile botului",
-        "commands_description": "Folosește comenzile slash de mai jos. Sugestiile automate sunt disponibile acolo unde se aplică.",
+        "commands_description": "Folosește comenzile slash de mai jos. Sugestiile automate sunt disponibile acolo unde se aplică.\nSfat: `/help topic:` deschide o singură comandă sau sarcină.",
         "commands_footer": "Comenzi — Pagina {page} din {pages}",
         "jobs_title": "Sarcini de fundal",
-        "jobs_description": "Sarcinile de fundal active și cât de des rulează.",
+        "jobs_description": "Sarcinile de fundal active și cât de des rulează.\nSfat: `/help topic:` deschide o singură comandă sau sarcină.",
         "jobs_footer": "Sarcini — Pagina {page} din {pages}",
         "commands_button": "Comenzi",
         "jobs_button": "Sarcini",
         "unavailable": "Ajutorul nu poate fi afișat momentan.",
+        "topic_footer_command": "Comandă — folosește /help fără opțiuni pentru lista completă",
+        "topic_footer_job": "Sarcină de fundal — folosește /help fără opțiuni pentru lista completă",
+        "unknown_topic": "Nicio comandă sau sarcină nu se potrivește cu **{topic}**. Alege una din sugestii sau folosește /help fără opțiuni pentru lista completă.",
         "commands": {
             "diplomacy": {
                 "name": "/diplomacy [country_name]",
@@ -1048,7 +1051,10 @@
         }
     },
     "slash": {
-        "help": {"description": "Afișează comenzile botului și sarcinile de fundal (paginat)."},
+        "help": {
+            "description": "Afișează comenzile botului și sarcinile de fundal sau una dintre ele în detaliu.",
+            "params": {"topic": "O singură comandă sau sarcină de fundal (lasă gol pentru lista completă)"}
+        },
         "setlang": {
             "description": "Setează limba botului pe acest server (doar pentru dezvoltatori).",
             "params": {"language": "Limba tuturor mesajelor botului pe acest server"}

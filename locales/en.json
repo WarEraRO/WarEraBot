@@ -111,14 +111,17 @@
     },
     "help": {
         "commands_title": "Bot Commands",
-        "commands_description": "Use the slash commands below. Autocomplete is available where applicable.",
+        "commands_description": "Use the slash commands below. Autocomplete is available where applicable.\nTip: `/help topic:` opens a single command or job.",
         "commands_footer": "Commands — Page {page} of {pages}",
         "jobs_title": "Background Jobs / Tasks",
-        "jobs_description": "Active background tasks and how often they run.",
+        "jobs_description": "Active background tasks and how often they run.\nTip: `/help topic:` opens a single command or job.",
         "jobs_footer": "Jobs — Page {page} of {pages}",
         "commands_button": "Commands",
         "jobs_button": "Jobs",
         "unavailable": "Unable to display help at this time.",
+        "topic_footer_command": "Command — run /help without options to browse everything",
+        "topic_footer_job": "Background job — run /help without options to browse everything",
+        "unknown_topic": "No command or job matches **{topic}**. Pick one from the suggestions, or run /help without options to browse everything.",
         "commands": {
             "diplomacy": {
                 "name": "/diplomacy [country_name]",
