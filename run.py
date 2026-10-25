@@ -88,7 +88,6 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.language")
 
         await self.load_extension("cogs.events.newbie_welcome")
-        await self.load_extension("cogs.events.join_server")
 
         guild = discord.Object(id=config["guild"])
 

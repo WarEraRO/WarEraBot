@@ -57,12 +57,6 @@
             "description": "The bot client is closing or disconnected unexpectedly."
         }
     },
-    "join_server": {
-        "reason": "Roles removed on joining the server.",
-        "title": "🧹 Roles removed on join",
-        "description": "{member} joined the server with roles, which were removed. Only Unverified is kept on join.",
-        "roles": "Removed roles"
-    },
     "newbie_welcome": {
         "title": "👋 Welcome to the Romanian community!",
         "description": "You just received the **{role}** role. This chat is the place for your questions: ask anything, more experienced players are here to help.",
@@ -289,10 +283,6 @@
             "article_mention": {
                 "name": "article_mention - every 5 minutes",
                 "desc": "Checks the 100 newest WarEra articles and posts in the articles channel every new article by a Romanian player (a Romania citizen, or a Citizen/Newbie member of this server), with a tip hint below level 25, and every article by another player that mentions or tags Romania or its regions."
-            },
-            "join_server": {
-                "name": "join_server - when a member joins the server",
-                "desc": "When a member joins or rejoins the server, removes every role they have at that moment, so a member who leaves and comes back can't keep their old roles. The Unverified role (roles.unverified, given by Carl-bot) is kept. Roles given after the join stay. Posts what it removed in the reports channel."
             },
             "newbie_welcome": {
                 "name": "newbie_welcome - when the Newbie role is given",

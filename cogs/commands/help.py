@@ -57,7 +57,6 @@ _JOB_IDS: List[str] = [
     "reddit_monitor",
     "article_mention",
     "newbie_welcome",
-    "join_server",
 ]
 
 _COMMANDS_PER_PAGE = 3
