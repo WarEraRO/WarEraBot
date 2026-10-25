@@ -50,7 +50,8 @@
             "leaderId": 711121837274300466,
             "threadIds": {
                 "contractsId": 1557442480142684280,
-                "weeklyReportId": 1557443140561019040
+                "weeklyReportId": 1557443140561019040,
+                "bountyId": 1563863220777787443
             },
             "designation": "fight",
             "friendlyName": "Walla"

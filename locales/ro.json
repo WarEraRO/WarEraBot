@@ -173,6 +173,10 @@
                 "name": "/subscribe contracts | /unsubscribe contracts",
                 "desc": "Primești mențiune în firul sau canalul de contracte al unității tale militare când aceasta câștigă un contract de mercenari. Contul tău de Discord trebuie să fie legat de jucătorul tău WarEra și trebuie să fii într-una dintre unitățile militare ale acestui server. Unitatea nu se salvează: primești mențiune pentru contractele unității în care ești când se câștigă unul, deci la schimbarea unității nu trebuie să te abonezi din nou. Nu primești mențiune cât ai build de economie sau nu ai puncte de skill, ori nu poți lupta (viață sub 10 și fără foame, sau în debuff). Dacă părăsești serverul, abonamentul se șterge. Răspunsurile sunt vizibile doar pentru tine."
             },
+            "subscriptions_bounty": {
+                "name": "/subscribe bounty | /unsubscribe bounty",
+                "desc": "Primești mențiune în firul de recompense al unității tale militare (threadIds.bountyId) când România, o țară din alianța ei sau un partener de pact defensiv are o recompensă într-o bătălie. Fiecare postare de recompensă te menționează o singură dată: în postare, dacă poți lupta pentru ea când apare, sau într-un răspuns când poți lupta mai târziu. Poți lupta când ai build de luptă (fără puncte de skill contează ca economie), viață 10+ sau foame rămasă și nu ești în debuff. Contul tău de Discord trebuie să fie legat de jucătorul tău WarEra și trebuie să fii într-o unitate militară cu fir de recompense. Unitatea nu se salvează, deci la schimbarea unității nu trebuie să te abonezi din nou. Dacă părăsești serverul, abonamentul se șterge. Răspunsurile sunt vizibile doar pentru tine."
+            },
             "subscriptions_loot": {
                 "name": "/subscribe loot | /unsubscribe loot",
                 "desc": "Primești un DM în ultimele ~10 minute ale fiecărei runde dintr-o bătălie în care ai lovit, cu pool-urile de loot ale rundei și ale bătăliei, ca în `/loot_targets`: locul, damage-ul și itemul tău, cât îți trebuie pentru locul următor și pentru o raritate mai bună și cine de sub tine îți poate lua raritatea. Estimează și damage-ul pe care îl mai poți da cu echipamentul, bonusul de bătălie, viața și foamea de acum, și cel mai bun item pe care îl atinge. Se trimit doar bătăliile în care ai un item sau poți ajunge la unul. Nu primești nimic cât ai build de economie sau nu ai puncte de skill, ori nu poți lupta (viață sub 10 și fără foame, sau în debuff). Contul tău de Discord trebuie să fie legat de jucătorul tău WarEra și trebuie să accepți DM-uri de la membrii acestui server. Dacă părăsești serverul, abonamentul se șterge. Răspunsurile sunt vizibile doar pentru tine."
@@ -250,6 +254,10 @@
             "buff_monitor": {
                 "name": "buff_monitor — la fiecare 10 minute",
                 "desc": "Urmărește buff-urile luptătorilor și îi anunță când buff-ul de la pastilă e pe cale să expire (folosește o memorie internă ca să nu repete notificările)."
+            },
+            "bounty_alerts": {
+                "name": "bounty_alerts — în fiecare minut",
+                "desc": "Ține câte o postare pe bătălie în firul de recompense al fiecărei unități militare (threadIds.bountyId; unitățile fără fir nu primesc nimic) cât timp România, un partener de pact defensiv sau un membru al alianței ei are o recompensă acolo: cele două țări, linkul bătăliei și, pentru fiecare parte aliată, plata la 1k damage și fondul rămas. Postarea se editează în fiecare minut cu plata și fondul actuale și se șterge când recompensa se termină; o recompensă înlocuită de una nouă între două verificări doar o actualizează. Menționează abonații /subscribe bounty ai unității care au build de luptă, viață 10+ sau foame rămasă și nu sunt în debuff, o singură dată pe postare: în postare sau într-un răspuns când pot lupta mai târziu. Postările făcute înainte de o repornire sunt preluate din nou din fir. Abonații care au părăsit serverul sunt dezabonați."
             },
             "bounty_monitor": {
                 "name": "bounty_monitor — interval configurabil",
@@ -732,6 +740,13 @@
     "bounty_monitor": {
         "bounty": "**[RECOMPENSĂ]** {money_per}/{pool} de la {country} ({side}) contra {opponent} ({opponent_side}) — [Vezi bătălia]({link})"
     },
+    "bounty_alerts": {
+        "title": "💰 Recompensă: {countries}",
+        "description": "{attacker_icon} {attacker} vs. {defender_icon} {defender}\n[Vezi bătălia]({link})",
+        "side_value": "💵 {rate} / 1k damage\n💰 {pool} în fond",
+        "footer": "Se actualizează în fiecare minut · se șterge când se termină recompensa",
+        "new_eligible": "⬆️ Puteți lupta acum pentru această recompensă: {mentions}"
+    },
     "nap_monitor": {
         "title": "Alertă de încălcare NAP",
         "description": "Au fost găsite ordine de luptă active împotriva partenerilor NAP configurați.",
@@ -751,6 +766,12 @@
         "loot_already_subscribed": "Ești deja abonat la alertele de loot.",
         "loot_not_subscribed": "Nu ești abonat la alertele de loot.",
         "loot_unsubscribed": "Nu mai primești alerte de loot.",
+        "bounty_not_in_unit": "Nu ești în nicio unitate militară care are un fir de recompense pe acest server.",
+        "bounty_subscribed": "Vei primi mențiune în {channel}, firul de recompense al unității **{mu}**, când România, o țară din alianța ei sau un partener de pact defensiv are o recompensă într-o bătălie. Fiecare postare de recompensă te menționează o singură dată: când apare sau mai târziu, când poți lupta pentru ea (build de luptă, viață 10+ sau foame rămasă, fără debuff). Dacă schimbi unitatea, primești mențiune în firul de recompense al noii unități, dacă are unul. Folosește `/unsubscribe bounty` ca să te dezabonezi.",
+        "bounty_already_subscribed": "Abonamentul la mențiunile pentru recompense există deja (acum ești în **{mu}**).",
+        "bounty_not_subscribed": "Nu ai un abonament la mențiunile pentru recompense.",
+        "bounty_unsubscribed": "Nu mai primești mențiuni pentru recompense.",
+        "bounty_unit_channel": "firul de recompense al unității militare",
         "failed": "Abonamentul nu a putut fi actualizat. Încearcă din nou mai târziu."
     },
     "loot_alerts": {
@@ -1120,6 +1141,9 @@
             },
             "loot": {
                 "description": "Primește DM despre loot-ul tău în ultimele minute ale fiecărei runde în care ai lovit."
+            },
+            "bounty": {
+                "description": "Primește mențiune în firul de recompense al unității când România sau aliații ei pun o recompensă."
             }
         },
         "unsubscribe": {
@@ -1129,6 +1153,9 @@
             },
             "loot": {
                 "description": "Nu mai primi DM-uri despre loot-ul tău când se încheie o rundă."
+            },
+            "bounty": {
+                "description": "Nu mai primi mențiuni pentru recompensele României și ale aliaților ei."
             }
         },
         "inactive_players": {"description": "Listează jucătorii inactivi de mai mult de 3 zile."},

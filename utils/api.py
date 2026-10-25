@@ -600,7 +600,27 @@ async def get_country(countryId, session, base_url="https://api2.warera.io/trpc/
     except Exception as e:
         logger.exception('get_country failed: %s', e)
         return None
-    
+
+async def get_alliance(allianceId, session, base_url="https://api2.warera.io/trpc/alliance.getById"):
+    """The alliance with this id (`country.allianceId`), or None when it could not be fetched.
+
+    `alliance.getById` is not in the official API spec (documented by the community explorer). The
+    result carries `memberCountries`, a list of `{"country": <country id>, "suspended": bool, ...}`.
+    """
+    try:
+        input_data = {'allianceId': allianceId}
+        params = {"input": json.dumps(input_data)}
+        data = await _get_with_retry(session, base_url, params=params)
+        if not data:
+            return None
+        api_result = data.get('result', {}).get('data')
+        if not api_result:
+            return None
+        return api_result
+    except Exception as e:
+        logger.exception('get_alliance failed: %s', e)
+        return None
+
 async def get_mercenary_auctions(session, base_url="https://api2.warera.io/trpc/mercenaryContractAuction.getPaginatedAuctions"):
     try:
         input_data = {"limit": 50, "status": "active"}

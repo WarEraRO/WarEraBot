@@ -172,6 +172,10 @@
                 "name": "/subscribe contracts | /unsubscribe contracts",
                 "desc": "Get pinged in your military unit's contracts thread or channel when it wins a mercenary contract. Your Discord account must be linked to your WarEra player, and you must be in one of this server's military units. The unit is not stored: you are pinged for the contracts of whichever unit you are in when one is won, so changing unit needs no new subscription. You are not pinged while you are on an economy build or have no skill points, or cannot fight (health under 10 and no hunger left, or in debuff). Leaving the server removes your subscription. Replies are only visible to you."
             },
+            "subscriptions_bounty": {
+                "name": "/subscribe bounty | /unsubscribe bounty",
+                "desc": "Get pinged in your military unit's bounty thread (threadIds.bountyId) when Romania, a country of its alliance or a defensive-pact partner has a bounty in a battle. Each bounty post mentions you once: in the post if you can fight for it when it appears, or in a reply when you become able to later. You can fight when you are on a fight build (no skill points counts as economy), have health 10+ or hunger left and are not in debuff. Your Discord account must be linked to your WarEra player, and you must be in a military unit with a bounty thread. The unit is not stored, so changing unit needs no new subscription. Leaving the server removes your subscription. Replies are only visible to you."
+            },
             "subscriptions_loot": {
                 "name": "/subscribe loot | /unsubscribe loot",
                 "desc": "Get a DM in the last ~10 minutes of each round of a battle you hit, with the round's and the battle's loot pools as `/loot_targets` shows them: your rank, damage and item, what the next rank and a better rarity need, and who below could take your rarity. It also estimates the damage your current gear, battle bonus, health and hunger can still deal, and the best item that damage reaches. Only battles where you hold an item or could reach one are sent. You get nothing while you are on an economy build or have no skill points, or cannot fight (health under 10 and no hunger left, or in debuff). Your Discord account must be linked to your WarEra player, and you must accept DMs from this server's members. Leaving the server removes your subscription. Replies are only visible to you."
@@ -249,6 +253,10 @@
             "buff_monitor": {
                 "name": "buff_monitor — every 10 minutes",
                 "desc": "Monitors fighter buffs and notifies users when their active pill buff is nearing expiration (uses an internal cache to avoid repeated notifications)."
+            },
+            "bounty_alerts": {
+                "name": "bounty_alerts — every minute",
+                "desc": "Keeps one post per battle in each military unit's bounty thread (threadIds.bountyId; units without one get nothing) while Romania, a defensive-pact partner or a member of its alliance has a bounty there: both countries, the battle link and each allied side's pay per 1k damage and pool left. The post is edited every minute with the current rate and pool, and deleted when the bounty runs out; a bounty replaced by a new one between two checks only updates it. Mentions the /subscribe bounty subscribers of that unit who are on a fight build, have health 10+ or hunger left and are not in debuff, once per post: in the post, or in a reply when they become able to fight later. Posts made before a restart are picked up again from the thread. Subscribers who left the server are unsubscribed."
             },
             "bounty_monitor": {
                 "name": "bounty_monitor — configurable interval",
@@ -726,6 +734,13 @@
     "bounty_monitor": {
         "bounty": "**[BOUNTY]** {money_per}/{pool} from {country} ({side}) against {opponent} ({opponent_side}) — [View Battle]({link})"
     },
+    "bounty_alerts": {
+        "title": "💰 Bounty: {countries}",
+        "description": "{attacker_icon} {attacker} vs. {defender_icon} {defender}\n[View battle]({link})",
+        "side_value": "💵 {rate} / 1k damage\n💰 {pool} left",
+        "footer": "Updated every minute · deleted when the bounty runs out",
+        "new_eligible": "⬆️ You can fight for this bounty now: {mentions}"
+    },
     "nap_monitor": {
         "title": "NAP Violation Alert",
         "description": "Active battle orders were found against configured NAP partners.",
@@ -745,6 +760,12 @@
         "loot_already_subscribed": "You are already subscribed to loot alerts.",
         "loot_not_subscribed": "You are not subscribed to loot alerts.",
         "loot_unsubscribed": "You will no longer get loot alerts.",
+        "bounty_not_in_unit": "You are not in any military unit that has a bounty thread on this server.",
+        "bounty_subscribed": "You will be pinged in {channel}, the bounty thread of **{mu}**, when Romania, a country of its alliance or a defensive-pact partner has a bounty in a battle. Each bounty post mentions you once: when it is posted, or later when you become able to fight for it (fight build, health 10+ or hunger left, not in debuff). If you change unit, you are pinged in your new unit's bounty thread, if it has one. Use `/unsubscribe bounty` to stop.",
+        "bounty_already_subscribed": "You are already subscribed to bounty pings (you are in **{mu}** now).",
+        "bounty_not_subscribed": "You are not subscribed to bounty pings.",
+        "bounty_unsubscribed": "You will no longer be pinged for bounties.",
+        "bounty_unit_channel": "the military unit's bounty thread",
         "failed": "Could not update your subscription. Try again later."
     },
     "loot_alerts": {
