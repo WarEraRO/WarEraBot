@@ -46,6 +46,7 @@ class WarEraBot(commands.Bot):
             await api.close_shared_session()
 
     async def setup_hook(self):
+        """Load every task, command and event cog, then sync the slash commands (with Romanian translations)."""
         await self.load_extension("cogs.tasks.military_unit_roles")
         await self.load_extension("cogs.tasks.commander_roles")
         await self.load_extension("cogs.tasks.skill_roles")
@@ -69,6 +70,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.naps")
         await self.load_extension("cogs.commands.mu_stray")
         await self.load_extension("cogs.commands.pills")
+        await self.load_extension("cogs.commands.mu_pill_plan")
         await self.load_extension("cogs.commands.fight_wealth")
         await self.load_extension("cogs.commands.mu_order_alignment")
         await self.load_extension("cogs.commands.mu_positions")

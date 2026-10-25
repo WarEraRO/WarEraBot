@@ -178,6 +178,10 @@
                 "name": "/pills military_unit",
                 "desc": "Pill status of a configured military unit (autocomplete): who is pilled, grouped by the hour they pilled, who is in debuff, grouped by the hour it ends (both with time left), and fighters not pilled. Hours are shown in the configured timezone."
             },
+            "mu_pill_plan": {
+                "name": "/mu_pill_plan military_unit",
+                "desc": "Pill plan for a configured military unit (autocomplete), assuming nobody takes a new Pill: how many fighters are in buff, in debuff or can take a Pill now, the earliest time all of them can take one together, an hour-by-hour timeline of those counts, and who can't take one yet, with the time they can. It also splits the fighters into squads of 4 that each take the Pill at their own hour every day, so everyone takes one within the same day. Squads are built from the hours members took their current Pill; fighters without one fill free places or form new squads in the emptiest hours. Each squad shows its daily hour, its first turn and its members, and the hours with no squad in buff are flagged. Economy builds are left out. Hours are shown in the configured timezone. The reply is posted in the channel; nobody is pinged."
+            },
             "fight_wealth": {
                 "name": "/fight_wealth military_unit",
                 "desc": "Fight wealth of every member of a configured military unit (autocomplete): money, items, equipment and weapons, companies excluded. Members are ranked richest first and grouped by tier: GOLD ≥15K, SILVER 10K–15K, BRONZE 5K–10K, IRON <5K. The daily report to MU leaders shows the tier counts and the richest names of each tier."
@@ -611,6 +615,32 @@
         "footer_economy": {
             "one": "{count} economy member not listed",
             "other": "{count} economy members not listed"
+        },
+        "footer_missing": {
+            "one": "{count} member could not be fetched",
+            "other": "{count} members could not be fetched"
+        }
+    },
+    "mu_pill_plan": {
+        "unknown_unit": "Unknown military unit. Pick one from the list.",
+        "members_unavailable": "Could not fetch the military unit members. Try again later.",
+        "title": "💊 Pill plan · {mu}",
+        "now_line": "**Now** · fighters: {total} · 💊 in buff: {buff} · 🥴 in debuff: {debuff} · ✅ can take a Pill: {ready}",
+        "all_ready_now": "✅ Every fighter can take a Pill **now**.",
+        "all_ready": "✅ Every fighter can take a Pill together from **{time}**.",
+        "all_available_now": "⚔️ Every fighter is in buff or can take a Pill **now**.",
+        "all_available": "⚔️ Every fighter is in buff or can take a Pill from **{time}**.",
+        "no_fighters": "No fighter could be found in this military unit.",
+        "now": "now",
+        "day_time_format": "%a %H:%M",
+        "timeline_title": "🕒 Timeline (hours when the counts change)",
+        "waiting_title": "⏳ Not ready yet ({count}) · can take a Pill from",
+        "rotation_title": "🔁 Daily squads of {size} · each takes the Pill at its hour every day · ▶ first turn",
+        "rotation_gap": "⚠️ No squad in buff {start} – {end}",
+        "footer": "Hours in {tz} · assumes nobody takes a new Pill · 💊 buff {buff} h, 🥴 debuff {debuff} h · ✅ can take a Pill",
+        "footer_economy": {
+            "one": "{count} economy member not counted",
+            "other": "{count} economy members not counted"
         },
         "footer_missing": {
             "one": "{count} member could not be fetched",
