@@ -57,12 +57,6 @@
             "description": "Clientul botului se închide sau s-a deconectat neașteptat."
         }
     },
-    "join_server": {
-        "reason": "Roluri eliminate la intrarea pe server.",
-        "title": "🧹 Roluri eliminate la intrare",
-        "description": "{member} a intrat pe server cu roluri, care au fost eliminate. La intrare se păstrează doar Unverified.",
-        "roles": "Roluri eliminate"
-    },
     "newbie_welcome": {
         "title": "👋 Bun venit în comunitatea românească!",
         "description": "Tocmai ai primit rolul **{role}**. Aici e locul pentru întrebările tale: întreabă orice, jucătorii mai experimentați te ajută.",
@@ -100,6 +94,12 @@
         "updated": "Limba botului pe acest server este acum **{language}**.",
         "unknown": "Limbă necunoscută: `{language}`. Disponibile: {available}.",
         "failed": "Limba nu a putut fi salvată. Încearcă din nou mai târziu."
+    },
+    "server_ids": {
+        "channels_title": "Canale ({page}/{pages})",
+        "threads_title": "Fire active ({page}/{pages})",
+        "roles_title": "Roluri ({page}/{pages})",
+        "no_category": "Fără categorie"
     },
     "run_job": {
         "every": "la fiecare {interval}",
@@ -173,6 +173,10 @@
                 "name": "/subscribe contracts | /unsubscribe contracts",
                 "desc": "Primești mențiune în firul sau canalul de contracte al unității tale militare când aceasta câștigă un contract de mercenari. Contul tău de Discord trebuie să fie legat de jucătorul tău WarEra și trebuie să fii într-una dintre unitățile militare ale acestui server. Unitatea nu se salvează: primești mențiune pentru contractele unității în care ești când se câștigă unul, deci la schimbarea unității nu trebuie să te abonezi din nou. Nu primești mențiune cât ai build de economie sau nu ai puncte de skill, ori nu poți lupta (viață sub 10 și fără foame, sau în debuff). Dacă părăsești serverul, abonamentul se șterge. Răspunsurile sunt vizibile doar pentru tine."
             },
+            "subscriptions_bounty": {
+                "name": "/subscribe bounty | /unsubscribe bounty",
+                "desc": "Primești mențiune în firul de recompense al unității tale militare (threadIds.bountyId) când România, o țară din alianța ei sau un partener de pact defensiv are o recompensă într-o bătălie. Fiecare postare de recompensă te menționează o singură dată: în postare, dacă poți lupta pentru ea când apare, sau într-un răspuns când poți lupta mai târziu. Poți lupta când ai build de luptă (fără puncte de skill contează ca economie), viață 10+ sau foame rămasă și nu ești în debuff. Contul tău de Discord trebuie să fie legat de jucătorul tău WarEra și trebuie să fii într-o unitate militară cu fir de recompense. Unitatea nu se salvează, deci la schimbarea unității nu trebuie să te abonezi din nou. Dacă părăsești serverul, abonamentul se șterge. Răspunsurile sunt vizibile doar pentru tine."
+            },
             "subscriptions_loot": {
                 "name": "/subscribe loot | /unsubscribe loot",
                 "desc": "Primești un DM în ultimele ~10 minute ale fiecărei runde dintr-o bătălie în care ai lovit, cu pool-urile de loot ale rundei și ale bătăliei, ca în `/loot_targets`: locul, damage-ul și itemul tău, cât îți trebuie pentru locul următor și pentru o raritate mai bună și cine de sub tine îți poate lua raritatea. Estimează și damage-ul pe care îl mai poți da cu echipamentul, bonusul de bătălie, viața și foamea de acum, și cel mai bun item pe care îl atinge. Se trimit doar bătăliile în care ai un item sau poți ajunge la unul. Nu primești nimic cât ai build de economie sau nu ai puncte de skill, ori nu poți lupta (viață sub 10 și fără foame, sau în debuff). Contul tău de Discord trebuie să fie legat de jucătorul tău WarEra și trebuie să accepți DM-uri de la membrii acestui server. Dacă părăsești serverul, abonamentul se șterge. Răspunsurile sunt vizibile doar pentru tine."
@@ -180,6 +184,10 @@
             "pills": {
                 "name": "/pills military_unit",
                 "desc": "Starea pastilelor într-o unitate militară configurată (cu sugestii): cine are pastilă, grupați după ora la care au luat-o, cine e în debuff, grupați după ora la care se termină (ambele cu timpul rămas), și luptătorii fără pastilă. Orele sunt afișate în fusul orar configurat."
+            },
+            "mu_pill_plan": {
+                "name": "/mu_pill_plan military_unit",
+                "desc": "Planul de pastile al unei unități militare configurate (cu sugestii), presupunând că nimeni nu ia o pastilă nouă: câți luptători au buff, sunt în debuff sau pot lua pastila acum, cel mai devreme moment în care o pot lua toți împreună, o cronologie pe ore a acestor numere și cine nu o poate lua încă, cu ora de la care poate. Împarte și luptătorii în echipe de câte 4, fiecare luând pastila la ora ei în fiecare zi, astfel încât toți o iau în aceeași zi. Echipele se formează după orele la care membrii au luat pastila actuală; luptătorii fără pastilă completează locurile libere sau formează echipe noi în orele cele mai goale. Fiecare echipă arată ora zilnică, prima tură și membrii, iar orele fără nicio echipă cu buff sunt semnalate. Build-urile de economie nu sunt incluse. Orele sunt afișate în fusul orar configurat. Răspunsul e postat în canal; nimeni nu e menționat."
             },
             "fight_wealth": {
                 "name": "/fight_wealth military_unit",
@@ -224,6 +232,10 @@
             "setlang": {
                 "name": "/setlang language",
                 "desc": "Doar pentru dezvoltatori. Setează limba botului pe acest server (engleză sau română): răspunsuri la comenzi, butoane, rapoarte, alerte și mesajele private trimise din cauza acestui server. Câmpul are sugestii."
+            },
+            "server_ids": {
+                "name": "/server_ids",
+                "desc": "Doar pentru dezvoltatori. Listează toate canalele (grupate pe categorii), firele active și rolurile acestui server, cu id-urile lor, în embed-uri vizibile doar pentru tine. Firele arhivate nu sunt listate."
             }
         },
         "jobs": {
@@ -250,6 +262,10 @@
             "buff_monitor": {
                 "name": "buff_monitor — la fiecare 10 minute",
                 "desc": "Urmărește buff-urile luptătorilor și îi anunță când buff-ul de la pastilă e pe cale să expire (folosește o memorie internă ca să nu repete notificările)."
+            },
+            "bounty_alerts": {
+                "name": "bounty_alerts — în fiecare minut",
+                "desc": "Ține câte o postare pe bătălie în firul de recompense al fiecărei unități militare (threadIds.bountyId; unitățile fără fir nu primesc nimic) cât timp România, un partener de pact defensiv sau un membru al alianței ei are o recompensă acolo: cele două țări, linkul bătăliei și, pentru fiecare parte aliată, plata la 1k damage și fondul rămas. Postarea se editează în fiecare minut cu plata și fondul actuale și se șterge când recompensa se termină; o recompensă înlocuită de una nouă între două verificări doar o actualizează. Menționează abonații /subscribe bounty ai unității care au build de luptă, viață 10+ sau foame rămasă și nu sunt în debuff, o singură dată pe postare: în postare sau într-un răspuns când pot lupta mai târziu. Postările făcute înainte de o repornire sunt preluate din nou din fir. Abonații care au părăsit serverul sunt dezabonați."
             },
             "bounty_monitor": {
                 "name": "bounty_monitor — interval configurabil",
@@ -282,10 +298,6 @@
             "article_mention": {
                 "name": "article_mention - la fiecare 5 minute",
                 "desc": "Verifică cele mai noi 100 de articole WarEra și postează în canalul de articole fiecare articol nou al unui jucător român (cetățean al României sau membru Citizen/Newbie al acestui server), cu un sfat despre bacșișuri (tips) sub nivelul 25, și fiecare articol al altui jucător care menționează sau etichetează România ori regiunile ei."
-            },
-            "join_server": {
-                "name": "join_server - la intrarea unui membru pe server",
-                "desc": "Când un membru intră sau revine pe server, elimină toate rolurile pe care le are în acel moment, ca un membru care pleacă și revine să nu-și păstreze rolurile vechi. Rolul Unverified (roles.unverified, dat de Carl-bot) rămâne. Rolurile date după intrare rămân. Postează ce a eliminat în canalul de rapoarte."
             },
             "newbie_welcome": {
                 "name": "newbie_welcome - la primirea rolului Newbie",
@@ -624,6 +636,34 @@
             "other": "{count} de membri nu au putut fi preluați"
         }
     },
+    "mu_pill_plan": {
+        "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
+        "members_unavailable": "Membrii unității militare nu au putut fi preluați. Încearcă din nou mai târziu.",
+        "title": "💊 Plan pastile · {mu}",
+        "now_line": "**Acum** · luptători: {total} · 💊 cu buff: {buff} · 🥴 în debuff: {debuff} · ✅ pot lua pastila: {ready}",
+        "all_ready_now": "✅ Toți luptătorii pot lua pastila **acum**.",
+        "all_ready": "✅ Toți luptătorii pot lua pastila împreună de la **{time}**.",
+        "all_available_now": "⚔️ Toți luptătorii au buff sau pot lua pastila **acum**.",
+        "all_available": "⚔️ Toți luptătorii au buff sau pot lua pastila de la **{time}**.",
+        "no_fighters": "Nu s-a găsit niciun luptător în această unitate militară.",
+        "now": "acum",
+        "day_time_format": "%a %H:%M",
+        "timeline_title": "🕒 Cronologie (orele la care se schimbă numerele)",
+        "waiting_title": "⏳ Nu pot lua încă pastila ({count}) · pot de la",
+        "rotation_title": "🔁 Echipe zilnice de câte {size} · fiecare ia pastila la ora ei în fiecare zi · ▶ prima tură",
+        "rotation_gap": "⚠️ Nicio echipă cu buff {start} – {end}",
+        "footer": "Ore în {tz} · presupune că nimeni nu ia o pastilă nouă · 💊 buff {buff} h, 🥴 debuff {debuff} h · ✅ poate lua pastila",
+        "footer_economy": {
+            "one": "{count} membru economic neinclus",
+            "few": "{count} membri economici neincluși",
+            "other": "{count} de membri economici neincluși"
+        },
+        "footer_missing": {
+            "one": "{count} membru nu a putut fi preluat",
+            "few": "{count} membri nu au putut fi preluați",
+            "other": "{count} de membri nu au putut fi preluați"
+        }
+    },
     "weekly_damages": {
         "title": "Damage săptămânal jucători - {countries}",
         "more_countries": "{names} + încă {count}",
@@ -732,6 +772,13 @@
     "bounty_monitor": {
         "bounty": "**[RECOMPENSĂ]** {money_per}/{pool} de la {country} ({side}) contra {opponent} ({opponent_side}) — [Vezi bătălia]({link})"
     },
+    "bounty_alerts": {
+        "title": "💰 Recompensă: {countries}",
+        "description": "{attacker_icon} {attacker} vs. {defender_icon} {defender}\n[Vezi bătălia]({link})",
+        "side_value": "💵 {rate} / 1k damage\n💰 {pool} în fond",
+        "footer": "Se actualizează în fiecare minut · se șterge când se termină recompensa",
+        "new_eligible": "⬆️ Puteți lupta acum pentru această recompensă: {mentions}"
+    },
     "nap_monitor": {
         "title": "Alertă de încălcare NAP",
         "description": "Au fost găsite ordine de luptă active împotriva partenerilor NAP configurați.",
@@ -751,6 +798,12 @@
         "loot_already_subscribed": "Ești deja abonat la alertele de loot.",
         "loot_not_subscribed": "Nu ești abonat la alertele de loot.",
         "loot_unsubscribed": "Nu mai primești alerte de loot.",
+        "bounty_not_in_unit": "Nu ești în nicio unitate militară care are un fir de recompense pe acest server.",
+        "bounty_subscribed": "Vei primi mențiune în {channel}, firul de recompense al unității **{mu}**, când România, o țară din alianța ei sau un partener de pact defensiv are o recompensă într-o bătălie. Fiecare postare de recompensă te menționează o singură dată: când apare sau mai târziu, când poți lupta pentru ea (build de luptă, viață 10+ sau foame rămasă, fără debuff). Dacă schimbi unitatea, primești mențiune în firul de recompense al noii unități, dacă are unul. Folosește `/unsubscribe bounty` ca să te dezabonezi.",
+        "bounty_already_subscribed": "Abonamentul la mențiunile pentru recompense există deja (acum ești în **{mu}**).",
+        "bounty_not_subscribed": "Nu ai un abonament la mențiunile pentru recompense.",
+        "bounty_unsubscribed": "Nu mai primești mențiuni pentru recompense.",
+        "bounty_unit_channel": "firul de recompense al unității militare",
         "failed": "Abonamentul nu a putut fi actualizat. Încearcă din nou mai târziu."
     },
     "loot_alerts": {
@@ -1000,6 +1053,9 @@
             "description": "Setează limba botului pe acest server (doar pentru dezvoltatori).",
             "params": {"language": "Limba tuturor mesajelor botului pe acest server"}
         },
+        "server_ids": {
+            "description": "Listează toate canalele, firele și rolurile acestui server, cu id-urile lor (doar pentru dezvoltatori)."
+        },
         "run_job": {
             "description": "Rulează acum o sarcină de fundal, în afara programului ei (doar pentru dezvoltatori și comandanți).",
             "params": {"job_name": "Sarcina de fundal de rulat"}
@@ -1087,6 +1143,10 @@
             "description": "Arată cine are pastilă, cine e în debuff și cine nu a luat pastila într-o unitate militară.",
             "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
         },
+        "mu_pill_plan": {
+            "description": "Arată când pot lua pastila împreună luptătorii unei unități militare, oră cu oră.",
+            "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
+        },
         "fight_wealth": {
             "description": "Arată averea de luptă (toată averea fără companii) și nivelul membrilor unei unități militare.",
             "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
@@ -1120,6 +1180,9 @@
             },
             "loot": {
                 "description": "Primește DM despre loot-ul tău în ultimele minute ale fiecărei runde în care ai lovit."
+            },
+            "bounty": {
+                "description": "Primește mențiune în firul de recompense al unității când România sau aliații ei pun o recompensă."
             }
         },
         "unsubscribe": {
@@ -1129,6 +1192,9 @@
             },
             "loot": {
                 "description": "Nu mai primi DM-uri despre loot-ul tău când se încheie o rundă."
+            },
+            "bounty": {
+                "description": "Nu mai primi mențiuni pentru recompensele României și ale aliaților ei."
             }
         },
         "inactive_players": {"description": "Listează jucătorii inactivi de mai mult de 3 zile."},

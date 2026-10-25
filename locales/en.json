@@ -57,12 +57,6 @@
             "description": "The bot client is closing or disconnected unexpectedly."
         }
     },
-    "join_server": {
-        "reason": "Roles removed on joining the server.",
-        "title": "🧹 Roles removed on join",
-        "description": "{member} joined the server with roles, which were removed. Only Unverified is kept on join.",
-        "roles": "Removed roles"
-    },
     "newbie_welcome": {
         "title": "👋 Welcome to the Romanian community!",
         "description": "You just received the **{role}** role. This chat is the place for your questions: ask anything, more experienced players are here to help.",
@@ -99,6 +93,12 @@
         "updated": "The bot's language for this server is now **{language}**.",
         "unknown": "Unknown language `{language}`. Available: {available}.",
         "failed": "Could not save the language. Please try again later."
+    },
+    "server_ids": {
+        "channels_title": "Channels ({page}/{pages})",
+        "threads_title": "Active threads ({page}/{pages})",
+        "roles_title": "Roles ({page}/{pages})",
+        "no_category": "No category"
     },
     "run_job": {
         "every": "every {interval}",
@@ -172,6 +172,10 @@
                 "name": "/subscribe contracts | /unsubscribe contracts",
                 "desc": "Get pinged in your military unit's contracts thread or channel when it wins a mercenary contract. Your Discord account must be linked to your WarEra player, and you must be in one of this server's military units. The unit is not stored: you are pinged for the contracts of whichever unit you are in when one is won, so changing unit needs no new subscription. You are not pinged while you are on an economy build or have no skill points, or cannot fight (health under 10 and no hunger left, or in debuff). Leaving the server removes your subscription. Replies are only visible to you."
             },
+            "subscriptions_bounty": {
+                "name": "/subscribe bounty | /unsubscribe bounty",
+                "desc": "Get pinged in your military unit's bounty thread (threadIds.bountyId) when Romania, a country of its alliance or a defensive-pact partner has a bounty in a battle. Each bounty post mentions you once: in the post if you can fight for it when it appears, or in a reply when you become able to later. You can fight when you are on a fight build (no skill points counts as economy), have health 10+ or hunger left and are not in debuff. Your Discord account must be linked to your WarEra player, and you must be in a military unit with a bounty thread. The unit is not stored, so changing unit needs no new subscription. Leaving the server removes your subscription. Replies are only visible to you."
+            },
             "subscriptions_loot": {
                 "name": "/subscribe loot | /unsubscribe loot",
                 "desc": "Get a DM in the last ~10 minutes of each round of a battle you hit, with the round's and the battle's loot pools as `/loot_targets` shows them: your rank, damage and item, what the next rank and a better rarity need, and who below could take your rarity. It also estimates the damage your current gear, battle bonus, health and hunger can still deal, and the best item that damage reaches. Only battles where you hold an item or could reach one are sent. You get nothing while you are on an economy build or have no skill points, or cannot fight (health under 10 and no hunger left, or in debuff). Your Discord account must be linked to your WarEra player, and you must accept DMs from this server's members. Leaving the server removes your subscription. Replies are only visible to you."
@@ -179,6 +183,10 @@
             "pills": {
                 "name": "/pills military_unit",
                 "desc": "Pill status of a configured military unit (autocomplete): who is pilled, grouped by the hour they pilled, who is in debuff, grouped by the hour it ends (both with time left), and fighters not pilled. Hours are shown in the configured timezone."
+            },
+            "mu_pill_plan": {
+                "name": "/mu_pill_plan military_unit",
+                "desc": "Pill plan for a configured military unit (autocomplete), assuming nobody takes a new Pill: how many fighters are in buff, in debuff or can take a Pill now, the earliest time all of them can take one together, an hour-by-hour timeline of those counts, and who can't take one yet, with the time they can. It also splits the fighters into squads of 4 that each take the Pill at their own hour every day, so everyone takes one within the same day. Squads are built from the hours members took their current Pill; fighters without one fill free places or form new squads in the emptiest hours. Each squad shows its daily hour, its first turn and its members, and the hours with no squad in buff are flagged. Economy builds are left out. Hours are shown in the configured timezone. The reply is posted in the channel; nobody is pinged."
             },
             "fight_wealth": {
                 "name": "/fight_wealth military_unit",
@@ -223,6 +231,10 @@
             "setlang": {
                 "name": "/setlang language",
                 "desc": "Developer-only. Set the language the bot uses in this server (English or Romanian): command responses, buttons, reports, alerts and the DMs this server triggers. The language field supports autocomplete."
+            },
+            "server_ids": {
+                "name": "/server_ids",
+                "desc": "Developer-only. Lists every channel (grouped by category), active thread and role of this server with its id, in ephemeral embeds only you can see. Archived threads are not listed."
             }
         },
         "jobs": {
@@ -249,6 +261,10 @@
             "buff_monitor": {
                 "name": "buff_monitor — every 10 minutes",
                 "desc": "Monitors fighter buffs and notifies users when their active pill buff is nearing expiration (uses an internal cache to avoid repeated notifications)."
+            },
+            "bounty_alerts": {
+                "name": "bounty_alerts — every minute",
+                "desc": "Keeps one post per battle in each military unit's bounty thread (threadIds.bountyId; units without one get nothing) while Romania, a defensive-pact partner or a member of its alliance has a bounty there: both countries, the battle link and each allied side's pay per 1k damage and pool left. The post is edited every minute with the current rate and pool, and deleted when the bounty runs out; a bounty replaced by a new one between two checks only updates it. Mentions the /subscribe bounty subscribers of that unit who are on a fight build, have health 10+ or hunger left and are not in debuff, once per post: in the post, or in a reply when they become able to fight later. Posts made before a restart are picked up again from the thread. Subscribers who left the server are unsubscribed."
             },
             "bounty_monitor": {
                 "name": "bounty_monitor — configurable interval",
@@ -281,10 +297,6 @@
             "article_mention": {
                 "name": "article_mention - every 5 minutes",
                 "desc": "Checks the 100 newest WarEra articles and posts in the articles channel every new article by a Romanian player (a Romania citizen, or a Citizen/Newbie member of this server), with a tip hint below level 25, and every article by another player that mentions or tags Romania or its regions."
-            },
-            "join_server": {
-                "name": "join_server - when a member joins the server",
-                "desc": "When a member joins or rejoins the server, removes every role they have at that moment, so a member who leaves and comes back can't keep their old roles. The Unverified role (roles.unverified, given by Carl-bot) is kept. Roles given after the join stay. Posts what it removed in the reports channel."
             },
             "newbie_welcome": {
                 "name": "newbie_welcome - when the Newbie role is given",
@@ -619,6 +631,32 @@
             "other": "{count} members could not be fetched"
         }
     },
+    "mu_pill_plan": {
+        "unknown_unit": "Unknown military unit. Pick one from the list.",
+        "members_unavailable": "Could not fetch the military unit members. Try again later.",
+        "title": "💊 Pill plan · {mu}",
+        "now_line": "**Now** · fighters: {total} · 💊 in buff: {buff} · 🥴 in debuff: {debuff} · ✅ can take a Pill: {ready}",
+        "all_ready_now": "✅ Every fighter can take a Pill **now**.",
+        "all_ready": "✅ Every fighter can take a Pill together from **{time}**.",
+        "all_available_now": "⚔️ Every fighter is in buff or can take a Pill **now**.",
+        "all_available": "⚔️ Every fighter is in buff or can take a Pill from **{time}**.",
+        "no_fighters": "No fighter could be found in this military unit.",
+        "now": "now",
+        "day_time_format": "%a %H:%M",
+        "timeline_title": "🕒 Timeline (hours when the counts change)",
+        "waiting_title": "⏳ Not ready yet ({count}) · can take a Pill from",
+        "rotation_title": "🔁 Daily squads of {size} · each takes the Pill at its hour every day · ▶ first turn",
+        "rotation_gap": "⚠️ No squad in buff {start} – {end}",
+        "footer": "Hours in {tz} · assumes nobody takes a new Pill · 💊 buff {buff} h, 🥴 debuff {debuff} h · ✅ can take a Pill",
+        "footer_economy": {
+            "one": "{count} economy member not counted",
+            "other": "{count} economy members not counted"
+        },
+        "footer_missing": {
+            "one": "{count} member could not be fetched",
+            "other": "{count} members could not be fetched"
+        }
+    },
     "weekly_damages": {
         "title": "Weekly User Damages - {countries}",
         "more_countries": "{names} + {count} more",
@@ -726,6 +764,13 @@
     "bounty_monitor": {
         "bounty": "**[BOUNTY]** {money_per}/{pool} from {country} ({side}) against {opponent} ({opponent_side}) — [View Battle]({link})"
     },
+    "bounty_alerts": {
+        "title": "💰 Bounty: {countries}",
+        "description": "{attacker_icon} {attacker} vs. {defender_icon} {defender}\n[View battle]({link})",
+        "side_value": "💵 {rate} / 1k damage\n💰 {pool} left",
+        "footer": "Updated every minute · deleted when the bounty runs out",
+        "new_eligible": "⬆️ You can fight for this bounty now: {mentions}"
+    },
     "nap_monitor": {
         "title": "NAP Violation Alert",
         "description": "Active battle orders were found against configured NAP partners.",
@@ -745,6 +790,12 @@
         "loot_already_subscribed": "You are already subscribed to loot alerts.",
         "loot_not_subscribed": "You are not subscribed to loot alerts.",
         "loot_unsubscribed": "You will no longer get loot alerts.",
+        "bounty_not_in_unit": "You are not in any military unit that has a bounty thread on this server.",
+        "bounty_subscribed": "You will be pinged in {channel}, the bounty thread of **{mu}**, when Romania, a country of its alliance or a defensive-pact partner has a bounty in a battle. Each bounty post mentions you once: when it is posted, or later when you become able to fight for it (fight build, health 10+ or hunger left, not in debuff). If you change unit, you are pinged in your new unit's bounty thread, if it has one. Use `/unsubscribe bounty` to stop.",
+        "bounty_already_subscribed": "You are already subscribed to bounty pings (you are in **{mu}** now).",
+        "bounty_not_subscribed": "You are not subscribed to bounty pings.",
+        "bounty_unsubscribed": "You will no longer be pinged for bounties.",
+        "bounty_unit_channel": "the military unit's bounty thread",
         "failed": "Could not update your subscription. Try again later."
     },
     "loot_alerts": {

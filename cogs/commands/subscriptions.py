@@ -6,6 +6,10 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from cogs.tasks.bounty_alerts import SUBSCRIPTION_JOB as BOUNTY_SUBSCRIPTION_JOB
+from cogs.tasks.bounty_alerts import SUBSCRIPTION_TARGET as BOUNTY_SUBSCRIPTION_TARGET
+from cogs.tasks.bounty_alerts import THREAD_KEY as BOUNTY_THREAD_KEY
+from cogs.tasks.bounty_alerts import bounty_units
 from cogs.tasks.loot_alerts import SUBSCRIPTION_JOB as LOOT_SUBSCRIPTION_JOB
 from cogs.tasks.loot_alerts import SUBSCRIPTION_TARGET as LOOT_SUBSCRIPTION_TARGET
 from cogs.tasks.military_unit_contract_monitor import SUBSCRIPTION_JOB, SUBSCRIPTION_TARGET, contract_units
@@ -193,6 +197,76 @@ class Subscriptions(commands.Cog):
             await interaction.followup.send(tr("subscriptions.failed"), ephemeral=True)
             return
         key = "subscriptions.loot_unsubscribed" if removed else "subscriptions.loot_not_subscribed"
+        await interaction.followup.send(tr(key), ephemeral=True)
+
+    # ------------------------------------------------------------------ /subscribe bounty
+
+    @subscribe.command(name="bounty", description="Get pinged in your military unit's bounty thread when Romania or its allies post a bounty.")
+    async def subscribe_bounty(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        tr = await get_translator(interaction.guild_id)
+
+        # only the WarEra player linked to the caller's Discord account (see the unidentified_members job)
+        try:
+            api_id = await asyncio.to_thread(find_api_id_by_discord_id, interaction.user.id)
+        except Exception:
+            logger.exception("Could not read the WarEra player linked to %s", interaction.user.id)
+            await interaction.followup.send(tr("subscriptions.failed"), ephemeral=True)
+            return
+        if not api_id:
+            await interaction.followup.send(tr("subscriptions.not_linked"), ephemeral=True)
+            return
+
+        session = await get_shared_session()
+        user = await get_user_info(api_id, session)
+        if not user:
+            await interaction.followup.send(tr("subscriptions.player_not_found"), ephemeral=True)
+            return
+
+        # only members of an MU with a bounty thread may subscribe; the MU itself is not stored
+        mu_id = str(user.get("mu") or "")
+        units = bounty_units()
+        if mu_id not in units:
+            await interaction.followup.send(tr("subscriptions.bounty_not_in_unit"), ephemeral=True)
+            return
+
+        try:
+            created = await asyncio.to_thread(
+                add_job_subscription,
+                BOUNTY_SUBSCRIPTION_JOB,
+                BOUNTY_SUBSCRIPTION_TARGET,
+                interaction.user.id,
+                str(api_id),
+                datetime.now(timezone.utc).isoformat(),
+            )
+        except Exception:
+            logger.exception("Could not save the bounty subscription of %s", interaction.user.id)
+            await interaction.followup.send(tr("subscriptions.failed"), ephemeral=True)
+            return
+
+        military_unit = await get_military_unit(mu_id, session)
+        mu_name = discord.utils.escape_markdown(str((military_unit or {}).get("name") or mu_id))
+        if not created:
+            await interaction.followup.send(tr("subscriptions.bounty_already_subscribed", mu=mu_name), ephemeral=True)
+            return
+        destination = await get_mu_destination(interaction.guild, units[mu_id], BOUNTY_THREAD_KEY) if interaction.guild else None
+        channel = destination.mention if destination else tr("subscriptions.bounty_unit_channel")
+        await interaction.followup.send(tr("subscriptions.bounty_subscribed", mu=mu_name, channel=channel), ephemeral=True)
+
+    # ------------------------------------------------------------------ /unsubscribe bounty
+
+    @unsubscribe.command(name="bounty", description="Stop getting pinged for the bounties of Romania and its allies.")
+    async def unsubscribe_bounty(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        tr = await get_translator(interaction.guild_id)
+
+        try:
+            removed = await self._remove_subscriptions(interaction.user.id, BOUNTY_SUBSCRIPTION_JOB)
+        except Exception:
+            logger.exception("Could not remove the bounty subscription of %s", interaction.user.id)
+            await interaction.followup.send(tr("subscriptions.failed"), ephemeral=True)
+            return
+        key = "subscriptions.bounty_unsubscribed" if removed else "subscriptions.bounty_not_subscribed"
         await interaction.followup.send(tr(key), ephemeral=True)
 
 

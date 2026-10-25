@@ -25,7 +25,9 @@ _COMMAND_IDS: List[str] = [
     "mu_stray",
     "subscriptions",
     "subscriptions_loot",
+    "subscriptions_bounty",
     "pills",
+    "mu_pill_plan",
     "fight_wealth",
     "mu_order_alignment",
     "mu_positions",
@@ -37,6 +39,7 @@ _COMMAND_IDS: List[str] = [
     "get_region_upgrade_cost",
     "run_job",
     "setlang",
+    "server_ids",
 ]
 
 _JOB_IDS: List[str] = [
@@ -47,6 +50,7 @@ _JOB_IDS: List[str] = [
     "takeover_countries",
     "buff_monitor",
     "bounty_monitor",
+    "bounty_alerts",
     "mercenary_contracts",
     "mu_contract_monitor",
     "loot_alerts",
@@ -55,7 +59,6 @@ _JOB_IDS: List[str] = [
     "reddit_monitor",
     "article_mention",
     "newbie_welcome",
-    "join_server",
 ]
 
 _COMMANDS_PER_PAGE = 3
