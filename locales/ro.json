@@ -95,6 +95,12 @@
         "unknown": "Limbă necunoscută: `{language}`. Disponibile: {available}.",
         "failed": "Limba nu a putut fi salvată. Încearcă din nou mai târziu."
     },
+    "server_ids": {
+        "channels_title": "Canale ({page}/{pages})",
+        "threads_title": "Fire active ({page}/{pages})",
+        "roles_title": "Roluri ({page}/{pages})",
+        "no_category": "Fără categorie"
+    },
     "run_job": {
         "every": "la fiecare {interval}",
         "scheduled": "programat",
@@ -226,6 +232,10 @@
             "setlang": {
                 "name": "/setlang language",
                 "desc": "Doar pentru dezvoltatori. Setează limba botului pe acest server (engleză sau română): răspunsuri la comenzi, butoane, rapoarte, alerte și mesajele private trimise din cauza acestui server. Câmpul are sugestii."
+            },
+            "server_ids": {
+                "name": "/server_ids",
+                "desc": "Doar pentru dezvoltatori. Listează toate canalele (grupate pe categorii), firele active și rolurile acestui server, cu id-urile lor, în embed-uri vizibile doar pentru tine. Firele arhivate nu sunt listate."
             }
         },
         "jobs": {
@@ -1042,6 +1052,9 @@
         "setlang": {
             "description": "Setează limba botului pe acest server (doar pentru dezvoltatori).",
             "params": {"language": "Limba tuturor mesajelor botului pe acest server"}
+        },
+        "server_ids": {
+            "description": "Listează toate canalele, firele și rolurile acestui server, cu id-urile lor (doar pentru dezvoltatori)."
         },
         "run_job": {
             "description": "Rulează acum o sarcină de fundal, în afara programului ei (doar pentru dezvoltatori și comandanți).",

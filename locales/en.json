@@ -94,6 +94,12 @@
         "unknown": "Unknown language `{language}`. Available: {available}.",
         "failed": "Could not save the language. Please try again later."
     },
+    "server_ids": {
+        "channels_title": "Channels ({page}/{pages})",
+        "threads_title": "Active threads ({page}/{pages})",
+        "roles_title": "Roles ({page}/{pages})",
+        "no_category": "No category"
+    },
     "run_job": {
         "every": "every {interval}",
         "scheduled": "scheduled",
@@ -225,6 +231,10 @@
             "setlang": {
                 "name": "/setlang language",
                 "desc": "Developer-only. Set the language the bot uses in this server (English or Romanian): command responses, buttons, reports, alerts and the DMs this server triggers. The language field supports autocomplete."
+            },
+            "server_ids": {
+                "name": "/server_ids",
+                "desc": "Developer-only. Lists every channel (grouped by category), active thread and role of this server with its id, in ephemeral embeds only you can see. Archived threads are not listed."
             }
         },
         "jobs": {

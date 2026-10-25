@@ -39,6 +39,7 @@ _COMMAND_IDS: List[str] = [
     "get_region_upgrade_cost",
     "run_job",
     "setlang",
+    "server_ids",
 ]
 
 _JOB_IDS: List[str] = [
