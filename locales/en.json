@@ -191,6 +191,10 @@
                 "name": "/mu_pill_plan military_unit",
                 "desc": "Pill plan for a configured military unit (autocomplete), assuming nobody takes a new Pill: how many fighters are in buff, in debuff or can take a Pill now, the earliest time all of them can take one together, an hour-by-hour timeline of those counts, and who can't take one yet, with the time they can. It also splits the fighters into squads of 4 that each take the Pill at their own hour every day, so everyone takes one within the same day. Squads are built from the hours members took their current Pill; fighters without one fill free places or form new squads in the emptiest hours. Each squad shows its daily hour, its first turn and its members, and the hours with no squad in buff are flagged. Economy builds are left out. Hours are shown in the configured timezone. The reply is posted in the channel; nobody is pinged."
             },
+            "progression": {
+                "name": "/progression [player]",
+                "desc": "Next steps for your WarEra account, or another player's: the next company action (switch product, build, raise the Companies skill or upgrade Automated Engine, with the materials and their market cost), your companies with their storage, your Production, Energy and Entrepreneurship with what to buy next in the skill order (computed with the economic build calculator, never needing a reset), and a checklist (daily reward, missions, job, full storage, MU, party). Companies follow BuhDeuce's economic guide: economy builds go past the Romanian guide's 6 companies at AE5 up to 12 companies at AE7 by level 50; fight builds stop at the war path's 6 companies at AE6. You are found by your linked account, then your nickname. Only you see the reply."
+            },
             "fight_wealth": {
                 "name": "/fight_wealth military_unit",
                 "desc": "Fight wealth of every member of a configured military unit (autocomplete): money, items, equipment and weapons, companies excluded. Members are ranked richest first and grouped by tier: GOLD ≥15K, SILVER 10K–15K, BRONZE 5K–10K, IRON <5K. The daily report to MU leaders shows the tier counts and the richest names of each tier."
@@ -659,6 +663,52 @@
             "one": "{count} member could not be fetched",
             "other": "{count} members could not be fetched"
         }
+    },
+    "progression": {
+        "self_not_found": "Couldn't find your WarEra player. Run the command again with `player:` and your in-game username, or say in the chat that your account isn't linked.",
+        "player_not_found": "No WarEra player is called **{name}**. Check the spelling (capital letters matter).",
+        "unavailable": "Could not load the player's data from WarEra. Try again later.",
+        "title": "📈 Progression plan",
+        "summary": "Level **{level}** · 🏭 Companies: {companies}",
+        "money": "💵 {money}",
+        "goal": "🎯 Goal: {companies} companies at Automated Engine {ae} by level {level}",
+        "goal_war": "🎯 Goal (war path): {companies} companies at Automated Engine {ae}",
+        "fight_build": "⚔️ Fight build: your companies follow the war path, the minimum for fighting; the skill order below is for economy builds.",
+        "step_title": "➡️ Next step",
+        "needs": "Needs {materials}",
+        "market_value": "(≈ {money} at market prices)",
+        "step": {
+            "done": "✅ Goal reached: every company is at the maximum. Keep storage empty and sell what you don't use.",
+            "done_war": "✅ War path reached. Keep storage empty; back on an economy build, the plan continues toward 12 companies at AE7.",
+            "unlock": "Reach level **{level}** to unlock the Companies skill, needed for company #{number}.",
+            "skill": "Raise **Companies** to level **{level}** ({points} SP) to unlock company #{number}.",
+            "build": "Build company **#{number}** producing **{item}**.",
+            "build_free": "Build company **#{number}**: pick a product that sells well, in a region with a production bonus of about 30% or more.",
+            "convert": "Switch **{company}** from {source} to **{item}**: your first companies make the concrete and steel you build with.",
+            "upgrade": "Upgrade **{company}** ({item}) to **Automated Engine {level}**."
+        },
+        "companies_title": "🏭 Companies",
+        "skills_title": "🧠 Skill points",
+        "skills": {
+            "production": "Production",
+            "energy": "Energy",
+            "entrepreneurship": "Entrepreneurship"
+        },
+        "spend": "👉 Spend **{points} SP** on {skill} (→ {target})",
+        "companies_first": "🏭 First **{points} SP** on Companies (→ {level}) for your next company",
+        "next": "⏭️ Next in the order: {skill} {level} · {points} SP",
+        "save": "💾 Keep your free points ({points} SP) for it",
+        "order_done": "✅ Production, Energy and Entrepreneurship are all at level 10",
+        "checklist_title": "📋 Checklist",
+        "check": {
+            "daily_reward": "🎁 Claim today's daily reward",
+            "missions": "📜 Do your beginner, daily and weekly missions for XP (the market unlocks at level {level})",
+            "job": "💼 Get a job: take the best-paid offer you qualify for and spend your Energy there",
+            "storage": "📦 **{company}** ({item}) storage is {percent}% full; a full storage stops production, so produce, sell or upgrade storage",
+            "mu": "🪖 Join a military unit",
+            "party": "🏛️ Join a party"
+        },
+        "footer": "Companies: BuhDeuce's economic guide · skills: economic-build-warera.netlify.app · the bot can't see your inventory or missions"
     },
     "weekly_damages": {
         "title": "Weekly User Damages - {countries}",

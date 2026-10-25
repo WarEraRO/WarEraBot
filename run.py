@@ -72,6 +72,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.pills")
         await self.load_extension("cogs.commands.mu_pill_plan")
         await self.load_extension("cogs.commands.fight_wealth")
+        await self.load_extension("cogs.commands.progression")
         await self.load_extension("cogs.commands.mu_order_alignment")
         await self.load_extension("cogs.commands.mu_positions")
         await self.load_extension("cogs.commands.mu_readiness")

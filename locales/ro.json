@@ -192,6 +192,10 @@
                 "name": "/mu_pill_plan military_unit",
                 "desc": "Planul de pastile al unei unități militare configurate (cu sugestii), presupunând că nimeni nu ia o pastilă nouă: câți luptători au buff, sunt în debuff sau pot lua pastila acum, cel mai devreme moment în care o pot lua toți împreună, o cronologie pe ore a acestor numere și cine nu o poate lua încă, cu ora de la care poate. Împarte și luptătorii în echipe de câte 4, fiecare luând pastila la ora ei în fiecare zi, astfel încât toți o iau în aceeași zi. Echipele se formează după orele la care membrii au luat pastila actuală; luptătorii fără pastilă completează locurile libere sau formează echipe noi în orele cele mai goale. Fiecare echipă arată ora zilnică, prima tură și membrii, iar orele fără nicio echipă cu buff sunt semnalate. Build-urile de economie nu sunt incluse. Orele sunt afișate în fusul orar configurat. Răspunsul e postat în canal; nimeni nu e menționat."
             },
+            "progression": {
+                "name": "/progression [player]",
+                "desc": "Pașii următori pentru contul tău WarEra sau al altui jucător: următoarea acțiune pentru companii (schimbarea produsului, construcție, creșterea skill-ului Companii sau Automated Engine, cu materialele și costul lor la piață), companiile tale cu depozitele lor, Producția, Energia și Antreprenoriatul cu ce să cumperi în continuare din ordinea de skill-uri (calculată cu calculatorul de build economic, fără să fie nevoie de resetare), plus o listă de făcut (recompensa zilnică, misiuni, job, depozit plin, MU, partid). Companiile urmează ghidul economic al lui BuhDeuce: build-urile de economie trec de cele 6 companii cu AE5 din ghidul românesc și ajung la 12 companii cu AE7 până la nivelul 50; build-urile de luptă se opresc la cele 6 companii cu AE6 ale căii de război. Ești găsit după contul legat, apoi după nickname. Doar tu vezi răspunsul."
+            },
             "fight_wealth": {
                 "name": "/fight_wealth military_unit",
                 "desc": "Averea de luptă a fiecărui membru dintr-o unitate militară configurată (cu sugestii): bani, iteme, echipament și arme, fără companii. Membrii sunt ordonați de la cel mai bogat și grupați pe niveluri: AUR ≥15K, ARGINT 10K–15K, BRONZ 5K–10K, FIER <5K. Raportul zilnic pentru liderii MU arată câți membri are fiecare nivel și cele mai bogate nume din fiecare."
@@ -666,6 +670,52 @@
             "few": "{count} membri nu au putut fi preluați",
             "other": "{count} de membri nu au putut fi preluați"
         }
+    },
+    "progression": {
+        "self_not_found": "Nu ți-am găsit jucătorul WarEra. Rulează din nou comanda cu `player:` și numele tău din joc sau spune pe chat că nu ai contul legat.",
+        "player_not_found": "Niciun jucător WarEra nu se numește **{name}**. Verifică scrierea (contează literele mari și mici).",
+        "unavailable": "Nu am putut încărca datele jucătorului din WarEra. Încearcă mai târziu.",
+        "title": "📈 Plan de progres",
+        "summary": "Nivel **{level}** · 🏭 Companii: {companies}",
+        "money": "💵 {money}",
+        "goal": "🎯 Obiectiv: {companies} companii cu Automated Engine {ae} până la nivelul {level}",
+        "goal_war": "🎯 Obiectiv (calea de război): {companies} companii cu Automated Engine {ae}",
+        "fight_build": "⚔️ Build de luptă: companiile urmează calea de război, minimul pentru luptă; ordinea de skill-uri de mai jos e pentru economie.",
+        "step_title": "➡️ Pasul următor",
+        "needs": "Necesită {materials}",
+        "market_value": "(≈ {money} la prețul pieței)",
+        "step": {
+            "done": "✅ Obiectiv atins: toate companiile sunt la maximum. Ține depozitele goale și vinde ce nu folosești.",
+            "done_war": "✅ Calea de război atinsă. Ține depozitele goale; înapoi pe un build de economie, planul continuă spre 12 companii cu AE7.",
+            "unlock": "Atinge nivelul **{level}** ca să deblochezi skill-ul Companii, necesar pentru compania #{number}.",
+            "skill": "Crește **Companii** la nivelul **{level}** ({points} SP) ca să deblochezi compania #{number}.",
+            "build": "Construiește compania **#{number}** care produce **{item}**.",
+            "build_free": "Construiește compania **#{number}**: alege un produs care se vinde bine, într-o regiune cu bonus de producție de cel puțin ~30%.",
+            "convert": "Schimbă **{company}** de pe {source} pe **{item}**: primele companii fac betonul și oțelul cu care construiești.",
+            "upgrade": "Îmbunătățește **{company}** ({item}) la **Automated Engine {level}**."
+        },
+        "companies_title": "🏭 Companii",
+        "skills_title": "🧠 Puncte de skill",
+        "skills": {
+            "production": "Producție",
+            "energy": "Energie",
+            "entrepreneurship": "Antreprenoriat"
+        },
+        "spend": "👉 Pune **{points} SP** în {skill} (→ {target})",
+        "companies_first": "🏭 Întâi **{points} SP** în Companii (→ {level}) pentru următoarea companie",
+        "next": "⏭️ Următorul în ordine: {skill} {level} · {points} SP",
+        "save": "💾 Păstrează punctele libere ({points} SP) pentru el",
+        "order_done": "✅ Producție, Energie și Antreprenoriat sunt toate la nivelul 10",
+        "checklist_title": "📋 De făcut",
+        "check": {
+            "daily_reward": "🎁 Revendică recompensa zilnică de azi",
+            "missions": "📜 Fă misiunile de început, zilnice și săptămânale pentru XP (piața se deblochează la nivelul {level})",
+            "job": "💼 Ia-ți un job: alege cea mai bine plătită ofertă pentru care te califici și folosește-ți Energia acolo",
+            "storage": "📦 Depozitul companiei **{company}** ({item}) e plin în proporție de {percent}%; un depozit plin oprește producția, așa că produ, vinde sau mărește depozitul",
+            "mu": "🪖 Intră într-o unitate militară",
+            "party": "🏛️ Intră într-un partid"
+        },
+        "footer": "Companii: ghidul economic al lui BuhDeuce · skill-uri: economic-build-warera.netlify.app · botul nu îți vede inventarul sau misiunile"
     },
     "weekly_damages": {
         "title": "Damage săptămânal jucători - {countries}",
@@ -1152,6 +1202,10 @@
         "mu_pill_plan": {
             "description": "Arată când pot lua pastila împreună luptătorii unei unități militare, oră cu oră.",
             "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
+        },
+        "progression": {
+            "description": "Arată pașii următori pentru contul tău WarEra: puncte de skill, companii și ce ai de făcut.",
+            "params": {"player": "Numele din joc al jucătorului (implicit: tu)"}
         },
         "fight_wealth": {
             "description": "Arată averea de luptă (toată averea fără companii) și nivelul membrilor unei unități militare.",

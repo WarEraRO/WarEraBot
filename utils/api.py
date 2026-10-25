@@ -261,6 +261,28 @@ async def get_users_equipment(user_ids, session):
     equipment = await _get_batch(session, 'inventory.fetchCurrentEquipment', [{'userId': user_id} for user_id in ids])
     return {user_id: items for user_id, items in zip(ids, equipment) if isinstance(items, dict)}
 
+async def get_user_companies(user_id, session, base_url="https://api2.warera.io/trpc/company.getCompanies"):
+    """Every company `user_id` owns, as company.getById objects in listing order, or None.
+
+    company.getCompanies returns bare id strings, so the companies are then fetched in one batched
+    company.getById request. One page of 100 covers every player (Companies skill 10 allows 12).
+    None when the listing or any company fails to load, so callers never plan from a partial list.
+    """
+    try:
+        params = {"input": json.dumps({'userId': user_id, 'perPage': 100})}
+        data = await _get_with_retry(session, base_url, params=params)
+        listing = (data or {}).get('result', {}).get('data')
+        if not isinstance(listing, dict):
+            return None
+        ids = [item if isinstance(item, str) else (item or {}).get('_id') for item in listing.get('items') or []]
+        companies = await _get_batch(session, 'company.getById', [{'companyId': company_id} for company_id in ids if company_id])
+        if len(companies) != len(ids) or not all(isinstance(company, dict) for company in companies):
+            return None
+        return companies
+    except Exception as e:
+        logger.exception('get_user_companies failed: %s', e)
+        return None
+
 async def get_last_tournament(session, base_url="https://api2.warera.io/trpc/tournament.getLastTournament"):
     """The most recently created or active tournament (not in the official spec; explorer-documented)."""
     try:
