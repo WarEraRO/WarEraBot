@@ -192,6 +192,10 @@
                 "name": "/mu_pill_plan military_unit",
                 "desc": "Planul de pastile al unei unități militare configurate (cu sugestii), presupunând că nimeni nu ia o pastilă nouă: câți luptători au buff, sunt în debuff sau pot lua pastila acum, cel mai devreme moment în care o pot lua toți împreună, o cronologie pe ore a acestor numere și cine nu o poate lua încă, cu ora de la care poate. Împarte și luptătorii în echipe de câte 4, fiecare luând pastila la ora ei în fiecare zi, astfel încât toți o iau în aceeași zi. Echipele se formează după orele la care membrii au luat pastila actuală; luptătorii fără pastilă completează locurile libere sau formează echipe noi în orele cele mai goale. Fiecare echipă arată ora zilnică, prima tură și membrii, iar orele fără nicio echipă cu buff sunt semnalate. Build-urile de economie nu sunt incluse. Orele sunt afișate în fusul orar configurat. Răspunsul e postat în canal; nimeni nu e menționat."
             },
+            "economy": {
+                "name": "/economy [companies] [player]",
+                "desc": "Cel mai bun build de Producție, Energie și Antreprenoriat pentru contul tău sau al altui jucător, la piața de azi. Fiecare combinație de niveluri pe care ți-o permit punctele de skill e evaluată în monede pe zi: jobul e cea mai bună ofertă deschisă pentru care se califică acel build, după taxe, iar munca proprie se face la cea mai bună companie a ta, cu bonusul ei de producție și prețul pieței. Arată cel mai bun build, build-ul tău actual și cât câștigi schimbându-l (puncte libere sau o resetare, cu costul și timpul de recuperare), următoarele variante și datele de piață folosite. `companies` păstrează puncte în skill-ul Companii pentru atâtea companii (implicit: limita ta actuală). Doar tu vezi răspunsul."
+            },
             "progression": {
                 "name": "/progression [player]",
                 "desc": "Pașii următori pentru contul tău WarEra sau al altui jucător: următoarea acțiune pentru companii (schimbarea produsului, construcție, creșterea skill-ului Companii sau Automated Engine, cu materialele și costul lor la piață), companiile tale cu depozitele lor, Producția, Energia și Antreprenoriatul cu ce să cumperi în continuare din ordinea de skill-uri (calculată cu calculatorul de build economic, fără să fie nevoie de resetare), plus o listă de făcut (recompensa zilnică, misiuni, job, depozit plin, MU, partid). Companiile urmează ghidul economic al lui BuhDeuce: build-urile de economie trec de cele 6 companii cu AE5 din ghidul românesc și ajung la 12 companii cu AE7 până la nivelul 50; build-urile de luptă se opresc la cele 6 companii cu AE6 ale căii de război. Ești găsit după contul legat, apoi după nickname. Doar tu vezi răspunsul."
@@ -670,6 +674,31 @@
             "few": "{count} membri nu au putut fi preluați",
             "other": "{count} de membri nu au putut fi preluați"
         }
+    },
+    "economy": {
+        "title": "💹 Cel mai bun build de economie",
+        "budget": "Nivel **{level}** · {total} SP · {companies_points} SP păstrate pentru Companii (până la {companies} companii) → **{budget} SP** pentru Producție, Energie și Antreprenoriat",
+        "points": "{points} SP",
+        "income": "💼 Job {job} + 🛠️ Muncă proprie {own} = **≈ {total} monede/zi**",
+        "per_day": "≈ {total}/zi",
+        "best_title": "🏆 Cel mai bun build",
+        "now_title": "📊 Build-ul tău acum",
+        "already_best": "✅ E deja cel mai bun build pentru piața de azi.",
+        "add_points": "⬆️ +{gain}/zi adăugând {points} SP, fără resetare (ai {available} SP libere).",
+        "reset_free": "🔄 +{gain}/zi cu o resetare de skill-uri (resetări gratuite rămase: {free}; pauză de {days} zile).",
+        "reset_paid": "🔄 +{gain}/zi cu o resetare de skill-uri: costă {cost}, recuperat în {payback} zile (pauză de {days} zile).",
+        "alternatives_title": "🥈 Următoarele variante",
+        "inputs_title": "📥 Datele de piață folosite",
+        "job_input": "💼 Cel mai bun job pentru acest build: {wage}/PP după taxe (cere Energie {energy}, Producție {production})",
+        "job_input_open": "💼 Cel mai bun job pentru acest build: {wage}/PP după taxe (fără cerințe)",
+        "no_job": "💼 Nicio ofertă de job deschisă nu se potrivește acum cu acest build",
+        "self_input": "🛠️ Muncă proprie la **{company}** ({item}): {value}/PP la prețul pieței, bonus +{bonus}%",
+        "no_self_work": "🛠️ Nicio companie nu are un produs cu preț pe piață, așa că munca proprie contează 0",
+        "not_enough_points": "Nu ai încă destule puncte de skill pentru {companies} companii.",
+        "over_budget": "⚠️ Build-ul tău folosește {points} SP, mai mult decât cele {budget} SP rămase după Companii pentru {companies} companii. Ca să încapă e nevoie de o resetare, iar venitul din muncă se schimbă cu {change}/zi; companiile în plus aduc în schimb producție din Automated Engine.",
+        "reset_cost_free": "🔄 Resetări gratuite rămase: {free} (pauză de {days} zile).",
+        "reset_cost_paid": "🔄 O resetare costă {cost} (pauză de {days} zile).",
+        "footer": "Model: economic-build-warera.netlify.app cu oferte de job live, companiile tale și prețurile pieței · o resetare mută toate punctele, inclusiv cele de luptă · Management și Automated Engine nu sunt incluse"
     },
     "progression": {
         "self_not_found": "Nu ți-am găsit jucătorul WarEra. Rulează din nou comanda cu `player:` și numele tău din joc sau spune pe chat că nu ai contul legat.",
@@ -1202,6 +1231,13 @@
         "mu_pill_plan": {
             "description": "Arată când pot lua pastila împreună luptătorii unei unități militare, oră cu oră.",
             "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
+        },
+        "economy": {
+            "description": "Găsește cel mai bun build de economie după ofertele de job și prețurile de azi.",
+            "params": {
+                "companies": "Pentru câte companii păstrezi puncte în Companii (implicit: limita ta actuală)",
+                "player": "Numele din joc al jucătorului (implicit: tu)"
+            }
         },
         "progression": {
             "description": "Arată pașii următori pentru contul tău WarEra: puncte de skill, companii și ce ai de făcut.",

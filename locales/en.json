@@ -191,6 +191,10 @@
                 "name": "/mu_pill_plan military_unit",
                 "desc": "Pill plan for a configured military unit (autocomplete), assuming nobody takes a new Pill: how many fighters are in buff, in debuff or can take a Pill now, the earliest time all of them can take one together, an hour-by-hour timeline of those counts, and who can't take one yet, with the time they can. It also splits the fighters into squads of 4 that each take the Pill at their own hour every day, so everyone takes one within the same day. Squads are built from the hours members took their current Pill; fighters without one fill free places or form new squads in the emptiest hours. Each squad shows its daily hour, its first turn and its members, and the hours with no squad in buff are flagged. Economy builds are left out. Hours are shown in the configured timezone. The reply is posted in the channel; nobody is pinged."
             },
+            "economy": {
+                "name": "/economy [companies] [player]",
+                "desc": "The best Production, Energy and Entrepreneurship build for your account, or another player's, at today's market. Every level combination your skill points allow is scored in coins per day: the job is the best open offer that build qualifies for, after tax, and self-work is at your best company, with its production bonus and market price. Shows the best build, your build now and what switching gains (free points, or a reset with its cost and payback), the next best builds and the market data used. `companies` keeps Companies skill points for that many companies (default: your current limit). Only you see the reply."
+            },
             "progression": {
                 "name": "/progression [player]",
                 "desc": "Next steps for your WarEra account, or another player's: the next company action (switch product, build, raise the Companies skill or upgrade Automated Engine, with the materials and their market cost), your companies with their storage, your Production, Energy and Entrepreneurship with what to buy next in the skill order (computed with the economic build calculator, never needing a reset), and a checklist (daily reward, missions, job, full storage, MU, party). Companies follow BuhDeuce's economic guide: economy builds go past the Romanian guide's 6 companies at AE5 up to 12 companies at AE7 by level 50; fight builds stop at the war path's 6 companies at AE6. You are found by your linked account, then your nickname. Only you see the reply."
@@ -663,6 +667,31 @@
             "one": "{count} member could not be fetched",
             "other": "{count} members could not be fetched"
         }
+    },
+    "economy": {
+        "title": "💹 Best economy build",
+        "budget": "Level **{level}** · {total} SP · {companies_points} SP kept for Companies (up to {companies} companies) → **{budget} SP** for Production, Energy and Entrepreneurship",
+        "points": "{points} SP",
+        "income": "💼 Job {job} + 🛠️ Self-work {own} = **≈ {total} coins/day**",
+        "per_day": "≈ {total}/day",
+        "best_title": "🏆 Best build",
+        "now_title": "📊 Your build now",
+        "already_best": "✅ Already the best build for today's market.",
+        "add_points": "⬆️ +{gain}/day by adding {points} SP, no reset needed (you have {available} free).",
+        "reset_free": "🔄 +{gain}/day with a skill reset (free resets left: {free}; {days}-day cooldown).",
+        "reset_paid": "🔄 +{gain}/day with a skill reset: costs {cost}, paid back in {payback} days ({days}-day cooldown).",
+        "alternatives_title": "🥈 Next best",
+        "inputs_title": "📥 Market data used",
+        "job_input": "💼 Best job for this build: {wage}/PP after tax (needs Energy {energy}, Production {production})",
+        "job_input_open": "💼 Best job for this build: {wage}/PP after tax (no requirements)",
+        "no_job": "💼 No open job offer fits this build right now",
+        "self_input": "🛠️ Self-work at **{company}** ({item}): {value}/PP at market prices, +{bonus}% bonus",
+        "no_self_work": "🛠️ No company whose product has a market price, so self-work counts as 0",
+        "not_enough_points": "You don't have enough skill points for {companies} companies yet.",
+        "over_budget": "⚠️ Your build uses {points} SP, more than the {budget} SP left with Companies for {companies} companies. Fitting it takes a reset and changes work income by {change}/day; the extra companies add Automated Engine output instead.",
+        "reset_cost_free": "🔄 Free resets left: {free} ({days}-day cooldown).",
+        "reset_cost_paid": "🔄 A reset costs {cost} ({days}-day cooldown).",
+        "footer": "Model: economic-build-warera.netlify.app with live job offers, your companies and market prices · a reset moves every point, combat skills included · Management and Automated Engine are not counted"
     },
     "progression": {
         "self_not_found": "Couldn't find your WarEra player. Run the command again with `player:` and your in-game username, or say in the chat that your account isn't linked.",

@@ -360,6 +360,26 @@ def build_embed(user: dict, companies: list[dict], game_config: dict, prices: di
     return embed
 
 
+async def resolve_player_id(interaction: discord.Interaction, player: str | None, session) -> str | None:
+    """The WarEra id of `player` (exact username), or of the caller when no player is given.
+
+    The caller is found by their Discord-id link in the database first, then by their server nickname,
+    which the server keeps equal to the in-game username. Also used by /economy.
+    """
+    if player:
+        user = await get_user(player.strip(), session)
+        return str(user["_id"]) if user and user.get("_id") else None
+    try:
+        api_id = await asyncio.to_thread(find_api_id_by_discord_id, interaction.user.id)
+    except Exception:
+        logger.exception("Could not read the WarEra player linked to %s", interaction.user.id)
+        api_id = None
+    if api_id:
+        return str(api_id)
+    user = await get_user(interaction.user.display_name, session)
+    return str(user["_id"]) if user and user.get("_id") else None
+
+
 class Progression(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -374,25 +394,6 @@ class Progression(commands.Cog):
                 self._game_config, self._game_config_at = game_config, time.monotonic()
         return self._game_config
 
-    async def _resolve_player_id(self, interaction: discord.Interaction, player: str | None, session) -> str | None:
-        """The WarEra id of `player` (exact username), or of the caller when no player is given.
-
-        The caller is found by their Discord-id link in the database first, then by their server nickname,
-        which the server keeps equal to the in-game username.
-        """
-        if player:
-            user = await get_user(player.strip(), session)
-            return str(user["_id"]) if user and user.get("_id") else None
-        try:
-            api_id = await asyncio.to_thread(find_api_id_by_discord_id, interaction.user.id)
-        except Exception:
-            logger.exception("Could not read the WarEra player linked to %s", interaction.user.id)
-            api_id = None
-        if api_id:
-            return str(api_id)
-        user = await get_user(interaction.user.display_name, session)
-        return str(user["_id"]) if user and user.get("_id") else None
-
     @app_commands.command(name="progression", description="Show the next steps for your WarEra account: skill points, companies and daily checklist.")
     @app_commands.describe(player="WarEra username (default: you)")
     async def progression_command(self, interaction: discord.Interaction, player: str | None = None):
@@ -400,7 +401,7 @@ class Progression(commands.Cog):
         tr = await get_translator(interaction.guild_id)
         session = await get_shared_session()
 
-        player_id = await self._resolve_player_id(interaction, player, session)
+        player_id = await resolve_player_id(interaction, player, session)
         if not player_id:
             key = "progression.player_not_found" if player else "progression.self_not_found"
             await interaction.followup.send(tr(key, name=discord.utils.escape_markdown(player or "")), ephemeral=True)

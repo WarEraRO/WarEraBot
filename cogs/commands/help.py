@@ -32,6 +32,7 @@ _COMMAND_IDS: List[str] = [
     "mu_pill_plan",
     "fight_wealth",
     "progression",
+    "economy",
     "mu_order_alignment",
     "mu_positions",
     "mu_readiness",
