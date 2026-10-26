@@ -261,6 +261,67 @@ async def get_users_equipment(user_ids, session):
     equipment = await _get_batch(session, 'inventory.fetchCurrentEquipment', [{'userId': user_id} for user_id in ids])
     return {user_id: items for user_id, items in zip(ids, equipment) if isinstance(items, dict)}
 
+async def get_user_companies(user_id, session, base_url="https://api2.warera.io/trpc/company.getCompanies"):
+    """Every company `user_id` owns, as company.getById objects in listing order, or None.
+
+    company.getCompanies returns bare id strings, so the companies are then fetched in one batched
+    company.getById request. One page of 100 covers every player (Companies skill 10 allows 12).
+    None when the listing or any company fails to load, so callers never plan from a partial list.
+    """
+    try:
+        params = {"input": json.dumps({'userId': user_id, 'perPage': 100})}
+        data = await _get_with_retry(session, base_url, params=params)
+        listing = (data or {}).get('result', {}).get('data')
+        if not isinstance(listing, dict):
+            return None
+        ids = [item if isinstance(item, str) else (item or {}).get('_id') for item in listing.get('items') or []]
+        companies = await _get_batch(session, 'company.getById', [{'companyId': company_id} for company_id in ids if company_id])
+        if len(companies) != len(ids) or not all(isinstance(company, dict) for company in companies):
+            return None
+        return companies
+    except Exception as e:
+        logger.exception('get_user_companies failed: %s', e)
+        return None
+
+async def get_production_bonuses(company_ids, session):
+    """Batched company.getProductionBonus: {companyId: bonus} for the ids that resolved.
+
+    Not in the official spec (explorer-documented). A bonus is {strategicBonus, depositBonus,
+    ethicSpecializationBonus, ethicDepositBonus, total}, in percent [observed 2026-10-25].
+    """
+    ids = list(dict.fromkeys(company_ids))
+    bonuses = await _get_batch(session, 'company.getProductionBonus', [{'companyId': company_id} for company_id in ids])
+    return {company_id: bonus for company_id, bonus in zip(ids, bonuses) if isinstance(bonus, dict)}
+
+async def get_work_offers(session, max_pages=3, base_url="https://api2.warera.io/trpc/workOffer.getWorkOffersPaginated"):
+    """Open job offers, best after-tax wage first, from up to `max_pages` pages of 100; None if the first fails.
+
+    Items carry wage and wageAfterTax (per production point), minEnergy, minProduction, minLevel
+    (absent when not required), citizenship, quantity and the employer's company and user
+    [observed 2026-10-25: sorted by wageAfterTax descending, about 600 offers]. The best offer a new
+    player can take was once on the third page, behind offers with requirements. A later page that
+    fails ends the listing early.
+    """
+    items = []
+    cursor = None
+    try:
+        for page_number in range(max_pages):
+            input_data = {'limit': 100, 'direction': 'forward'}
+            if cursor:
+                input_data['cursor'] = cursor
+            data = await _get_with_retry(session, base_url, params={"input": json.dumps(input_data)})
+            page = (data or {}).get('result', {}).get('data')
+            if not isinstance(page, dict):
+                return None if page_number == 0 else items
+            items.extend(page.get('items') or [])
+            cursor = page.get('nextCursor')
+            if not cursor:
+                break
+        return items
+    except Exception as e:
+        logger.exception('get_work_offers failed: %s', e)
+        return items or None
+
 async def get_last_tournament(session, base_url="https://api2.warera.io/trpc/tournament.getLastTournament"):
     """The most recently created or active tournament (not in the official spec; explorer-documented)."""
     try:

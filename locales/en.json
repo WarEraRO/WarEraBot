@@ -111,14 +111,17 @@
     },
     "help": {
         "commands_title": "Bot Commands",
-        "commands_description": "Use the slash commands below. Autocomplete is available where applicable.",
+        "commands_description": "Use the slash commands below. Autocomplete is available where applicable.\nTip: `/help topic:` opens a single command or job.",
         "commands_footer": "Commands — Page {page} of {pages}",
         "jobs_title": "Background Jobs / Tasks",
-        "jobs_description": "Active background tasks and how often they run.",
+        "jobs_description": "Active background tasks and how often they run.\nTip: `/help topic:` opens a single command or job.",
         "jobs_footer": "Jobs — Page {page} of {pages}",
         "commands_button": "Commands",
         "jobs_button": "Jobs",
         "unavailable": "Unable to display help at this time.",
+        "topic_footer_command": "Command — run /help without options to browse everything",
+        "topic_footer_job": "Background job — run /help without options to browse everything",
+        "unknown_topic": "No command or job matches **{topic}**. Pick one from the suggestions, or run /help without options to browse everything.",
         "commands": {
             "diplomacy": {
                 "name": "/diplomacy [country_name]",
@@ -187,6 +190,14 @@
             "mu_pill_plan": {
                 "name": "/mu_pill_plan military_unit",
                 "desc": "Pill plan for a configured military unit (autocomplete), assuming nobody takes a new Pill: how many fighters are in buff, in debuff or can take a Pill now, the earliest time all of them can take one together, an hour-by-hour timeline of those counts, and who can't take one yet, with the time they can. It also splits the fighters into squads of 4 that each take the Pill at their own hour every day, so everyone takes one within the same day. Squads are built from the hours members took their current Pill; fighters without one fill free places or form new squads in the emptiest hours. Each squad shows its daily hour, its first turn and its members, and the hours with no squad in buff are flagged. Economy builds are left out. Hours are shown in the configured timezone. The reply is posted in the channel; nobody is pinged."
+            },
+            "economy": {
+                "name": "/economy [companies] [player]",
+                "desc": "The best Production, Energy and Entrepreneurship build for your account, or another player's, at today's market. Every level combination your skill points allow is scored in coins per day: the job is the best open offer that build qualifies for, after tax, and self-work is at your best company, with its production bonus and market price. Shows the best build, your build now and what switching gains (free points, or a reset with its cost and payback), the next best builds and the market data used. `companies` keeps Companies skill points for that many companies (default: your current limit). Only you see the reply."
+            },
+            "progression": {
+                "name": "/progression [player]",
+                "desc": "Next steps for your WarEra account, or another player's: the next company action (switch product, build, raise the Companies skill or upgrade Automated Engine, with the materials and their market cost), your companies with their storage, your Production, Energy and Entrepreneurship with what to buy next in the skill order (computed with the economic build calculator, never needing a reset), and a checklist (daily reward, missions, job, full storage, MU, party). Companies follow BuhDeuce's economic guide: economy builds go past the Romanian guide's 6 companies at AE5 up to 12 companies at AE7 by level 50; fight builds stop at the war path's 6 companies at AE6. You are found by your linked account, then your nickname. Only you see the reply."
             },
             "fight_wealth": {
                 "name": "/fight_wealth military_unit",
@@ -657,6 +668,77 @@
             "other": "{count} members could not be fetched"
         }
     },
+    "economy": {
+        "title": "💹 Best economy build",
+        "budget": "Level **{level}** · {total} SP · {companies_points} SP kept for Companies (up to {companies} companies) → **{budget} SP** for Production, Energy and Entrepreneurship",
+        "points": "{points} SP",
+        "income": "💼 Job {job} + 🛠️ Self-work {own} = **≈ {total} coins/day**",
+        "per_day": "≈ {total}/day",
+        "best_title": "🏆 Best build",
+        "now_title": "📊 Your build now",
+        "already_best": "✅ Already the best build for today's market.",
+        "add_points": "⬆️ +{gain}/day by adding {points} SP, no reset needed (you have {available} free).",
+        "reset_free": "🔄 +{gain}/day with a skill reset (free resets left: {free}; {days}-day cooldown).",
+        "reset_paid": "🔄 +{gain}/day with a skill reset: costs {cost}, paid back in {payback} days ({days}-day cooldown).",
+        "alternatives_title": "🥈 Next best",
+        "inputs_title": "📥 Market data used",
+        "job_input": "💼 Best job for this build: {wage}/PP after tax (needs Energy {energy}, Production {production})",
+        "job_input_open": "💼 Best job for this build: {wage}/PP after tax (no requirements)",
+        "no_job": "💼 No open job offer fits this build right now",
+        "self_input": "🛠️ Self-work at **{company}** ({item}): {value}/PP at market prices, +{bonus}% bonus",
+        "no_self_work": "🛠️ No company whose product has a market price, so self-work counts as 0",
+        "not_enough_points": "You don't have enough skill points for {companies} companies yet.",
+        "over_budget": "⚠️ Your build uses {points} SP, more than the {budget} SP left with Companies for {companies} companies. Fitting it takes a reset and changes work income by {change}/day; the extra companies add Automated Engine output instead.",
+        "reset_cost_free": "🔄 Free resets left: {free} ({days}-day cooldown).",
+        "reset_cost_paid": "🔄 A reset costs {cost} ({days}-day cooldown).",
+        "footer": "Model: economic-build-warera.netlify.app with live job offers, your companies and market prices · a reset moves every point, combat skills included · Management and Automated Engine are not counted"
+    },
+    "progression": {
+        "self_not_found": "Couldn't find your WarEra player. Run the command again with `player:` and your in-game username, or say in the chat that your account isn't linked.",
+        "player_not_found": "No WarEra player is called **{name}**. Check the spelling (capital letters matter).",
+        "unavailable": "Could not load the player's data from WarEra. Try again later.",
+        "title": "📈 Progression plan",
+        "summary": "Level **{level}** · 🏭 Companies: {companies}",
+        "money": "💵 {money}",
+        "goal": "🎯 Goal: {companies} companies at Automated Engine {ae} by level {level}",
+        "goal_war": "🎯 Goal (war path): {companies} companies at Automated Engine {ae}",
+        "fight_build": "⚔️ Fight build: your companies follow the war path, the minimum for fighting; the skill order below is for economy builds.",
+        "step_title": "➡️ Next step",
+        "needs": "Needs {materials}",
+        "market_value": "(≈ {money} at market prices)",
+        "step": {
+            "done": "✅ Goal reached: every company is at the maximum. Keep storage empty and sell what you don't use.",
+            "done_war": "✅ War path reached. Keep storage empty; back on an economy build, the plan continues toward 12 companies at AE7.",
+            "unlock": "Reach level **{level}** to unlock the Companies skill, needed for company #{number}.",
+            "skill": "Raise **Companies** to level **{level}** ({points} SP) to unlock company #{number}.",
+            "build": "Build company **#{number}** producing **{item}**.",
+            "build_free": "Build company **#{number}**: pick a product that sells well, in a region with a production bonus of about 30% or more.",
+            "convert": "Switch **{company}** from {source} to **{item}**: your first companies make the concrete and steel you build with.",
+            "upgrade": "Upgrade **{company}** ({item}) to **Automated Engine {level}**."
+        },
+        "companies_title": "🏭 Companies",
+        "skills_title": "🧠 Skill points",
+        "skills": {
+            "production": "Production",
+            "energy": "Energy",
+            "entrepreneurship": "Entrepreneurship"
+        },
+        "spend": "👉 Spend **{points} SP** on {skill} (→ {target})",
+        "companies_first": "🏭 First **{points} SP** on Companies (→ {level}) for your next company",
+        "next": "⏭️ Next in the order: {skill} {level} · {points} SP",
+        "save": "💾 Keep your free points ({points} SP) for it",
+        "order_done": "✅ Production, Energy and Entrepreneurship are all at level 10",
+        "checklist_title": "📋 Checklist",
+        "check": {
+            "daily_reward": "🎁 Claim today's daily reward",
+            "missions": "📜 Do your beginner, daily and weekly missions for XP (the market unlocks at level {level})",
+            "job": "💼 Get a job: take the best-paid offer you qualify for and spend your Energy there",
+            "storage": "📦 **{company}** ({item}) storage is {percent}% full; a full storage stops production, so produce, sell or upgrade storage",
+            "mu": "🪖 Join a military unit",
+            "party": "🏛️ Join a party"
+        },
+        "footer": "Companies: BuhDeuce's economic guide · skills: economic-build-warera.netlify.app · the bot can't see your inventory or missions"
+    },
     "weekly_damages": {
         "title": "Weekly User Damages - {countries}",
         "more_countries": "{names} + {count} more",
@@ -934,13 +1016,13 @@
         "not_enough_sp": "❌ **{name}** does not have enough skill points ({total}) for {count} companies.",
         "no_builds": "❌ Could not generate any builds. Try again later.",
         "title": "⚔️ Pill builds · {name}",
-        "header_player": "**Level** {level} · **{sp} SP** for combat ({reserved} SP on Companies)",
+        "header_player": "**Level** {level} · **{sp} SP** (level × 4) · **{prestige}** Prestige Points",
         "header_bonus": "**Military rank** +{rank}% · **battle bonus** +{battle}% (assumed)",
-        "header_companies": "**Companies** {count} × engine L{level}, +{bonus}% → {pp} PP/day of {product} × {per_pp}/PP = **{income}/day**",
+        "header_companies": "**Companies** {count} (Companies skill {skill}) × engine L{level} → {pp} PP/day of {product} × {per_pp}/PP (0% production bonus) = **{income}/day**",
         "header_no_companies": "**Companies**: none counted",
-        "header_prices": "**Prices**: Pill {pill} · case {case} · elite case {elite} · scrap {scrap} · pool item ~{pool}",
+        "header_prices": "**Prices**: Pill {pill} · case {case} · elite case {elite} · scrap {scrap} · pool loot {pool}/1k damage",
         "model_title": "How it is calculated",
-        "model_text": "• One Pill a day: you fight only during the 8 h buff, starting with full bars, so you use 1.8 Health bars and 1.8 Hunger bars of food.\n• Gear: average rolls at average market prices, 100 durability, 1 lost per hit (the weapon on every hit, other gear only on hits that are not dodged). Every weapon except the Knife uses 1 ammo per hit.\n• Returns: cases at market price (Loot Chance per hit that is not a miss, elite = 1/100 of that), broken gear gives 1/3 of its scrap, round/battle pool items (1 per 200k + 1 per 500k damage), company engine output.\n• Damage is an estimate (miss = ½ Attack, crit = Attack × (1 + Crit Damage)). Respec, travel and bounties are not included.",
+        "model_text": "• One Pill a day: you fight only during the 8 h buff, starting with full bars, so you use 1.8 Health bars and 1.8 Hunger bars of food.\n• Skills: level × 4 SP. Prestige Points add levels on top of any skill (k levels on one skill cost 2^k − 1 points), placed where they save the most SP.\n• Gear: average rolls at average market prices, 100 durability, 1 lost per hit (the weapon on every hit, other gear only on hits that are not dodged). Every weapon except the Knife uses 1 ammo per hit.\n• Returns: cases at live market price (Loot Chance per hit that is not a miss, elite = 1/100 of that), broken gear gives 1/3 of its scrap, pool loot at a flat {pool}/1k damage, company engines valued as iron. Work income is not counted yet.\n• Damage is an estimate (miss = ½ Attack, crit = Attack × (1 + Crit Damage)). Respec, travel and bounties are not included.",
         "bracket_title": "💰 ≤ {bracket}/1k · {damage} damage/day ({cost}/1k)",
         "bracket_unreachable_title": "💰 Cheapest build · {damage} damage/day ({cost}/1k)",
         "bracket_unreachable": "No build gets down to ≤ {brackets}/1k with these settings; this one has the lowest net cost per 1k damage found.",
@@ -959,10 +1041,11 @@
         "no_food": "🍖 No food",
         "combat": "**{per_hit}** damage per hit × **{hits}** hits\nAttack {attack} · Precision {precision}%\nCrit {crit}% × {crit_damage}% crit damage\nArmor {armor} → {armor_pct}% · Dodge {dodge} → {dodge_pct}%\nHealth {health} · Hunger {hunger} · Loot {loot}%\nHealth per hit {health_per_hit}",
         "costs": "Pill {pill} · Ammo {ammo} · Food {food}\nGear wear {gear}\n**Total {total}**",
-        "returns": "Cases {cases} → {case_value}\nElite cases {elite} → {elite_value}\nScrap {scrap} → {scrap_value}\nPool loot ~{pool} items → {pool_value}\nCompanies {companies}\n**Total {total}**",
+        "returns": "Cases {cases} → {case_value}\nElite cases {elite} → {elite_value}\nScrap {scrap} → {scrap_value}\nPool loot → {pool_value}\nCompanies {companies}\n**Total {total}**",
         "net": "**{net}/day** → **{cost} per 1k damage**",
-        "footer": "SP used {used}/{sp} · economy skills left at 0",
+        "footer": "SP used {used}/{sp} · Prestige Points used {prestige_used}/{prestige} · other economy skills at 0",
         "gear_none": "none",
+        "companies_skill": "Companies",
         "skills": {
             "attack": "Attack",
             "precision": "Precision",

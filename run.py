@@ -1,7 +1,9 @@
+import asyncio
 import discord
 from discord.ext import commands
 from config import config
 import utils.api as api
+from utils import db
 from datetime import datetime, timezone
 from utils.i18n import CommandTranslator, get_translator
 
@@ -46,7 +48,14 @@ class WarEraBot(commands.Bot):
             await api.close_shared_session()
 
     async def setup_hook(self):
-        """Load every task, command and event cog, then sync the slash commands (with Romanian translations)."""
+        """Create the database schema, load every task, command and event cog, then sync the slash commands (with Romanian translations)."""
+        # create the tables up front: the startup embed reads guild_settings even when
+        # no cog that calls init_db() is loaded
+        try:
+            await asyncio.to_thread(db.init_db)
+        except Exception as e:
+            print(f"Database init failed: {e}")
+
         await self.load_extension("cogs.tasks.military_unit_roles")
         await self.load_extension("cogs.tasks.commander_roles")
         await self.load_extension("cogs.tasks.skill_roles")
@@ -72,6 +81,8 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.pills")
         await self.load_extension("cogs.commands.mu_pill_plan")
         await self.load_extension("cogs.commands.fight_wealth")
+        await self.load_extension("cogs.commands.progression")
+        await self.load_extension("cogs.commands.economy")
         await self.load_extension("cogs.commands.mu_order_alignment")
         await self.load_extension("cogs.commands.mu_positions")
         await self.load_extension("cogs.commands.mu_readiness")
@@ -89,6 +100,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.run-job")
         await self.load_extension("cogs.commands.language")
         await self.load_extension("cogs.commands.server_ids")
+        await self.load_extension("cogs.commands.damage")
 
         await self.load_extension("cogs.events.newbie_welcome")
 

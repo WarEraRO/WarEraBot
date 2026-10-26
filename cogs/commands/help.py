@@ -1,3 +1,5 @@
+import unicodedata
+
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -29,6 +31,8 @@ _COMMAND_IDS: List[str] = [
     "pills",
     "mu_pill_plan",
     "fight_wealth",
+    "progression",
+    "economy",
     "mu_order_alignment",
     "mu_positions",
     "mu_readiness",
@@ -63,6 +67,97 @@ _JOB_IDS: List[str] = [
 
 _COMMANDS_PER_PAGE = 3
 _JOBS_PER_PAGE = 4
+
+# /help topic values are "<section>:<id>"; the section picks the locale block and the embed colour
+_SECTIONS = {"command": ("commands", _COMMAND_IDS), "job": ("jobs", _JOB_IDS)}
+_SECTION_ICONS = {"command": "⌨️", "job": "⚙️"}
+_SECTION_COLORS = {"command": discord.Color.blurple(), "job": discord.Color.dark_gold()}
+# Discord's limits for one autocomplete choice label and the number of choices
+_CHOICE_NAME_LIMIT = 100
+_MAX_CHOICES = 25
+
+
+# ---------------------------------------------------------------------------
+# Single topic (/help topic:<...>)
+# ---------------------------------------------------------------------------
+
+def _topic_entries(tr: Translator) -> List[tuple[str, str, str]]:
+    """List every help topic, commands first, in the order the paginated help shows them.
+
+    Args:
+        tr: Translator used for the topic labels.
+
+    Returns:
+        ``(value, section, label)`` tuples, where ``value`` is ``"<section>:<id>"`` and ``label`` is the entry's
+        icon plus its translated field name.
+    """
+    entries = []
+    for section, (block, ids) in _SECTIONS.items():
+        for entry_id in ids:
+            label = f"{_SECTION_ICONS[section]} {tr(f'help.{block}.{entry_id}.name')}"
+            entries.append((f"{section}:{entry_id}", section, label))
+    return entries
+
+
+def _resolve_topic(topic: str) -> tuple[str, str] | None:
+    """Find the help entry a /help ``topic`` value refers to.
+
+    Accepts an autocomplete value (``"job:skill_roles"``), a bare entry id (``"skill_roles"``) or a typed command
+    name (``"/nap"``, ``"nap list"``), case-insensitively. Matching uses ids and the English field names only, so it
+    needs no translator.
+
+    Args:
+        topic: Text the member picked or typed.
+
+    Returns:
+        ``(section, id)``, or None when nothing matches.
+    """
+    wanted = topic.strip().lower()
+    section, _, entry_id = wanted.partition(":")
+    if section in _SECTIONS and entry_id in _SECTIONS[section][1]:
+        return section, entry_id
+    bare = wanted.lstrip("/")
+    for section, (_, ids) in _SECTIONS.items():
+        if bare in ids:
+            return section, bare
+    # A typed command name, matched against each " | "-separated usage in the English field names, so
+    # "subscribe loot" finds "/subscribe loot | /unsubscribe loot" and "nap" finds "/nap add ... | /nap list"
+    usages = [
+        (section, value.split(":", 1)[1], usage.strip().lstrip("/").lower())
+        for value, section, label in _topic_entries(Translator("en"))
+        for usage in label.split(" ", 1)[1].split(" | ")
+    ]
+    for section, entry_id, usage in usages:
+        if usage == bare or usage.startswith(bare + " "):
+            return section, entry_id
+    return None
+
+
+def _fold(text: str) -> str:
+    """Lowercase ``text`` and drop diacritics, so "ora" matches "oră" in autocomplete."""
+    decomposed = unicodedata.normalize("NFKD", text.lower())
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
+
+
+def _build_topic_embed(tr: Translator, section: str, entry_id: str) -> discord.Embed:
+    """Build the embed for one command or job.
+
+    Args:
+        tr: Translator for the server's language.
+        section: ``"command"`` or ``"job"``.
+        entry_id: Id from ``_COMMAND_IDS`` or ``_JOB_IDS``.
+
+    Returns:
+        An embed titled with the entry's field name and described by its text.
+    """
+    block = _SECTIONS[section][0]
+    embed = discord.Embed(
+        title=tr(f"help.{block}.{entry_id}.name"),
+        description=tr(f"help.{block}.{entry_id}.desc"),
+        color=_SECTION_COLORS[section],
+    )
+    embed.set_footer(text=tr(f"help.topic_footer_{section}"))
+    return embed
 
 
 # ---------------------------------------------------------------------------
@@ -192,8 +287,47 @@ class Help(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="help", description="Show bot commands and background jobs (paginated).")
-    async def help(self, interaction: discord.Interaction):
+    async def topic_autocomplete(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
+        """Suggest commands and jobs whose id or name contains the typed text.
+
+        Labels follow the member's Discord client language rather than the server's, because the server
+        language is a database read and Discord drops autocomplete answers after about 3 seconds.
+
+        Args:
+            interaction: The autocomplete interaction.
+            current: Text typed so far.
+
+        Returns:
+            Up to 25 choices whose value is ``"<section>:<id>"``.
+        """
+        tr = Translator("ro" if interaction.locale == discord.Locale.romanian else "en")
+        wanted = _fold((current or "").strip())
+        choices = []
+        for value, _, label in _topic_entries(tr):
+            if wanted and wanted not in value and wanted not in _fold(label):
+                continue
+            if len(label) > _CHOICE_NAME_LIMIT:
+                label = label[: _CHOICE_NAME_LIMIT - 1] + "…"
+            choices.append(app_commands.Choice(name=label, value=value))
+            if len(choices) >= _MAX_CHOICES:
+                break
+        return choices
+
+    @app_commands.command(name="help", description="Show bot commands and background jobs, or one of them in detail.")
+    @app_commands.describe(topic="A single command or background job to show (leave empty to browse all)")
+    @app_commands.autocomplete(topic=topic_autocomplete)
+    async def help(self, interaction: discord.Interaction, topic: str | None = None):
+        if topic:
+            resolved = _resolve_topic(topic)
+            if resolved is None:
+                await interaction.response.defer(ephemeral=True)
+                tr = await get_translator(interaction.guild_id)
+                await interaction.followup.send(tr("help.unknown_topic", topic=topic[:100]), ephemeral=True)
+                return
+            await interaction.response.defer()
+            tr = await get_translator(interaction.guild_id)
+            await interaction.followup.send(embed=_build_topic_embed(tr, *resolved))
+            return
         await interaction.response.defer()
         tr = await get_translator(interaction.guild_id)
         view = _HelpPaginator(tr)
