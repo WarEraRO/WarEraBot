@@ -698,7 +698,8 @@
         "over_budget": "⚠️ Build-ul tău folosește {points} SP, mai mult decât cele {budget} SP rămase după Companii pentru {companies} companii. Ca să încapă e nevoie de o resetare, iar venitul din muncă se schimbă cu {change}/zi; companiile în plus aduc în schimb producție din Automated Engine.",
         "reset_cost_free": "🔄 Resetări gratuite rămase: {free} (pauză de {days} zile).",
         "reset_cost_paid": "🔄 O resetare costă {cost} (pauză de {days} zile).",
-        "footer": "Model: economic-build-warera.netlify.app cu oferte de job live, companiile tale și prețurile pieței · o resetare mută toate punctele, inclusiv cele de luptă · Management și Automated Engine nu sunt incluse"
+        "footer": "Model: economic-build-warera.netlify.app cu oferte de job live, companiile tale și prețurile pieței · o resetare mută toate punctele, inclusiv cele de luptă · Management și Automated Engine nu sunt incluse",
+        "paused": "⏸️ /economy este oprită temporar. WarEra v0.27 a eliminat piața de joburi și skill-ul Entrepreneurship pe care se baza acest calculator. Va reveni după ce este refăcută pentru angajați și manageri."
     },
     "progression": {
         "self_not_found": "Nu ți-am găsit jucătorul WarEra. Rulează din nou comanda cu `player:` și numele tău din joc sau spune pe chat că nu ai contul legat.",

@@ -691,7 +691,8 @@
         "over_budget": "⚠️ Your build uses {points} SP, more than the {budget} SP left with Companies for {companies} companies. Fitting it takes a reset and changes work income by {change}/day; the extra companies add Automated Engine output instead.",
         "reset_cost_free": "🔄 Free resets left: {free} ({days}-day cooldown).",
         "reset_cost_paid": "🔄 A reset costs {cost} ({days}-day cooldown).",
-        "footer": "Model: economic-build-warera.netlify.app with live job offers, your companies and market prices · a reset moves every point, combat skills included · Management and Automated Engine are not counted"
+        "footer": "Model: economic-build-warera.netlify.app with live job offers, your companies and market prices · a reset moves every point, combat skills included · Management and Automated Engine are not counted",
+        "paused": "⏸️ /economy is paused. WarEra v0.27 removed the job market and the Entrepreneurship skill this build calculator was based on. It will come back once it is rebuilt for employees and managers."
     },
     "progression": {
         "self_not_found": "Couldn't find your WarEra player. Run the command again with `player:` and your in-game username, or say in the chat that your account isn't linked.",
