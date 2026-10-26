@@ -1018,6 +1018,7 @@
         "title": "⚔️ Pill builds · {name}",
         "header_player": "**Level** {level} · **{sp} SP** (level × 4) · **{prestige}** Prestige Points",
         "header_bonus": "**Military rank** +{rank}% · **battle bonus** +{battle}% (assumed)",
+        "header_companies": "**Companies** {count} (Companies skill {skill}) × engine L{level} → {pp} PP/day of {product} × {per_pp}/PP (0% production bonus) = **{income}/day**",
         "header_no_companies": "**Companies**: none counted",
         "header_prices": "**Prices**: Pill {pill} · case {case} · elite case {elite} · scrap {scrap} · pool loot {pool}/1k damage",
         "model_title": "How it is calculated",
