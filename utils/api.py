@@ -301,6 +301,9 @@ async def get_work_offers(session, max_pages=3, base_url="https://api2.warera.io
     [observed 2026-10-25: sorted by wageAfterTax descending, about 600 offers]. The best offer a new
     player can take was once on the third page, behind offers with requirements. A later page that
     fails ends the listing early.
+
+    WarEra v0.27 removed the procedure (404 "No procedure found" [observed 2026-10-26]), so this
+    now always returns None; /economy no longer calls it.
     """
     items = []
     cursor = None

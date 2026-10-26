@@ -10,6 +10,10 @@ for (minimum Energy, Production and level, citizenship), and self-work is valued
 (its production bonus, and its item's market price minus its inputs per production point). The skill points are
 the player's total minus what the Companies skill needs for the chosen number of companies; Management and the
 companies' Automated Engine output are not part of the model.
+
+Paused since WarEra v0.27 (2026-10-25): the job market (workOffer.getWorkOffersPaginated, now a 404) and the
+Entrepreneurship skill are gone, so while ECONOMY_PAUSED is set the command only replies with a notice. The
+model below is kept for the rebuild around employees and managers.
 """
 import asyncio
 import logging
@@ -36,6 +40,8 @@ from utils.i18n import Translator, get_translator
 logger = logging.getLogger(__name__)
 
 GAME_CONFIG_TTL = 3600
+# WarEra v0.27 removed the job market and Entrepreneurship that the build model needs
+ECONOMY_PAUSED = True
 BUILD_SKILLS = ("production", "energy", "entrepreneurship")
 MAX_SKILL_LEVEL = 10
 # best build plus this many runners-up
@@ -309,8 +315,12 @@ class Economy(commands.Cog):
         companies: app_commands.Range[int, 2, 12] | None = None,
         player: str | None = None,
     ):
+        """Reply with the best economy builds for a player, or the paused notice while ECONOMY_PAUSED is set."""
         await interaction.response.defer(ephemeral=True)
         tr = await get_translator(interaction.guild_id)
+        if ECONOMY_PAUSED:
+            await interaction.followup.send(tr("economy.paused"), ephemeral=True)
+            return
         session = await get_shared_session()
 
         player_id = await resolve_player_id(interaction, player, session)
