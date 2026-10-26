@@ -11,9 +11,15 @@ The model (game rules from gameConfig and the warera-game-expert references):
   to 2 significant figures.
 - Gear has 100 durability and loses 1 per hit: the weapon on every hit, other gear only on hits that are not
   dodged. A broken item auto-dismantles for 1/3 of a new item's scrap.
-- Returns: cases (Loot Chance per valid hit, elite cases 1/100 of that) at market price, scrap, items of the
-  round/battle loot pools (1 per 200k and 1 per 500k damage) and the companies' Automated Engine output.
-Economy skills are never used; Companies only takes the points needed for the companies the user asks for.
+- Returns: cases (Loot Chance per valid hit, elite cases 1/100 of that) at live market price, scrap, round/battle
+  loot pool items as a flat `LOOT_POOL_PER_1K` per 1,000 damage (pool items go to the top ranks, so the bot does
+  not model them item by item; intel.warera.wiki uses the same flat value) and the companies' Automated Engine
+  output, valued as iron at 0% production bonus. Work income is not counted until the v0.27 formulas are known.
+- Skill points: level x 4. Prestige Points (`leveling.prestigeLevel`, one per Prestige) add bonus levels on top of
+  any base level, k levels on one skill costing 2^k - 1 points; skill values continue past level 10 with the same
+  step. Checked against the API on 2026-10-26: `skills.<s>.value` = table value at `level + prestige`.
+Economy skills are never used; Companies only takes the level needed for the companies the user asks for, paid
+with skill points or Prestige Points, whichever the build can spare.
 """
 import asyncio
 import logging
@@ -25,7 +31,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from utils.api import _get_batch, get_game_config, get_market_prices, get_shared_session, get_user
-from utils.i18n import get_translator, t
+from utils.i18n import get_translator
 
 logger = logging.getLogger(__name__)
 
@@ -53,16 +59,14 @@ AMMO_CODES = ("lightAmmo", "ammo", "heavyAmmo")
 FOOD_CODES = ("bread", "steak", "cookedFish")
 PILL_CODE = "cocain"
 ELITE_CASE_SHARE = 1 / 100
-# Rarity split of regular cases [wiki]; used as the estimate for loot-pool items too.
-POOL_RARITY_ODDS = (0.62, 0.30, 0.071, 0.0085, 0.0004, 0.0001)
+# Round + battle loot pool value per 1,000 damage: intel.warera.wiki's flat default. The codex observed
+# ~0.12 at the gear prices of 2026-09-16 (warera-game-expert battle-loot.md).
+LOOT_POOL_PER_1K = 0.17
 OVERFLOW_PER_POINT = 4
-
-# Items an Automated Engine can produce, offered as /damage company_product choices.
-COMPANY_PRODUCTS = (
-    "grain", "limestone", "iron", "lead", "coca", "petroleum", "wood", "livestock", "fish",
-    "bread", "steak", "cookedFish", "concrete", "steel", "oil", "paper",
-    "lightAmmo", "ammo", "heavyAmmo", "cocain",
-)
+SP_PER_LEVEL = 4
+# Company output is valued as this raw material: v0.27 removed production bonuses, so it is a neutral baseline.
+COMPANY_PRODUCT = "iron"
+MAX_COMPANIES = 20
 
 # Each weight is the damage one coin is worth to the optimizer (maximize damage - weight x net cost).
 # A build at the edge of an X/1k budget is optimal for weight 1000 / X; the last weight minimizes cost.
@@ -87,6 +91,66 @@ def _level_value(levels: dict, level: int) -> float:
     return float(levels[str(level)]["value"])
 
 
+def _max_bonus(prestige_points: int) -> int:
+    """Most Prestige bonus levels one skill can take: k levels cost 2^k - 1 points."""
+    bonus = 0
+    while (1 << (bonus + 1)) - 1 <= prestige_points:
+        bonus += 1
+    return bonus
+
+
+def _skill_table(levels: dict, top: int, bonus: int) -> tuple[list[float], list[int]]:
+    """(value, total skill-point cost) per level 0..top, values extended by `bonus` Prestige levels.
+
+    Above the table the value keeps the step of its last level, as the live client does; costs stop at
+    `top` because Prestige levels are paid with Prestige Points only.
+    """
+    values = [_level_value(levels, lvl) for lvl in range(top + 1)]
+    step = values[top] - values[top - 1] if top else 0.0
+    values += [values[top] + step * k for k in range(1, bonus + 1)]
+    costs = [int(levels[str(lvl)].get("totalCost", lvl * (lvl + 1) // 2)) for lvl in range(top + 1)]
+    return values, costs
+
+
+def _place_prestige(targets: list, points: int) -> tuple[int, tuple] | None:
+    """Return the fewest skill points that reach every target level, and where the Prestige levels go.
+
+    Up to `points` Prestige Points are placed where they save the most skill points.
+
+    Args:
+        targets: (level, skill-point costs per base level) per skill; a level above the last cost entry
+            must be covered by Prestige levels.
+        points: Prestige Points available.
+
+    Returns:
+        (skill points, Prestige levels per skill in `targets` order), or None when the levels are out of reach.
+    """
+    if points <= 0:
+        total = 0
+        for level, costs in targets:
+            if level >= len(costs):
+                return None
+            total += costs[level]
+        return total, (0,) * len(targets)
+
+    # knapsack over the Prestige Points spent so far: spent -> (skill points, Prestige levels so far)
+    best = {0: (0, ())}
+    for level, costs in targets:
+        step = {}
+        for spent, (sp, placed) in best.items():
+            for bonus in range(max(0, level - len(costs) + 1), level + 1):
+                total = spent + (1 << bonus) - 1
+                if total > points:
+                    break
+                option = (sp + costs[level - bonus], placed + (bonus,))
+                if total not in step or option < step[total]:
+                    step[total] = option
+        if not step:
+            return None
+        best = step
+    return min(best.values())
+
+
 def _mitigation(points: float, soft_cap: float) -> float:
     """Armor/Dodge share: points / (points + soft cap) rounded to 2 significant figures."""
     if points <= 0:
@@ -109,14 +173,16 @@ def _price_per_pp(code: str, items: dict, prices: dict) -> float | None:
     return (prices[code] - inputs) / points
 
 
-def _companies_sp(game_config: dict, count: int) -> int | None:
-    """Skill points the Companies skill needs to own `count` companies (None if out of reach)."""
+def _companies_table(game_config: dict, prestige_points: int) -> tuple[list[float], list[int]]:
+    """Companies skill (value, cost) table, extended by the Prestige levels the player can afford."""
     levels = game_config["skills"]["companies"]["levels"]
-    for lvl in range(len(levels)):
-        entry = levels.get(str(lvl))
-        if entry and entry["value"] >= count:
-            return int(entry.get("totalCost", 0))
-    return None
+    top = min(MAX_SKILL_LEVEL, max(int(k) for k in levels))
+    return _skill_table(levels, top, _max_bonus(prestige_points))
+
+
+def _companies_level(values: list[float], count: int) -> int | None:
+    """Lowest Companies level that allows `count` companies (None if out of reach)."""
+    return next((lvl for lvl, value in enumerate(values) if value >= count), None)
 
 
 def _engine_levels(game_config: dict) -> dict:
@@ -201,7 +267,21 @@ class Model:
     """Everything a build evaluation needs: skill tables, gear options, prices and the player's bonuses."""
 
     def __init__(self, game_config: dict, prices: dict, gear_prices: dict, player_level: int,
-                 rank_pct: float, battle_pct: float, company_income: float):
+                 prestige_points: int, companies_level: int, rank_pct: float, battle_pct: float,
+                 company_income: float):
+        """Build the tables for one player.
+
+        Args:
+            game_config: Live gameConfig.
+            prices: Market prices by item code; needs the Pill, `case1` and `case2`.
+            gear_prices: Average market price by equipment code.
+            player_level: Unlocks skills by their `unlockAtLevel`.
+            prestige_points: Prestige Points the builds may place (`leveling.prestigeLevel`).
+            companies_level: Companies skill level every build must keep (0 for none).
+            rank_pct: Military rank bonus in percent.
+            battle_pct: Total battle bonus in percent, floored at -100%.
+            company_income: Daily company output value, added to every build's returns.
+        """
         items = game_config["items"]
         skills = game_config["skills"]
         battle = game_config["battle"]
@@ -215,19 +295,27 @@ class Model:
         # full bars at the start of the buff plus one regen per hour of it
         self.bars = 1 + regen * self.buff_hours
 
+        self.prestige_points = max(0, int(prestige_points))
+        bonus = _max_bonus(self.prestige_points)
         self.skill_values = []
+        self.skill_costs = []
         self.skill_max = []
         for code in SKILLS:
             levels = skills[code]["levels"]
-            unlocked = player_level >= int(levels["0"].get("unlockAtLevel", 1))
-            top = min(MAX_SKILL_LEVEL, max(int(k) for k in levels)) if unlocked else 0
-            self.skill_values.append([_level_value(levels, lvl) for lvl in range(top + 1)])
-            self.skill_max.append(top)
-        self.level_cost = [lvl * (lvl + 1) // 2 for lvl in range(MAX_SKILL_LEVEL + 1)]
+            if player_level >= int(levels["0"].get("unlockAtLevel", 1)):
+                values, costs = _skill_table(levels, min(MAX_SKILL_LEVEL, max(int(k) for k in levels)), bonus)
+            else:
+                values, costs = [_level_value(levels, 0)], [0]
+            self.skill_values.append(values)
+            self.skill_costs.append(costs)
+            self.skill_max.append(len(values) - 1)
+        self.companies_level = companies_level
+        self.companies_costs = _companies_table(game_config, self.prestige_points)[1]
+        self._placements = {}
 
         self.scrap_price = prices.get("scraps", 0.0)
-        self.case_price = prices.get("case1", 0.0)
-        self.elite_case_price = prices.get("case2", 0.0)
+        self.case_price = prices["case1"]
+        self.elite_case_price = prices["case2"]
         self.pill_price = prices[PILL_CODE]
 
         # gear[slot] = list of options (tier, stats, price, broken scrap); tier 0 is "nothing equipped"
@@ -258,19 +346,6 @@ class Model:
         self.rank_pct = rank_pct
         self.battle_pct = battle_pct
         self.company_income = company_income
-
-        # one item per 200k round damage and one per 500k battle damage
-        self.pool_items_per_damage = (1 / float(game_config["loot"].get("damagePerLootItem", 200_000))
-                                      + 1 / float(game_config["loot"].get("battleLootDamagePerLootItem", 500_000)))
-        weapon_share = float(game_config["loot"].get("weaponChancePercent", 30)) / 100
-        self.pool_item_value = 0.0
-        for idx, odds in enumerate(POOL_RARITY_ODDS):
-            tier = idx + 1
-            fallback = NEW_ITEM_SCRAP[idx] * self.scrap_price
-            weapon = gear_prices.get(WEAPON_CODES[idx], fallback)
-            others = [gear_prices.get(f"{slot}{tier}", fallback) for slot in GEAR_SLOTS[1:]]
-            self.pool_item_value += odds * (weapon_share * weapon + (1 - weapon_share) * sum(others) / len(others))
-
         self._mitigation = [_mitigation(p, self.soft_cap) for p in range(1001)]
 
     def mitigation(self, points: float) -> float:
@@ -279,8 +354,28 @@ class Model:
             return self._mitigation[idx]
         return _mitigation(points, self.soft_cap)
 
-    def sp_cost(self, levels) -> int:
-        return sum(self.level_cost[lvl] for lvl in levels)
+    def placement(self, levels) -> tuple[int, tuple] | None:
+        """Return the cheapest way to reach these combat levels and the reserved Companies level.
+
+        Returns:
+            (skill points, Prestige levels per combat skill then Companies), cached per level tuple, or None
+            when out of reach.
+        """
+        key = tuple(levels)
+        if key not in self._placements:
+            targets = list(zip(key, self.skill_costs)) + [(self.companies_level, self.companies_costs)]
+            self._placements[key] = _place_prestige(targets, self.prestige_points)
+        return self._placements[key]
+
+    def sp_needed(self, levels) -> int | None:
+        """Skill points these combat levels and the Companies level need (None when out of reach)."""
+        placed = self.placement(levels)
+        return placed[0] if placed else None
+
+    def fits(self, levels, sp: int) -> bool:
+        """Whether these combat levels and the Companies level fit in `sp` skill points."""
+        need = self.sp_needed(levels)
+        return need is not None and need <= sp
 
     def loadout(self, gear: tuple, ammo: int, food: int) -> tuple:
         """Constants of a gear/ammo/food choice, computed once and reused for every skill trial."""
@@ -341,11 +436,10 @@ class Model:
 
         cases = hits * p * sv[LOOT][levels[LOOT]] / 100
         elite_cases = cases * ELITE_CASE_SHARE
-        pool_items = damage * self.pool_items_per_damage
         scrap_value = scrap * self.scrap_price
         case_value = cases * self.case_price
         elite_value = elite_cases * self.elite_case_price
-        pool_value = pool_items * self.pool_item_value
+        pool_value = damage / 1000 * LOOT_POOL_PER_1K
         returns = scrap_value + case_value + elite_value + pool_value + self.company_income
         net = cost - returns
 
@@ -360,7 +454,7 @@ class Model:
             "health_per_hit": health_per_hit, "foods": foods,
             "pill_cost": self.pill_price, "food_cost": food_cost, "ammo_cost": ammo_cost, "gear_cost": gear_cost,
             "cases": cases, "case_value": case_value, "elite_cases": elite_cases, "elite_value": elite_value,
-            "scrap": scrap, "scrap_value": scrap_value, "pool_items": pool_items, "pool_value": pool_value,
+            "scrap": scrap, "scrap_value": scrap_value, "pool_value": pool_value,
             "company_income": self.company_income,
         }
 
@@ -373,7 +467,8 @@ def _optimize_skills(model: Model, terms: tuple, weight: float, sp: int, start=N
     """Local search over the 9 combat skills for max damage - weight x net cost within `sp` points.
 
     Adds the levels with the best gain per point first (up to 3 at a time, to cross flat stretches such as
-    armor rounding or precision below the cap), then moves points between skills until nothing improves."""
+    armor rounding or precision below the cap), then moves points between skills until nothing improves.
+    Prestige Points are re-placed for every candidate by `Model.placement`."""
     cache = {}
 
     def score(lv):
@@ -384,25 +479,27 @@ def _optimize_skills(model: Model, terms: tuple, weight: float, sp: int, start=N
         return cache[key]
 
     levels = list(start) if start else [0] * len(SKILLS)
-    while model.sp_cost(levels) > sp:
+    while not model.fits(levels, sp) and any(levels):
         top = max(range(len(SKILLS)), key=lambda i: levels[i])
         levels[top] -= 1
     current = score(levels)
-    cost = model.level_cost
 
     while True:
-        used = model.sp_cost(levels)
+        used = model.sp_needed(levels)
         best_ratio, best = 0.0, None
         for i in range(len(SKILLS)):
             for step in (1, 2, 3):
                 target = levels[i] + step
                 if target > model.skill_max[i]:
                     break
-                extra = cost[target] - cost[levels[i]]
-                if used + extra > sp:
-                    break
                 trial = levels.copy()
                 trial[i] = target
+                need = model.sp_needed(trial)
+                # the points a level needs only grow with it, so a higher step cannot fit either
+                if need is None or need > sp:
+                    break
+                # a level paid by re-placed Prestige Points costs no skill points; count it as one
+                extra = max(need - used, 1)
                 gain = score(trial) - current
                 if gain > 1e-9 and gain / extra > best_ratio:
                     best_ratio, best = gain / extra, trial
@@ -415,7 +512,6 @@ def _optimize_skills(model: Model, terms: tuple, weight: float, sp: int, start=N
             for down in (1, 2):
                 if levels[i] - down < 0:
                     break
-                freed = cost[levels[i]] - cost[levels[i] - down]
                 base = levels.copy()
                 base[i] -= down
                 value = score(base)
@@ -428,10 +524,10 @@ def _optimize_skills(model: Model, terms: tuple, weight: float, sp: int, start=N
                         target = levels[j] + step
                         if target > model.skill_max[j]:
                             break
-                        if used - freed + cost[target] - cost[levels[j]] > sp:
-                            break
                         trial = base.copy()
                         trial[j] = target
+                        if not model.fits(trial, sp):
+                            break
                         value = score(trial)
                         if value > best_value:
                             best_value, best = value, trial
@@ -512,30 +608,33 @@ def _search(model: Model, sp: int, weights=OPTIMIZER_WEIGHTS) -> list:
 
 def _skill_neighbors(model: Model, levels: tuple, sp: int):
     """Skill builds one move away: add up to 3 levels, drop 1-2 levels, or move points between two skills."""
-    cost = model.level_cost
-    used = model.sp_cost(levels)
     n = len(SKILLS)
     for i in range(n):
         for step in (1, 2, 3):
             target = levels[i] + step
-            if target > model.skill_max[i] or used + cost[target] - cost[levels[i]] > sp:
+            if target > model.skill_max[i]:
                 break
-            yield levels[:i] + (target,) + levels[i + 1:]
+            trial = levels[:i] + (target,) + levels[i + 1:]
+            if not model.fits(trial, sp):
+                break
+            yield trial
     for i in range(n):
         for down in (1, 2):
             if levels[i] - down < 0:
                 break
             base = levels[:i] + (levels[i] - down,) + levels[i + 1:]
             yield base
-            room = sp - used + cost[levels[i]] - cost[levels[i] - down]
             for j in range(n):
                 if j == i:
                     continue
                 for step in (1, 2, 3):
                     target = levels[j] + step
-                    if target > model.skill_max[j] or cost[target] - cost[levels[j]] > room:
+                    if target > model.skill_max[j]:
                         break
-                    yield base[:j] + (target,) + base[j + 1:]
+                    trial = base[:j] + (target,) + base[j + 1:]
+                    if not model.fits(trial, sp):
+                        break
+                    yield trial
 
 
 def _loadout_neighbors(model: Model, gear: tuple, ammo: int, food: int):
@@ -654,10 +753,19 @@ def _item_name(tr, slot: str, tier: int) -> str:
     return tr(f"damage.rarities.{RARITIES[tier - 1]}")
 
 
+def _level_text(name: str, level: int, prestige: int) -> str:
+    """`Attack **7**`, or `Attack **7** (6+1★)` when Prestige levels pay part of it."""
+    text = f"{name} **{level}**"
+    return f"{text} ({level - prestige}+{prestige}★)" if prestige else text
+
+
 def _build_embed(tr, model: Model, sp: int, brackets: list, build: dict, fits: bool,
                  same_as: float | None) -> discord.Embed:
-    """One budget's build; `brackets` lists every budget it stands for (all unreachable ones share the
-    cheapest build)."""
+    """Build one budget's page.
+
+    `brackets` lists every budget the build stands for (all unreachable ones share the cheapest build). The
+    footer shows the skill and Prestige Points the build uses; `_BuildPager` prefixes the page number.
+    """
     gear, levels = build["gear"], build["levels"]
     weapon_tier = model.gear[0][gear[0]][0]
     color = RARITY_COLOR[weapon_tier - 1] if weapon_tier else 0x808080
@@ -683,11 +791,13 @@ def _build_embed(tr, model: Model, sp: int, brackets: list, build: dict, fits: b
             color=color,
         )
 
-    names = [tr(f"damage.skills.{code}") for code in SKILLS]
-    skill_lines = [
-        " · ".join(f"{names[i]} **{levels[i]}**" for i in row)
-        for row in ((ATK, PRC, CRIT), (CRITD, ARM, DDG), (HP, HUN, LOOT))
-    ]
+    sp_used, prestige = model.placement(levels)
+    names = [tr(f"damage.skills.{code}") for code in SKILLS] + [tr("damage.companies_skill")]
+    shown = tuple(levels) + (model.companies_level,)
+    rows = [(ATK, PRC, CRIT), (CRITD, ARM, DDG), (HP, HUN, LOOT)]
+    if model.companies_level:
+        rows.append((len(SKILLS),))
+    skill_lines = [" · ".join(_level_text(names[i], shown[i], prestige[i]) for i in row) for row in rows]
     embed.add_field(name=tr("damage.field_skills"), value="\n".join(skill_lines), inline=False)
 
     gear_lines = []
@@ -736,7 +846,7 @@ def _build_embed(tr, model: Model, sp: int, brackets: list, build: dict, fits: b
         cases=_fmt(d["cases"], 1), case_value=_fmt(d["case_value"]),
         elite=_fmt(d["elite_cases"], 2), elite_value=_fmt(d["elite_value"]),
         scrap=_fmt(d["scrap"], 0), scrap_value=_fmt(d["scrap_value"]),
-        pool=_fmt(d["pool_items"], 1), pool_value=_fmt(d["pool_value"]),
+        pool_value=_fmt(d["pool_value"]),
         companies=_fmt(d["company_income"]), total=_fmt(d["returns"]),
     )
     embed.add_field(name=tr("damage.field_returns"), value=returns, inline=True)
@@ -745,23 +855,56 @@ def _build_embed(tr, model: Model, sp: int, brackets: list, build: dict, fits: b
         value=tr("damage.net", net=_fmt(d["net"]), cost=f"{per_1k:.3f}"),
         inline=False,
     )
-    embed.set_footer(text=tr("damage.footer", used=model.sp_cost(levels), sp=sp))
+    embed.set_footer(text=tr(
+        "damage.footer", used=sp_used, sp=sp,
+        prestige_used=sum((1 << k) - 1 for k in prestige), prestige=model.prestige_points,
+    ))
     return embed
 
 
-def _chunk_embeds(embeds: list, max_chars: int = 5_900, max_embeds: int = 10) -> list:
-    """Pack embeds within Discord's per-message aggregate limits."""
-    chunks, current, current_chars = [], [], 0
-    for embed in embeds:
-        size = len(embed)
-        if current and (len(current) >= max_embeds or current_chars + size > max_chars):
-            chunks.append(current)
-            current, current_chars = [], 0
-        current.append(embed)
-        current_chars += size
-    if current:
-        chunks.append(current)
-    return chunks
+class _BuildPager(discord.ui.View):
+    """Prev/Next buttons over the overview and the build pages, one page per message edit.
+
+    Prefixes every page's footer with its page number once, at construction.
+    """
+
+    def __init__(self, pages: list[discord.Embed], tr, timeout: float = 600):
+        super().__init__(timeout=timeout)
+        self.pages = pages
+        self.current = 0
+        self.message: discord.Message | None = None
+        self.prev_btn.label = tr("common.prev")
+        self.next_btn.label = tr("common.next")
+        for number, page in enumerate(pages, start=1):
+            label = tr("common.page_short", page=number, pages=len(pages))
+            footer = page.footer.text if page.footer else None
+            page.set_footer(text=f"{label} · {footer}" if footer else label)
+        self._sync()
+
+    def _sync(self):
+        self.prev_btn.disabled = self.current == 0
+        self.next_btn.disabled = self.current == len(self.pages) - 1
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except Exception:
+                pass
+
+    @discord.ui.button(label="◀ Prev", style=discord.ButtonStyle.primary)
+    async def prev_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current = max(0, self.current - 1)
+        self._sync()
+        await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+
+    @discord.ui.button(label="Next ▶", style=discord.ButtonStyle.primary)
+    async def next_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current = min(len(self.pages) - 1, self.current + 1)
+        self._sync()
+        await interaction.response.edit_message(embed=self.pages[self.current], view=self)
 
 
 # ---------------------------------------------------------------------------
@@ -788,24 +931,16 @@ class DamageBuildHelper(commands.Cog):
     )
     @app_commands.describe(
         player_name="In-game player name.",
-        number_of_companies="Companies kept active (0-12); their Companies skill points are reserved.",
-        companies_level="Automated Engine level of those companies (0-7).",
-        company_product="What the companies produce (default: the most profitable per production point).",
-        production_bonus="Production bonus of the companies in percent (deposit, country, ...).",
+        number_of_companies="Companies kept active; the Companies skill level they need is reserved.",
+        companies_level="Automated Engine level of those companies (0-7). Output is valued as iron.",
         battle_bonus="Total battle bonus in percent (patriotic, orders, alliance, ...). Default 20.",
     )
-    @app_commands.choices(company_product=[
-        # Discord shows choice names untranslated, so they use the English locale
-        app_commands.Choice(name=t("en", f"damage.products.{code}"), value=code) for code in COMPANY_PRODUCTS
-    ])
     async def calculate_build(
         self,
         interaction: discord.Interaction,
         player_name: str,
-        number_of_companies: app_commands.Range[int, 0, 12] = 0,
+        number_of_companies: app_commands.Range[int, 0, MAX_COMPANIES] = 0,
         companies_level: app_commands.Range[int, 0, 7] = 0,
-        company_product: str | None = None,
-        production_bonus: app_commands.Range[int, 0, 200] = 0,
         battle_bonus: app_commands.Range[int, -100, 300] = DEFAULT_BATTLE_BONUS,
     ) -> None:
         await interaction.response.defer(thinking=True)
@@ -822,33 +957,40 @@ class DamageBuildHelper(commands.Cog):
             await interaction.followup.send(tr("damage.player_not_found", name=player_name), ephemeral=True)
             return
         prices = ((prices_raw or {}).get("result") or {}).get("data") or {}
-        if not game_config or PILL_CODE not in prices or not gear_prices:
+        # cases are a large share of the returns, so a missing live case price must not silently count as 0
+        required = (PILL_CODE, "case1", "case2") + ((COMPANY_PRODUCT,) if number_of_companies else ())
+        if not game_config or not gear_prices or any(code not in prices for code in required):
             await interaction.followup.send(tr("damage.data_unavailable"), ephemeral=True)
             return
 
-        level = user_data.get("leveling", {}).get("level", 1)
-        total_sp = user_data.get("leveling", {}).get("totalSkillPoints", level * 4)
+        leveling = user_data.get("leveling") or {}
+        level = int(leveling.get("level") or 1)
+        sp = level * SP_PER_LEVEL
+        prestige_points = int(leveling.get("prestigeLevel") or 0)
         rank_pct = float((user_data.get("skills", {}).get("attack") or {}).get("militaryRankPercent") or 0)
 
-        reserved_sp = _companies_sp(game_config, number_of_companies) if number_of_companies else 0
+        companies_values = _companies_table(game_config, prestige_points)[0]
+        companies_skill = _companies_level(companies_values, number_of_companies) if number_of_companies else 0
         companies_unlock = int(game_config["skills"]["companies"]["levels"]["0"].get("unlockAtLevel", 1))
-        if reserved_sp is None or (reserved_sp and level < companies_unlock) or reserved_sp > total_sp:
+        if companies_skill is None or (companies_skill and level < companies_unlock):
             await interaction.followup.send(
-                tr("damage.not_enough_sp", name=player_name, total=total_sp, count=number_of_companies),
+                tr("damage.not_enough_sp", name=player_name, total=sp, count=number_of_companies),
                 ephemeral=True,
             )
             return
-        sp = total_sp - reserved_sp
 
-        items = game_config["items"]
-        per_pp = {code: _price_per_pp(code, items, prices) for code in COMPANY_PRODUCTS}
-        per_pp = {code: value for code, value in per_pp.items() if value is not None}
-        product = company_product if company_product in per_pp else max(per_pp, key=per_pp.get, default=None)
-        engine_pp = _engine_levels(game_config).get(companies_level, 0.0)
-        daily_pp = number_of_companies * engine_pp * (1 + production_bonus / 100)
-        company_income = daily_pp * per_pp[product] if product else 0.0
+        iron_per_pp = _price_per_pp(COMPANY_PRODUCT, game_config["items"], prices) or 0.0
+        daily_pp = number_of_companies * _engine_levels(game_config).get(companies_level, 0.0)
+        company_income = daily_pp * iron_per_pp
 
-        model = Model(game_config, prices, gear_prices, level, rank_pct, battle_bonus, company_income)
+        model = Model(game_config, prices, gear_prices, level, prestige_points, companies_skill,
+                      rank_pct, battle_bonus, company_income)
+        if not model.fits([0] * len(SKILLS), sp):
+            await interaction.followup.send(
+                tr("damage.not_enough_sp", name=player_name, total=sp, count=number_of_companies),
+                ephemeral=True,
+            )
+            return
         selected = await asyncio.to_thread(_recommend, model, sp)
         if not selected:
             await interaction.followup.send(tr("damage.no_builds"))
@@ -856,15 +998,15 @@ class DamageBuildHelper(commands.Cog):
 
         header = discord.Embed(title=tr("damage.title", name=user_data.get("username", player_name)), color=0x3498DB)
         lines = [
-            tr("damage.header_player", level=level, sp=sp, reserved=reserved_sp),
+            tr("damage.header_player", level=level, sp=sp, prestige=prestige_points),
             tr("damage.header_bonus", rank=f"{rank_pct:g}", battle=battle_bonus),
         ]
-        if number_of_companies and engine_pp and product:
+        if number_of_companies:
             lines.append(tr(
                 "damage.header_companies",
-                count=number_of_companies, level=companies_level, bonus=production_bonus,
-                pp=_fmt(daily_pp, 0), product=tr(f"damage.products.{product}"),
-                per_pp=f"{per_pp[product]:.3f}", income=_fmt(company_income),
+                count=number_of_companies, skill=companies_skill, level=companies_level,
+                pp=_fmt(daily_pp, 0), product=tr(f"damage.products.{COMPANY_PRODUCT}"),
+                per_pp=f"{iron_per_pp:.3f}", income=_fmt(company_income),
             ))
         else:
             lines.append(tr("damage.header_no_companies"))
@@ -872,10 +1014,12 @@ class DamageBuildHelper(commands.Cog):
             "damage.header_prices",
             pill=_fmt(model.pill_price), case=_fmt(model.case_price),
             elite=_fmt(model.elite_case_price), scrap=f"{model.scrap_price:.3f}",
-            pool=_fmt(model.pool_item_value),
+            pool=f"{LOOT_POOL_PER_1K:.2f}",
         ))
         header.description = "\n".join(lines)
-        header.add_field(name=tr("damage.model_title"), value=tr("damage.model_text"), inline=False)
+        header.add_field(
+            name=tr("damage.model_title"), value=tr("damage.model_text", pool=f"{LOOT_POOL_PER_1K:.2f}"), inline=False,
+        )
 
         embeds = [header]
         unreachable = [(bracket, build) for bracket, build, fits in selected if not fits]
@@ -891,8 +1035,8 @@ class DamageBuildHelper(commands.Cog):
             if same_as is None:
                 previous = (bracket, key)
 
-        for chunk in _chunk_embeds(embeds):
-            await interaction.followup.send(embeds=chunk)
+        view = _BuildPager(embeds, tr)
+        view.message = await interaction.followup.send(embed=embeds[0], view=view, wait=True)
 
 
 async def setup(bot: commands.Bot):
