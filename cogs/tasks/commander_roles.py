@@ -1,10 +1,13 @@
 import asyncio
+import logging
 from discord.ext import commands, tasks
 from utils.api import get_shared_session, get_military_units_by_ids, get_users_info
 from utils.db import init_db, save_user, get_record_by_api_id, find_api_id_by_discord_id
 from utils.i18n import Translator, get_translator
 from config import config
 import discord
+
+logger = logging.getLogger(__name__)
 
 class CommanderRolesJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -20,7 +23,13 @@ class CommanderRolesJob(commands.Cog):
     
     @tasks.loop(hours=3)
     async def commander_roles(self):
-        """Syncs the Discord commander role with commanders configured in all military units."""
+        """Syncs the Discord commander role with commanders configured in all military units.
+
+        Members are only stripped of the role when every lookup succeeded. If a military unit,
+        a DB record or a commander's user info could not be fetched (API down, timeout, 5xx),
+        the commander list may be incomplete, so the role is still added where due but no one
+        loses it on that run.
+        """
         guild = self.bot.get_guild(config['guild'])
         if guild is None:
             return
@@ -33,12 +42,17 @@ class CommanderRolesJob(commands.Cog):
         tr = await get_translator(guild)
         military_units = config.get('military_units', [])
         commander_ids = set()
+        # False once any lookup fails; removals are skipped then, since the API helpers return
+        # nothing (rather than raising) on errors and that would look like "no commanders".
+        complete = True
 
         # Gather commander api ids from all military units (one batched request for every MU)
         mu_data_by_id = await get_military_units_by_ids([unit['id'] for unit in military_units], session)
         for unit in military_units:
             mu_data = mu_data_by_id.get(unit['id'])
             if not mu_data:
+                complete = False
+                logger.warning('commander_roles: could not fetch military unit %s', unit['id'])
                 continue
             try:
                 commanders = (mu_data.get('roles') or {}).get('commanders') or []
@@ -72,6 +86,8 @@ class CommanderRolesJob(commands.Cog):
             try:
                 rec = await asyncio.to_thread(get_record_by_api_id, api_id)
             except Exception:
+                complete = False
+                logger.exception('commander_roles: DB lookup failed for %s', api_id)
                 continue
 
             member = None
@@ -93,7 +109,11 @@ class CommanderRolesJob(commands.Cog):
             # If not found via DB, try to resolve via API username and match display_name
             if member is None:
                 info = infos.get(api_id)
-                if isinstance(info, dict):
+                if not isinstance(info, dict):
+                    # Unknown whether this commander is one of the members holding the role
+                    complete = False
+                    logger.warning('commander_roles: could not fetch user info for commander %s', api_id)
+                else:
                     username = (info.get('username') or '').lower()
                     if username and username in display_map:
                         member = display_map[username]
@@ -117,8 +137,11 @@ class CommanderRolesJob(commands.Cog):
                 except Exception:
                     pass
 
-        # Remove commander role from members that should no longer have it
-        current_with_role = commander_role.members if commander_role else []
+        # Remove commander role from members that should no longer have it, but only when the
+        # commander list is known to be complete
+        current_with_role = commander_role.members if commander_role and complete else []
+        if not complete:
+            logger.warning('commander_roles: some lookups failed, skipping role removals this run')
         for member in current_with_role:
             if member not in desired_members:
                 try:
