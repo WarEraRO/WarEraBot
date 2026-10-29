@@ -6,7 +6,7 @@ from aiohttp import ClientError
 import discord
 import aiohttp
 from config import config
-from utils.computational import triangular
+from utils.computational import ECONOMY_SKILLS, triangular
 
 PLAYER_CACHE = {}
 
@@ -467,8 +467,7 @@ def fight_status_from_user(userId: str, api_result: dict, member: discord.Member
             for skill_name, skill_data in api_result['skills'].items():
                 level = skill_data['level']
                 if level != 0:
-                    economy = ['energy', 'companies', 'entrepreneurship', 'production']
-                    if skill_name in economy:
+                    if skill_name in ECONOMY_SKILLS:
                         economy_skill_points += triangular(level)
                     else:
                         fight_skill_points += triangular(level)
