@@ -4,11 +4,10 @@ from discord.ext import commands
 from datetime import datetime, timezone
 from config import config
 from utils.api import get_shared_session, get_users_by_name
-from utils.computational import triangular
+from utils.computational import ECONOMY_SKILLS, triangular
 from utils.i18n import Translator, get_translator
 
 _PAGE_SIZE = 15
-ECONOMY_SKILLS = ["energy", "companies", "entrepreneurship", "production"]
 
 # (key, color); titles are promotions.title_<key>
 _FILTERS = [
