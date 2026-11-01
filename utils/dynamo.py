@@ -13,6 +13,7 @@ _DIPLOMACIES_TABLE_NAME = config.get("DYNAMO_DIPLOMACIES_TABLE", "warera-ro-disc
 _NAPS_TABLE_NAME = config.get("DYNAMO_NAPS_TABLE", "warera-ro-discordbot_prod_naps")
 _GUILD_SETTINGS_TABLE_NAME = config.get("DYNAMO_GUILD_SETTINGS_TABLE", "warera-ro-discordbot_prod_guild_settings")
 _JOB_SUBSCRIPTIONS_TABLE_NAME = config.get("DYNAMO_JOB_SUBSCRIPTIONS_TABLE", "warera-ro-discordbot_prod_job_subscriptions")
+_CONTESTS_TABLE_NAME = config.get("DYNAMO_CONTESTS_TABLE", "warera-ro-discordbot_prod_contests")
 
 # Module-level cached resource to avoid re-creating sessions on every call
 _resource = None
@@ -49,6 +50,10 @@ def _guild_settings():
 
 def _job_subscriptions():
     return _get_resource().Table(_JOB_SUBSCRIPTIONS_TABLE_NAME)
+
+
+def _contests():
+    return _get_resource().Table(_CONTESTS_TABLE_NAME)
 
 
 def _parse_diplomacy_list(raw) -> List:
@@ -432,6 +437,50 @@ def get_user_job_subscriptions(discord_id, job: Optional[str] = None) -> List[Di
 
 
 # ---------------------------------------------------------------------------
+# Contests  (hash key: contest_id, range key: record_id; `data` is the record as a JSON string,
+# which keeps floats out of DynamoDB's Decimal conversion). Contest records live in one index
+# partition (utils.db.CONTEST_INDEX_ID), participants in the partition of their contest.
+# ---------------------------------------------------------------------------
+
+def save_contest_rows(rows: List[tuple]) -> None:
+    """Put (overwrite) (contest_id, record_id, record) rows."""
+    with _contests().batch_writer(overwrite_by_pkeys=["contest_id", "record_id"]) as batch:
+        for contest_id, record_id, record in rows:
+            batch.put_item(Item={"contest_id": contest_id, "record_id": record_id, "data": json.dumps(record)})
+
+
+def _query_contest_items(contest_id: str, **kwargs) -> List[Dict]:
+    items: List[Dict] = []
+    kwargs["KeyConditionExpression"] = Key("contest_id").eq(contest_id)
+    while True:
+        resp = _contests().query(**kwargs)
+        items.extend(resp.get("Items", []))
+        if "LastEvaluatedKey" not in resp:
+            return items
+        kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
+
+
+def get_contest_rows(contest_id: str) -> Dict[str, Dict]:
+    """Every row of one partition, {record_id: record}."""
+    return {item["record_id"]: json.loads(item["data"]) for item in _query_contest_items(contest_id)}
+
+
+def get_contest_row(contest_id: str, record_id: str) -> Optional[Dict]:
+    """One row's record, or None."""
+    item = _contests().get_item(Key={"contest_id": contest_id, "record_id": record_id}).get("Item")
+    return json.loads(item["data"]) if item else None
+
+
+def delete_contest_rows(index_id: str, contest_id: str) -> None:
+    """Delete a contest's index row and every participant row."""
+    items = _query_contest_items(contest_id, ProjectionExpression="contest_id, record_id")
+    with _contests().batch_writer() as batch:
+        for item in items:
+            batch.delete_item(Key={"contest_id": item["contest_id"], "record_id": item["record_id"]})
+        batch.delete_item(Key={"contest_id": index_id, "record_id": contest_id})
+
+
+# ---------------------------------------------------------------------------
 # Table provisioning
 # ---------------------------------------------------------------------------
 
@@ -441,6 +490,7 @@ def ensure_tables(
     naps_table: str = _NAPS_TABLE_NAME,
     guild_settings_table: str = _GUILD_SETTINGS_TABLE_NAME,
     job_subscriptions_table: str = _JOB_SUBSCRIPTIONS_TABLE_NAME,
+    contests_table: str = _CONTESTS_TABLE_NAME,
     region: Optional[str] = None,
 ) -> bool:
     """Ensure both users and diplomacies tables exist in DynamoDB.
@@ -635,6 +685,38 @@ def ensure_tables(
             )
             client.get_waiter("table_exists").wait(
                 TableName=job_subscriptions_table, WaiterConfig={"Delay": 2, "MaxAttempts": 25}
+            )
+            created_any = True
+        except ClientError as ce:
+            if ce.response.get("Error", {}).get("Code") == "ResourceInUseException":
+                created_any = True
+            else:
+                raise
+
+    # ------------------------------------------------------------------
+    # Contests table  (hash key: contest_id, range key: record_id "meta" or a WarEra user id)
+    # ------------------------------------------------------------------
+    try:
+        client.describe_table(TableName=contests_table)
+        created_any = True
+    except ClientError as e:
+        if e.response.get("Error", {}).get("Code") != "ResourceNotFoundException":
+            raise
+        try:
+            client.create_table(
+                TableName=contests_table,
+                AttributeDefinitions=[
+                    {"AttributeName": "contest_id", "AttributeType": "S"},
+                    {"AttributeName": "record_id", "AttributeType": "S"},
+                ],
+                KeySchema=[
+                    {"AttributeName": "contest_id", "KeyType": "HASH"},
+                    {"AttributeName": "record_id", "KeyType": "RANGE"},
+                ],
+                BillingMode="PAY_PER_REQUEST",
+            )
+            client.get_waiter("table_exists").wait(
+                TableName=contests_table, WaiterConfig={"Delay": 2, "MaxAttempts": 25}
             )
             created_any = True
         except ClientError as ce:

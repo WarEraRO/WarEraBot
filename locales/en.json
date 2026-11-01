@@ -47,6 +47,154 @@
             "defender": "Defender"
         }
     },
+    "contest": {
+        "datetime_format": "%a %d %b, %H:%M %Z",
+        "levels_open": "level {low}+",
+        "levels_range": "level {low}–{high}",
+        "category": {
+            "fighters": "Fighters",
+            "economists": "Economists"
+        },
+        "status": {
+            "draft": "draft",
+            "scheduled": "scheduled",
+            "running": "running",
+            "ended": "ended",
+            "cancelled": "cancelled"
+        },
+        "zero_points": "0 points: ",
+        "no_participants": "No participants yet.",
+        "no_winner": "nobody",
+        "winner_line": "{place}. {name}: {prize}",
+        "gems": "{gems} gems",
+        "ranking_title": "📊 **{name}**: ranking after day {day}/{days}",
+        "ranking_now": "📊 **{name}**: current ranking",
+        "updated_at": "(updated {time})",
+        "final_title": "🏁 **{name}**: final results",
+        "final_ranking": "**Final ranking**",
+        "started_dm": "Your contest **{name}** has started with {players} participants and was announced in {channels} channel(s).",
+        "announce_title": "🏆 **{name}** has started!",
+        "announce_dates": "From {start} to {end} ({days} days)",
+        "announce_units": "Units: {units}",
+        "announce_pool": "Prize pool: {pool}",
+        "announce_prizes": "Prizes, {bracket}: {prizes}",
+        "announce_rankings": "The ranking is posted every day at {time}, before the game reset. Members who join a participating unit later take part from that moment.",
+        "panel_title": "**Contest setup: {name}** ({status})",
+        "panel_brackets": "{category}: {brackets}",
+        "panel_missions": "**Missions**",
+        "panel_no_missions": "No missions yet.",
+        "panel_prizes": "**Prizes**",
+        "panel_no_prizes": "No prizes yet.",
+        "panel_expired": "This panel expired. Use `/contest edit` to continue.",
+        "details_title": "Contest details",
+        "levels_title": "Levels and brackets",
+        "pool_title": "Prize pool",
+        "field": {
+            "name": "Name",
+            "start_date": "First day (YYYY-MM-DD)",
+            "duration": "Duration in days",
+            "fighter_min_level": "Fighters from level",
+            "fighter_brackets": "Fighter brackets start at (e.g. 40)",
+            "economist_brackets": "Economist brackets start at (e.g. 10)",
+            "points": "Points",
+            "place": "Place {place}: gems | prize text",
+            "prize_pool": "Prize pool (free text)"
+        },
+        "prize_placeholder": "600 | banner or premium",
+        "button_details": "Details",
+        "button_levels": "Levels",
+        "button_pool": "Prize pool",
+        "button_publish": "Publish",
+        "button_save": "Save",
+        "button_discard": "Discard",
+        "button_close": "Close",
+        "select_units": "Participating military units",
+        "select_add_mission": "Add a mission…",
+        "select_remove_mission": "Remove a mission…",
+        "select_prizes": "Set the prizes of a bracket…",
+        "published": "✅ Published. Nothing is posted until the contest starts on {start}; then it is announced in the units' contest threads.",
+        "discarded": "Draft discarded.",
+        "closed": "Closed without saving changes.",
+        "cancelled": "Contest **{name}** cancelled.",
+        "ended": "Contest **{name}** ended; the final results were posted.",
+        "list_line": "**{name}** ({status}): from {start}, {days} days. Units: {units}",
+        "list_empty": "No scheduled or running contests.",
+        "error_date": "Write the start date as YYYY-MM-DD (or DD.MM.YYYY).",
+        "error_date_past": "The first day must be tomorrow or later.",
+        "error_days": "The duration must be between 1 and {max} days.",
+        "error_levels": "Levels must be whole numbers, separated by commas, with at most 4 bracket starts per category.",
+        "error_failed": "Something went wrong. Try again later; the bot log has the details.",
+        "error_number": "`{value}` is not a valid number.",
+        "error_prize": "`{value}` is not a valid prize. Write the gems first, for example `600 | banner or premium`.",
+        "error_no_units": "Select at least one military unit.",
+        "error_no_missions": "Add at least one mission.",
+        "error_not_commander": "Only an in-game commander of a configured military unit can create a contest.",
+        "error_not_commander_selected": "You must be an in-game commander of at least one of the selected units.",
+        "error_conflict": "A selected unit is already in the contest **{name}** on some of these days.",
+        "error_gone": "This contest is no longer a draft or was deleted.",
+        "error_not_found": "Contest not found. Pick one from the suggestions.",
+        "error_not_creator": "Only the contest's creator or a developer can do this.",
+        "error_status": "Not possible: the contest is {status}.",
+        "error_tracker": "The contest tracker is not running. Try again later.",
+        "mission": {
+            "daily_damage": {
+                "label": "Daily damage",
+                "text": "{goal} damage in one day: +{points}",
+                "field": {
+                    "goal": "Damage in one day (e.g. 1M)"
+                }
+            },
+            "daily_pill": {
+                "label": "Daily pill",
+                "text": "A pill on every contest day: +{points}"
+            },
+            "contract_damage": {
+                "label": "Contract damage",
+                "text": "{goal}+ damage in a contract of at least {min_contract}: +{points} per contract",
+                "field": {
+                    "goal": "Your damage in the contract (e.g. 500k)",
+                    "min_contract": "Minimum contract size (e.g. 1M)"
+                }
+            },
+            "contract_money": {
+                "label": "Contract coins",
+                "text": "Every {goal} coins earned from contracts: +{points}",
+                "field": {
+                    "goal": "Coins per reward (e.g. 100)"
+                }
+            },
+            "company_disabled": {
+                "label": "Disabled companies",
+                "text": "Each company disabled, keeping {keep} active: +{points}",
+                "field": {
+                    "keep": "Companies that stay active (e.g. 4)"
+                }
+            },
+            "eco_skills": {
+                "label": "Economy skills only",
+                "text": "No skill points in fight skills: +{points}"
+            },
+            "automated_engine": {
+                "label": "Automated Engine upgrade",
+                "text": "Each Automated Engine level upgraded: +{points}"
+            },
+            "build_company": {
+                "label": "Build a company",
+                "text": "Each company built: +{points}"
+            },
+            "recruit_employee": {
+                "label": "Recruit an employee",
+                "text": "Each employee recruited: +{points}"
+            },
+            "employee_output": {
+                "label": "Employee output",
+                "text": "Each employee who produces {goal}+ coins: +{points}",
+                "field": {
+                    "goal": "Coins produced per employee (e.g. 3)"
+                }
+            }
+        }
+    },
     "lifecycle": {
         "started": {
             "title": "WarEraBot started",
@@ -243,6 +391,14 @@
                 "name": "/setlang language",
                 "desc": "Developer-only. Set the language the bot uses in this server (English or Romanian): command responses, buttons, reports, alerts and the DMs this server triggers. The language field supports autocomplete."
             },
+            "start_contest": {
+                "name": "/start_contest name start_date duration",
+                "desc": "In-game MU commanders only. Create a points contest for some configured military units: a private panel sets the units, level brackets, missions (from a fixed list), prizes and prize pool. Nothing is posted until it starts at the game reset before the first day; the bot then tracks the points, posts a ranking every day before the reset and the final results at the end."
+            },
+            "contest": {
+                "name": "/contest edit | /contest cancel | /contest end | /contest ranking | /contest list",
+                "desc": "Manage contests: edit one before it starts, cancel it, end it early with final results (creator or developers only), show the current ranking, or list scheduled and running contests."
+            },
             "server_ids": {
                 "name": "/server_ids",
                 "desc": "Developer-only. Lists every channel (grouped by category), active thread and role of this server with its id, in ephemeral embeds only you can see. Archived threads are not listed."
@@ -308,6 +464,10 @@
             "article_mention": {
                 "name": "article_mention - every 5 minutes",
                 "desc": "Checks the 100 newest WarEra articles and posts in the articles channel every new article by a Romanian player (a Romania citizen, or a Citizen/Newbie member of this server), with a tip hint below level 25, and every article by another player that mentions or tags Romania or its regions."
+            },
+            "contest_tracker": {
+                "name": "contest_tracker — every 5 minutes",
+                "desc": "Runs the contests created with /start_contest: at the start registers the members of the participating units and announces the contest in each unit's contest thread (else its channel, once per channel); refreshes the points hourly from the WarEra API; posts the ranking 15 minutes before each game reset and the final results after the last day. Missed runs are caught up from the saved state."
             },
             "newbie_welcome": {
                 "name": "newbie_welcome - when the Newbie role is given",
