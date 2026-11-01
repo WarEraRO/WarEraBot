@@ -50,7 +50,8 @@
             "threadIds": {
                 "contractsId": 1557442480142684280,
                 "weeklyReportId": 1557443140561019040,
-                "bountyId": 1563863220777787443
+                "bountyId": 1563863220777787443,
+                "contestId": 1566370969847865394
             },
             "designation": "fight",
             "friendlyName": "Walla"
@@ -112,7 +113,7 @@
         {
             "id" : "69976c2fdcd6dac676a8f1ff",
             "roleId": 1494963502874366022,
-            "channelId": 1494963795846627451,
+            "channelId": 1413530594419282066,
             "friendlyName": "WolfPack"
         },
         {

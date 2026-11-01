@@ -47,6 +47,154 @@
             "defender": "Apărător"
         }
     },
+    "contest": {
+        "datetime_format": "%a %d %b, %H:%M %Z",
+        "levels_open": "nivel {low}+",
+        "levels_range": "nivel {low}–{high}",
+        "category": {
+            "fighters": "Luptători",
+            "economists": "Economiști"
+        },
+        "status": {
+            "draft": "ciornă",
+            "scheduled": "programat",
+            "running": "în desfășurare",
+            "ended": "încheiat",
+            "cancelled": "anulat"
+        },
+        "zero_points": "0 puncte: ",
+        "no_participants": "Încă nu sunt participanți.",
+        "no_winner": "nimeni",
+        "winner_line": "{place}. {name}: {prize}",
+        "gems": "{gems} gems",
+        "ranking_title": "📊 **{name}**: clasamentul după ziua {day}/{days}",
+        "ranking_now": "📊 **{name}**: clasamentul actual",
+        "updated_at": "(actualizat la {time})",
+        "final_title": "🏁 **{name}**: rezultatele finale",
+        "final_ranking": "**Clasamentul final**",
+        "started_dm": "Concursul tău **{name}** a început cu {players} participanți și a fost anunțat în {channels} canal(e).",
+        "announce_title": "🏆 **{name}** a început!",
+        "announce_dates": "De la {start} până la {end} ({days} zile)",
+        "announce_units": "Unități: {units}",
+        "announce_pool": "Premii totale: {pool}",
+        "announce_prizes": "Premii, {bracket}: {prizes}",
+        "announce_rankings": "Clasamentul se postează în fiecare zi la {time}, înainte de resetarea zilnică. Cine intră mai târziu într-o unitate participantă concurează din acel moment.",
+        "panel_title": "**Configurare concurs: {name}** ({status})",
+        "panel_brackets": "{category}: {brackets}",
+        "panel_missions": "**Misiuni**",
+        "panel_no_missions": "Încă nu sunt misiuni.",
+        "panel_prizes": "**Premii**",
+        "panel_no_prizes": "Încă nu sunt premii.",
+        "panel_expired": "Panoul a expirat. Folosește `/contest edit` pentru a continua.",
+        "details_title": "Detaliile concursului",
+        "levels_title": "Niveluri și categorii",
+        "pool_title": "Premii totale",
+        "field": {
+            "name": "Nume",
+            "start_date": "Prima zi (AAAA-LL-ZZ)",
+            "duration": "Durata în zile",
+            "fighter_min_level": "Luptători de la nivelul",
+            "fighter_brackets": "Categorii de luptători încep la (ex. 40)",
+            "economist_brackets": "Categorii de economiști încep la (ex. 10)",
+            "points": "Puncte",
+            "place": "Locul {place}: gems | text premiu",
+            "prize_pool": "Premii totale (text liber)"
+        },
+        "prize_placeholder": "600 | banner sau premium",
+        "button_details": "Detalii",
+        "button_levels": "Niveluri",
+        "button_pool": "Premii totale",
+        "button_publish": "Publică",
+        "button_save": "Salvează",
+        "button_discard": "Renunță",
+        "button_close": "Închide",
+        "select_units": "Unitățile militare participante",
+        "select_add_mission": "Adaugă o misiune…",
+        "select_remove_mission": "Șterge o misiune…",
+        "select_prizes": "Setează premiile unei categorii…",
+        "published": "✅ Publicat. Nu se postează nimic până la începerea concursului pe {start}; atunci va fi anunțat în firele de concurs ale unităților.",
+        "discarded": "Ciorna a fost ștearsă.",
+        "closed": "Închis fără salvarea modificărilor.",
+        "cancelled": "Concursul **{name}** a fost anulat.",
+        "ended": "Concursul **{name}** s-a încheiat; rezultatele finale au fost postate.",
+        "list_line": "**{name}** ({status}): de la {start}, {days} zile. Unități: {units}",
+        "list_empty": "Nu sunt concursuri programate sau în desfășurare.",
+        "error_date": "Scrie data de început ca AAAA-LL-ZZ (sau ZZ.LL.AAAA).",
+        "error_date_past": "Prima zi trebuie să fie mâine sau mai târziu.",
+        "error_days": "Durata trebuie să fie între 1 și {max} zile.",
+        "error_levels": "Nivelurile trebuie să fie numere întregi, separate prin virgulă, cu cel mult 4 începuturi de categorie.",
+        "error_failed": "Ceva nu a mers. Încearcă mai târziu; detaliile sunt în logul botului.",
+        "error_number": "`{value}` nu este un număr valid.",
+        "error_prize": "`{value}` nu este un premiu valid. Scrie întâi gems, de exemplu `600 | banner sau premium`.",
+        "error_no_units": "Selectează cel puțin o unitate militară.",
+        "error_no_missions": "Adaugă cel puțin o misiune.",
+        "error_not_commander": "Doar un comandant din joc al unei unități militare configurate poate crea un concurs.",
+        "error_not_commander_selected": "Trebuie să fii comandant în joc la cel puțin una dintre unitățile selectate.",
+        "error_conflict": "O unitate selectată este deja în concursul **{name}** în unele dintre aceste zile.",
+        "error_gone": "Acest concurs nu mai este o ciornă sau a fost șters.",
+        "error_not_found": "Concursul nu a fost găsit. Alege unul din sugestii.",
+        "error_not_creator": "Doar creatorul concursului sau un developer poate face asta.",
+        "error_status": "Nu se poate: concursul este {status}.",
+        "error_tracker": "Sarcina concursurilor nu rulează. Încearcă mai târziu.",
+        "mission": {
+            "daily_damage": {
+                "label": "Damage zilnic",
+                "text": "{goal} damage într-o zi: +{points}",
+                "field": {
+                    "goal": "Damage într-o zi (ex. 1M)"
+                }
+            },
+            "daily_pill": {
+                "label": "Pastila zilnică",
+                "text": "Pastilă în fiecare zi de concurs: +{points}"
+            },
+            "contract_damage": {
+                "label": "Damage în contract",
+                "text": "Minim {goal} damage într-un contract de cel puțin {min_contract}: +{points} per contract",
+                "field": {
+                    "goal": "Damage-ul tău în contract (ex. 500k)",
+                    "min_contract": "Mărimea minimă a contractului (ex. 1M)"
+                }
+            },
+            "contract_money": {
+                "label": "Bănuți din contracte",
+                "text": "La fiecare {goal} bănuți obținuți din contracte: +{points}",
+                "field": {
+                    "goal": "Bănuți per recompensă (ex. 100)"
+                }
+            },
+            "company_disabled": {
+                "label": "Companii dezactivate",
+                "text": "Fiecare companie dezactivată, păstrând {keep} active: +{points}",
+                "field": {
+                    "keep": "Companii care rămân active (ex. 4)"
+                }
+            },
+            "eco_skills": {
+                "label": "Doar skilluri economice",
+                "text": "Niciun punct în skillurile de luptă: +{points}"
+            },
+            "automated_engine": {
+                "label": "Motor automat îmbunătățit",
+                "text": "Fiecare nivel de motor automat îmbunătățit: +{points}"
+            },
+            "build_company": {
+                "label": "Construire companie",
+                "text": "Fiecare companie construită: +{points}"
+            },
+            "recruit_employee": {
+                "label": "Recrutare angajat",
+                "text": "Fiecare angajat recrutat: +{points}"
+            },
+            "employee_output": {
+                "label": "Producția angajaților",
+                "text": "Fiecare angajat care produce cel puțin {goal} bănuți: +{points}",
+                "field": {
+                    "goal": "Bănuți produși de un angajat (ex. 3)"
+                }
+            }
+        }
+    },
     "lifecycle": {
         "started": {
             "title": "WarEraBot a pornit",
@@ -244,6 +392,14 @@
                 "name": "/setlang language",
                 "desc": "Doar pentru dezvoltatori. Setează limba botului pe acest server (engleză sau română): răspunsuri la comenzi, butoane, rapoarte, alerte și mesajele private trimise din cauza acestui server. Câmpul are sugestii."
             },
+            "start_contest": {
+                "name": "/start_contest name start_date duration",
+                "desc": "Doar comandanții din joc ai unităților. Creează un concurs pe puncte pentru unele unități militare configurate: un panou privat setează unitățile, categoriile de nivel, misiunile (dintr-o listă fixă), premiile și premiile totale. Nu se postează nimic până la început, la resetarea dinaintea primei zile; apoi botul ține scorul, postează clasamentul zilnic înainte de resetare și rezultatele finale la sfârșit."
+            },
+            "contest": {
+                "name": "/contest edit | /contest cancel | /contest end | /contest ranking | /contest list",
+                "desc": "Gestionează concursurile: editează unul înainte de început, anulează-l, încheie-l mai devreme cu rezultate finale (doar creatorul sau developerii), arată clasamentul actual sau listează concursurile programate și în desfășurare."
+            },
             "server_ids": {
                 "name": "/server_ids",
                 "desc": "Doar pentru dezvoltatori. Listează toate canalele (grupate pe categorii), firele active și rolurile acestui server, cu id-urile lor, în embed-uri vizibile doar pentru tine. Firele arhivate nu sunt listate."
@@ -309,6 +465,10 @@
             "article_mention": {
                 "name": "article_mention - la fiecare 5 minute",
                 "desc": "Verifică cele mai noi 100 de articole WarEra și postează în canalul de articole fiecare articol nou al unui jucător român (cetățean al României sau membru Citizen/Newbie al acestui server), cu un sfat despre bacșișuri (tips) sub nivelul 25, și fiecare articol al altui jucător care menționează sau etichetează România ori regiunile ei."
+            },
+            "contest_tracker": {
+                "name": "contest_tracker — la fiecare 5 minute",
+                "desc": "Rulează concursurile create cu /start_contest: la început înscrie membrii unităților participante și anunță concursul în firul de concurs al fiecărei unități (altfel în canalul ei, o dată pe canal); actualizează punctele din API-ul WarEra în fiecare oră; postează clasamentul cu 15 minute înainte de fiecare resetare și rezultatele finale după ultima zi. Rulările ratate sunt recuperate din starea salvată."
             },
             "newbie_welcome": {
                 "name": "newbie_welcome - la primirea rolului Newbie",
@@ -1310,6 +1470,44 @@
         "get_region_upgrade_cost": {
             "description": "Calculează consumul zilnic de petrol al îmbunătățirilor active din regiunile unei țări.",
             "params": {"country": "Țara de calculat (alege una din sugestii)."}
+        },
+        "start_contest": {
+            "description": "Creează un concurs pe puncte pentru unele unități militare (doar comandanți).",
+            "params": {
+                "name": "Numele concursului",
+                "start_date": "Prima zi (AAAA-LL-ZZ); începe la resetarea dinaintea acelei zile",
+                "duration": "Numărul de zile; se termină la resetarea de după ultima zi"
+            }
+        },
+        "contest": {
+            "description": "Gestionează concursurile pe puncte dintre unitățile militare.",
+            "edit": {
+                "description": "Redeschide panoul de configurare al concursului tău înainte de început.",
+                "params": {
+                    "contest": "Concursul"
+                }
+            },
+            "cancel": {
+                "description": "Anulează concursul tău; nu se mai postează nimic.",
+                "params": {
+                    "contest": "Concursul"
+                }
+            },
+            "end": {
+                "description": "Încheie acum concursul tău și postează rezultatele finale.",
+                "params": {
+                    "contest": "Concursul"
+                }
+            },
+            "ranking": {
+                "description": "Arată punctele actuale ale unui concurs în desfășurare sau încheiat.",
+                "params": {
+                    "contest": "Concursul"
+                }
+            },
+            "list": {
+                "description": "Listează concursurile programate și în desfășurare."
+            }
         },
         "damage": {
             "description": "Builduri de luptă pentru o zi cu pastilă, ordonate după costul net la 1.000 de daune.",

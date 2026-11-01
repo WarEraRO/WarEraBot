@@ -293,6 +293,61 @@ async def get_production_bonuses(company_ids, session):
     bonuses = await _get_batch(session, 'company.getProductionBonus', [{'companyId': company_id} for company_id in ids])
     return {company_id: bonus for company_id, bonus in zip(ids, bonuses) if isinstance(bonus, dict)}
 
+async def get_users_company_ids(user_ids, session):
+    """Batched company.getCompanies: {userId: [companyId]} for the users whose listing loaded.
+
+    The listing holds 10 ids unless perPage is raised; one page of 100 covers every player.
+    """
+    ids = list(dict.fromkeys(user_ids))
+    listings = await _get_batch(session, 'company.getCompanies', [{'userId': user_id, 'perPage': 100} for user_id in ids])
+    result = {}
+    for user_id, listing in zip(ids, listings):
+        if isinstance(listing, dict):
+            items = listing.get('items') or []
+            ids = [item if isinstance(item, str) else (item or {}).get('_id') for item in items]
+            result[user_id] = [company_id for company_id in ids if company_id]
+    return result
+
+async def get_companies_by_ids(company_ids, session):
+    """Batched company.getById: {companyId: company} for the ids that resolved."""
+    ids = list(dict.fromkeys(company_ids))
+    companies = await _get_batch(session, 'company.getById', [{'companyId': company_id} for company_id in ids])
+    return {company_id: company for company_id, company in zip(ids, companies) if isinstance(company, dict)}
+
+# employee.getCompanyRoster and work.getStatsByEmployee are not in the official spec: the first is a
+# game-client query opened to API keys in v0.27.2 (2026-10-28), the second is explorer-documented.
+async def get_company_rosters(company_ids, session):
+    """Batched employee.getCompanyRoster: {companyId: roster} for the ids that resolved.
+
+    A roster is {employees: [employee], hourly}; each employee has _id, owner, company and createdAt
+    (the hire time) [observed 2026-10-28]. An unknown company id answers 404.
+    """
+    ids = list(dict.fromkeys(company_ids))
+    rosters = await _get_batch(session, 'employee.getCompanyRoster', [{'companyId': company_id} for company_id in ids], quiet_statuses=(404,))
+    return {company_id: roster for company_id, roster in zip(ids, rosters) if isinstance(roster, dict)}
+
+async def get_employees_work_stats(employee_ids, session):
+    """Batched work.getStatsByEmployee: {employeeId: [day]} for the ids that resolved. Requires an API key.
+
+    Each day is {dailyDate (YYYY-MM-DD, UTC game day), total, wage, employeeProd}, with production in
+    production points [observed 2026-11-01].
+    """
+    ids = list(dict.fromkeys(employee_ids))
+    stats = await _get_batch(session, 'work.getStatsByEmployee', [{'employeeId': employee_id} for employee_id in ids])
+    return {employee_id: days for employee_id, days in zip(ids, stats) if isinstance(days, list)}
+
+async def get_pp_money_value(session, base_url="https://api2.warera.io/trpc/gameStat.getPpMoneyValue"):
+    """The game's money value of 1 production point (explorer-documented, no input), or None."""
+    try:
+        data = await _get_with_retry(session, base_url)
+        value = (data or {}).get('result', {}).get('data')
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return float(value)
+        return None
+    except Exception as e:
+        logger.exception('get_pp_money_value failed: %s', e)
+        return None
+
 async def get_work_offers(session, max_pages=3, base_url="https://api2.warera.io/trpc/workOffer.getWorkOffersPaginated"):
     """Open job offers, best after-tax wage first, from up to `max_pages` pages of 100; None if the first fails.
 

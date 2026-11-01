@@ -20,3 +20,4 @@ config["DYNAMO_DIPLOMACIES_TABLE"] = os.environ.get("DYNAMO_DIPLOMACIES_TABLE", 
 config["DYNAMO_NAPS_TABLE"] = os.environ.get("DYNAMO_NAPS_TABLE", "warera-ro-discordbot_prod_naps")
 config["DYNAMO_GUILD_SETTINGS_TABLE"] = os.environ.get("DYNAMO_GUILD_SETTINGS_TABLE", "warera-ro-discordbot_prod_guild_settings")
 config["DYNAMO_JOB_SUBSCRIPTIONS_TABLE"] = os.environ.get("DYNAMO_JOB_SUBSCRIPTIONS_TABLE", "warera-ro-discordbot_prod_job_subscriptions")
+config["DYNAMO_CONTESTS_TABLE"] = os.environ.get("DYNAMO_CONTESTS_TABLE", "warera-ro-discordbot_prod_contests")

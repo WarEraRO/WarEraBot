@@ -73,6 +73,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.tasks.bounty_alerts")
         await self.load_extension("cogs.tasks.military_unit_weekly_report")
         await self.load_extension("cogs.tasks.military_unit_daily_report")
+        await self.load_extension("cogs.tasks.contests")
 
         await self.load_extension("cogs.commands.fight_status")
         await self.load_extension("cogs.commands.diplomacy")
@@ -101,6 +102,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.commands.language")
         await self.load_extension("cogs.commands.server_ids")
         await self.load_extension("cogs.commands.damage")
+        await self.load_extension("cogs.commands.contests")
 
         await self.load_extension("cogs.events.newbie_welcome")
 

@@ -44,6 +44,8 @@ _COMMAND_IDS: List[str] = [
     "run_job",
     "setlang",
     "server_ids",
+    "start_contest",
+    "contest",
 ]
 
 _JOB_IDS: List[str] = [
@@ -63,6 +65,7 @@ _JOB_IDS: List[str] = [
     "reddit_monitor",
     "article_mention",
     "newbie_welcome",
+    "contest_tracker",
 ]
 
 _COMMANDS_PER_PAGE = 3

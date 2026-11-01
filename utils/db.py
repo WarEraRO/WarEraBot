@@ -94,6 +94,16 @@ def init_db() -> None:
             """
         )
         cur.execute("CREATE INDEX IF NOT EXISTS idx_job_subscriptions_discord_id ON job_subscriptions(discord_id)")
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS contests (
+                contest_id TEXT NOT NULL,
+                record_id TEXT NOT NULL,
+                data TEXT NOT NULL,
+                PRIMARY KEY (contest_id, record_id)
+            )
+            """
+        )
         conn.commit()
 
 
@@ -497,3 +507,75 @@ def get_user_job_subscriptions(discord_id: int | str, job: str | None = None) ->
                 (str(discord_id), job),
             )
         return [dict(row) for row in cur.fetchall()]
+
+
+# Contests (/start_contest), all in the `contests` table: each contest record is a row
+# (CONTEST_INDEX_ID, <contest id>), so listing contests never reads participants, and each participant
+# record is a row (<contest id>, <WarEra user id>). `data` is the record as JSON.
+CONTEST_INDEX_ID = "__contests__"
+
+
+def _save_contest_rows(rows: list[tuple[str, str, Dict]]) -> None:
+    if not rows:
+        return
+    if _USE_DYNAMO:
+        return dynamo.save_contest_rows(rows)
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.executemany(
+            "INSERT OR REPLACE INTO contests (contest_id, record_id, data) VALUES (?, ?, ?)",
+            [(pk, rk, json.dumps(record)) for pk, rk, record in rows],
+        )
+        conn.commit()
+
+
+def _contest_rows(contest_id: str) -> Dict[str, Dict]:
+    if _USE_DYNAMO:
+        return dynamo.get_contest_rows(contest_id)
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT record_id, data FROM contests WHERE contest_id = ?", (contest_id,))
+        return {row['record_id']: json.loads(row['data']) for row in cur.fetchall()}
+
+
+def save_contest(contest: Dict, players: Optional[Dict[str, Dict]] = None) -> None:
+    """Insert or replace a contest record (keyed by its "id") and, optionally, participant records by user id.
+
+    Participants are written first and the contest record last: the DynamoDB batch is not atomic, and a
+    contest record saved without its participants would mark work as done (a settled battle, a scan
+    cursor) whose results were never stored.
+    """
+    _save_contest_rows([(contest["id"], user_id, player) for user_id, player in (players or {}).items()])
+    _save_contest_rows([(CONTEST_INDEX_ID, contest["id"], contest)])
+
+
+def get_contest(contest_id: str) -> Optional[Dict]:
+    """One contest record, or None when it does not exist."""
+    if _USE_DYNAMO:
+        return dynamo.get_contest_row(CONTEST_INDEX_ID, contest_id)
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT data FROM contests WHERE contest_id = ? AND record_id = ?", (CONTEST_INDEX_ID, contest_id))
+        row = cur.fetchone()
+        return json.loads(row['data']) if row else None
+
+
+def get_contest_players(contest_id: str) -> Dict[str, Dict]:
+    """Every participant record of one contest, {user_id: record}."""
+    return _contest_rows(contest_id)
+
+
+def get_contests() -> list[Dict]:
+    """Every contest record, in any status."""
+    return list(_contest_rows(CONTEST_INDEX_ID).values())
+
+
+def delete_contest(contest_id: str) -> None:
+    """Delete a contest and all of its participant records."""
+    if _USE_DYNAMO:
+        return dynamo.delete_contest_rows(CONTEST_INDEX_ID, contest_id)
+    with _connect() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM contests WHERE contest_id = ?", (contest_id,))
+        cur.execute("DELETE FROM contests WHERE contest_id = ? AND record_id = ?", (CONTEST_INDEX_ID, contest_id))
+        conn.commit()
