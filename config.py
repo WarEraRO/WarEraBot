@@ -1,9 +1,18 @@
+"""Load the bot configuration from config.json and secrets from the environment.
+
+Running with ``--test`` (``python run.py --test``) loads config.test.json instead,
+and utils.db then uses the local SQLite database in database/ instead of DynamoDB.
+"""
+
 import json
 import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
-CONFIG_PATH = Path(__file__).parent / "config.json"
+# config is imported by run.py and every cog, so the flag is read from argv here
+TEST_MODE = "--test" in sys.argv
+CONFIG_PATH = Path(__file__).parent / ("config.test.json" if TEST_MODE else "config.json")
 load_dotenv(CONFIG_PATH.parent / ".env")
 
 with open(CONFIG_PATH, "r") as f:

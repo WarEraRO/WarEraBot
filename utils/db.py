@@ -3,10 +3,11 @@ import sqlite3
 from typing import Optional, Dict
 import json
 import utils.dynamo as dynamo
-from config import config
+from config import config, TEST_MODE
 
-# When AWS credentials are present every function delegates to dynamo.py
-_USE_DYNAMO: bool = bool(
+# When AWS credentials are present every function delegates to dynamo.py;
+# --test always uses the local SQLite database in database/
+_USE_DYNAMO: bool = not TEST_MODE and bool(
     config.get("AWS_ACCESS_KEY_ID") and config.get("AWS_SECRET_ACCESS_KEY")
 )
 
@@ -23,7 +24,7 @@ def _connect():
 
 
 def init_db() -> None:
-    """Create tables / confirm they exist.  Uses DynamoDB when credentials are present."""
+    """Create tables / confirm they exist.  Uses DynamoDB when credentials are present, except with --test."""
     if _USE_DYNAMO:
         try:
             created = dynamo.ensure_tables()
