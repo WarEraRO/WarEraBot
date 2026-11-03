@@ -2,7 +2,7 @@ import asyncio
 import discord
 from discord.ext import commands
 from config import config
-import utils.api as api
+from utils.api import warera
 from utils import db
 from datetime import datetime, timezone
 from utils.i18n import CommandTranslator, get_translator
@@ -45,7 +45,7 @@ class WarEraBot(commands.Bot):
         try:
             await super().close()
         finally:
-            await api.close_shared_session()
+            await warera.close()
 
     async def setup_hook(self):
         """Create the database schema, load every task, command and event cog, then sync the slash commands (with Romanian translations)."""
@@ -107,12 +107,6 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.events.newbie_welcome")
 
         guild = discord.Object(id=config["guild"])
-
-        # Initialize shared aiohttp session used by API helpers
-        try:
-            await api.get_shared_session()
-        except Exception:
-            pass
 
         # localized slash-command descriptions for Romanian Discord clients
         await self.tree.set_translator(CommandTranslator())

@@ -1,5 +1,5 @@
 from discord.ext import commands, tasks
-from utils.api import get_shared_session, get_mercenary_auctions, get_country, get_countries_by_ids
+from utils.api import warera
 from utils.db import init_db
 from utils.i18n import get_translator
 from config import config
@@ -36,9 +36,8 @@ class MercenaryContractsJob(commands.Cog):
         if guild is None:
             return
 
-        session = await get_shared_session()
         try:
-            auctions = await get_mercenary_auctions(session)
+            auctions = await warera.contracts.get_active_auctions()
         except Exception:
             auctions = None
 
@@ -66,7 +65,7 @@ class MercenaryContractsJob(commands.Cog):
             and self.displayed_auctions.get(a.get('_id')) != (a.get('updatedAt') or a.get('createdAt') or a.get('currentPayout'))
         ]
         country_ids = [cid for cid in (a.get('country') or a.get('forCountry') for a in to_post) if cid]
-        countries = await get_countries_by_ids(country_ids, session)
+        countries = await warera.countries.get_many(country_ids)
         for cid in country_ids:
             cobj = countries.get(cid)
             country_cache[cid] = cobj.get('name') if isinstance(cobj, dict) else str(cid)
@@ -76,7 +75,7 @@ class MercenaryContractsJob(commands.Cog):
             if cid in country_cache:
                 return country_cache[cid]
             try:
-                cobj = await get_country(cid, session)
+                cobj = await warera.countries.get(cid)
             except Exception:
                 cobj = None
             name = cobj.get('name') if isinstance(cobj, dict) else str(cid)

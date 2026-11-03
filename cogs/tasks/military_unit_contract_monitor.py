@@ -8,16 +8,7 @@ import discord
 from discord.ext import commands, tasks
 
 from config import config
-from utils.api import (
-    get_all_countries,
-    get_battle,
-    get_game_config,
-    get_military_unit,
-    get_round,
-    get_shared_session,
-    get_users_info,
-    get_won_mercenary_auctions,
-)
+from utils.api import warera
 from utils.common import country_flag, get_mu_destination
 from utils.computational import is_economy_build
 from utils.db import get_job_subscribers, remove_job_subscription
@@ -172,9 +163,8 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
         if not units:
             return
 
-        session = await get_shared_session()
         created_after = (datetime.now(timezone.utc) - CONTRACT_LOOKBACK).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        contracts = await get_won_mercenary_auctions(session, created_after)
+        contracts = await warera.contracts.get_won_since(created_after)
         if contracts is None:
             return
 
@@ -202,9 +192,9 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
             if channel is None:
                 logger.warning("Contracts channel/thread for MU %s not found", unit.get("friendlyName"))
                 continue
-            embed = await self._build_embed(contract, unit, session, tr)
+            embed = await self._build_embed(contract, unit, tr)
             # an MU has at most 25 members (dormitories level 5), so every mention fits in one message
-            mentions = await self._subscriber_mentions(str(unit["id"]), guild, session)
+            mentions = await self._subscriber_mentions(str(unit["id"]), guild)
             try:
                 await channel.send(
                     content=" ".join(mentions) or None,
@@ -216,13 +206,13 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
                 continue
             self._remember(contract)
 
-        await self._prune_posted(session)
+        await self._prune_posted()
 
     @mu_contract_monitor.before_loop
     async def before_mu_contract_monitor(self):
         await self.bot.wait_until_ready()
 
-    async def _subscriber_mentions(self, mu_id: str, guild: discord.Guild, session) -> list[str]:
+    async def _subscriber_mentions(self, mu_id: str, guild: discord.Guild) -> list[str]:
         """Mentions of the contract subscribers who are in the MU, on a fight build and able to fight.
 
         Subscribers who have left the server are not pinged and their subscriptions are dropped.
@@ -237,7 +227,7 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
         if not api_ids:
             return []
         # one batched request; a subscriber whose stats could not be fetched is not pinged
-        users = await get_users_info(api_ids.values(), session)
+        users = await warera.users.get_many(api_ids.values())
         now = datetime.now(timezone.utc)
         return [
             f"<@{discord_id}>"
@@ -276,32 +266,32 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
             "round": contract.get("round"),
         }
 
-    async def _prune_posted(self, session):
+    async def _prune_posted(self):
         now = time.monotonic()
         for contract_id, info in list(self._posted.items()):
             if now - info["posted_at"] < POSTED_RETENTION_SECONDS:
                 continue
             # round contracts finish with their round, battle contracts with their battle
             if info["round"]:
-                target = await get_round(info["round"], session)
+                target = await warera.battles.get_round(info["round"])
             else:
-                target = await get_battle(info["battle"], session)
+                target = await warera.battles.get(info["battle"])
             if target is not None and not target.get("isActive"):
                 del self._posted[contract_id]
 
-    async def _build_embed(self, contract: dict, unit: dict, session, tr: Translator) -> discord.Embed:
+    async def _build_embed(self, contract: dict, unit: dict, tr: Translator) -> discord.Embed:
         battle_id = str(contract.get("battle") or "")
         battle_link = f"https://app.warera.io/battle/{battle_id}"
-        battle = await get_battle(battle_id, session) if battle_id else None
+        battle = await warera.battles.get(battle_id) if battle_id else None
         battle = battle or {}
 
         # a round contract carries its round; a battle contract follows the battle's current round
         round_id = contract.get("round") or battle.get("currentRound")
         round_obj, game_config, country_names, military_unit = await asyncio.gather(
-            get_round(str(round_id), session) if round_id else asyncio.sleep(0),
-            self._get_game_config(session),
-            self._get_country_names(session),
-            get_military_unit(str(unit["id"]), session),
+            warera.battles.get_round(str(round_id)) if round_id else asyncio.sleep(0),
+            self._get_game_config(),
+            self._get_country_names(),
+            warera.mus.get(str(unit["id"])),
         )
         military_unit = military_unit if isinstance(military_unit, dict) else {}
 
@@ -391,11 +381,11 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
         """Time until the leading side wins the round, assuming it wins every remaining tick."""
         return round_eta(round_obj, game_config["tick_points"], game_config["points_to_win"], datetime.now(timezone.utc))
 
-    async def _get_game_config(self, session) -> dict:
+    async def _get_game_config(self) -> dict:
         now = time.monotonic()
         if self._game_config and now - self._game_config[1] < GAME_CONFIG_TTL_SECONDS:
             return self._game_config[0]
-        raw = await get_game_config(session)
+        raw = await warera.game.get_config()
         battle_config = (raw or {}).get("battle") or {}
         try:
             tick_points = {int(k): int(v) for k, v in (battle_config.get("tickPoints") or {}).items()}
@@ -411,11 +401,11 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
             self._game_config = (parsed, now)
         return parsed
 
-    async def _get_country_names(self, session) -> dict[str, str]:
+    async def _get_country_names(self) -> dict[str, str]:
         now = time.monotonic()
         if self._country_names and now - self._country_names[1] < COUNTRY_CACHE_TTL_SECONDS:
             return self._country_names[0]
-        countries = await get_all_countries(session)
+        countries = await warera.countries.get_all()
         if not countries:
             return self._country_names[0] if self._country_names else {}
         names = {

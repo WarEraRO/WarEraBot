@@ -7,18 +7,7 @@ import discord
 from discord.ext import commands, tasks
 
 from config import config
-from utils.api import (
-    get_all_countries,
-    get_battle_ranking,
-    get_ended_battles,
-    get_military_unit,
-    get_mu_members,
-    get_mu_public_orders,
-    get_mu_transactions,
-    get_shared_session,
-    get_users_info,
-    get_won_mercenary_auctions,
-)
+from utils.api import warera
 from utils.common import country_with_flag, get_mu_destination, to_local
 from utils.i18n import Translator, get_translator
 
@@ -118,14 +107,13 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
 
     @tasks.loop(minutes=MU_BATTLE_TRACKER_INTERVAL_MINUTES)
     async def mu_battle_tracker(self):
-        session = await get_shared_session()
-        await self._collect_battles(session, _week_start(datetime.now(timezone.utc)))
+        await self._collect_battles(_week_start(datetime.now(timezone.utc)))
 
     @mu_battle_tracker.before_loop
     async def before_mu_battle_tracker(self):
         await self.bot.wait_until_ready()
 
-    async def _collect_battles(self, session, week_start: datetime) -> bool:
+    async def _collect_battles(self, week_start: datetime) -> bool:
         """Fetch the MU rankings of battles that ended this week and are not cached yet.
 
         After a restart the cache is empty and the whole week is backfilled. Returns False when
@@ -133,7 +121,7 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
         """
         async with self._battle_lock:
             units = self._units()
-            battles = await get_ended_battles(session, _iso(week_start - BATTLE_LOOKBACK))
+            battles = await warera.battles.get_ended_since(_iso(week_start - BATTLE_LOOKBACK))
             if battles is None:
                 return False
             week_start_iso = _iso(week_start)
@@ -150,7 +138,7 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
             ]
             semaphore = asyncio.Semaphore(RANKING_CONCURRENCY)
             results = await asyncio.gather(
-                *(self._battle_result(battle, units, session, semaphore) for battle in pending)
+                *(self._battle_result(battle, units, semaphore) for battle in pending)
             )
             complete = True
             for battle, result in zip(pending, results):
@@ -162,13 +150,13 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
                 logger.info("MU weekly report: collected %d ended battles (%d failed)", len(pending), results.count(None))
             return complete
 
-    async def _battle_result(self, battle: dict, units: dict[str, dict], session, semaphore) -> dict | None:
+    async def _battle_result(self, battle: dict, units: dict[str, dict], semaphore) -> dict | None:
         battle_id = str(battle["_id"])
         async with semaphore:
             # per-side rankings tell which side each MU fought for, so wins and losses can be counted
             attacker, defender = await asyncio.gather(
-                get_battle_ranking(battle_id, "damage", "mu", "attacker", session),
-                get_battle_ranking(battle_id, "damage", "mu", "defender", session),
+                warera.battles.get_ranking(battle_id, "damage", "mu", "attacker"),
+                warera.battles.get_ranking(battle_id, "damage", "mu", "defender"),
             )
             if attacker is None or defender is None:
                 return None
@@ -181,7 +169,7 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
             money_by_mu: dict[str, float] = {}
             if side_damage:
                 # money = bounty plus mercenary contract payouts earned in this battle
-                money = await get_battle_ranking(battle_id, "money", "mu", "merged", session)
+                money = await warera.battles.get_ranking(battle_id, "money", "mu", "merged")
                 if money is None:
                     return None
                 money_by_mu = {str(item.get("mu") or ""): item.get("value") or 0 for item in money}
@@ -225,14 +213,13 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
         if not units:
             return
 
-        session = await get_shared_session()
         week_start = _week_start(now)
-        battles_complete = await self._collect_battles(session, week_start)
+        battles_complete = await self._collect_battles(week_start)
         # contracts for battles that ended this week may have been won before it started
-        contracts = await get_won_mercenary_auctions(session, _iso(week_start - BATTLE_LOOKBACK))
+        contracts = await warera.contracts.get_won_since(_iso(week_start - BATTLE_LOOKBACK))
         country_names = {
             str(country.get("_id")): str(country.get("name"))
-            for country in await get_all_countries(session) or []
+            for country in await warera.countries.get_all() or []
             if country.get("_id") and country.get("name")
         }
 
@@ -241,7 +228,7 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
         for mu_id, unit in units.items():
             try:
                 embed = await self._build_embed(
-                    mu_id, unit, session, week_start, now, contracts, battles_complete, names, country_names, tr
+                    mu_id, unit, week_start, now, contracts, battles_complete, names, country_names, tr
                 )
                 if embed is None:
                     continue
@@ -261,7 +248,6 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
         self,
         mu_id: str,
         unit: dict,
-        session,
         week_start: datetime,
         now: datetime,
         contracts: list[dict] | None,
@@ -273,8 +259,8 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
         """The MU's weekly report, or None when it has no members or dealt less than MIN_REPORT_DAMAGE."""
         week_start_iso = _iso(week_start)
         military_unit, members = await asyncio.gather(
-            get_military_unit(mu_id, session),
-            get_mu_members(mu_id, session),
+            warera.mus.get(mu_id),
+            warera.mus.get_members(mu_id),
         )
         if military_unit is None and members is None:
             logger.warning("Skipping weekly report for MU %s: MU could not be fetched", unit.get("friendlyName"))
@@ -302,8 +288,8 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
             return None
 
         transactions, open_orders = await asyncio.gather(
-            get_mu_transactions(mu_id, ["donation", "trading"], week_start_iso, session),
-            get_mu_public_orders(mu_id, session),
+            warera.market.get_mu_transactions(mu_id, ["donation", "trading"], week_start_iso),
+            warera.mus.get_public_orders(mu_id),
         )
 
         # contracts: won this week, plus any won earlier for battles that ended this week
@@ -361,7 +347,6 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
                 str(member.get("user"))
                 for member in top_fighters + idle_members[:IDLE_MEMBERS_SHOWN] + new_members[:NEW_MEMBERS_SHOWN]
             ],
-            session,
             names,
         )
 
@@ -594,10 +579,10 @@ class MilitaryUnitWeeklyReportJob(commands.Cog):
             tips.append(tr("mu_weekly.tip_battles", won=won, total=len(fought)))
         return tips
 
-    async def _resolve_names(self, user_ids: list[str], session, names: dict[str, str]):
+    async def _resolve_names(self, user_ids: list[str], names: dict[str, str]):
         missing = [user_id for user_id in dict.fromkeys(user_ids) if user_id and user_id not in names]
         # one batched request for every missing name
-        users = await get_users_info(missing, session)
+        users = await warera.users.get_many(missing)
         for user_id in missing:
             # "" when unknown; shown as a translated "unknown"
             names[user_id] = str((users.get(user_id) or {}).get("username") or "")

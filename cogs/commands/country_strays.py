@@ -2,7 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from config import config
-from utils.api import get_users_by_name, get_shared_session, get_all_countries, get_country
+from utils.api import warera
 from utils.i18n import Translator, get_translator
 
 _PAGE_SIZE = 15
@@ -91,18 +91,17 @@ class CountryStrays(commands.Cog):
         if newbie_role:
             members.update(newbie_role.members)
 
-        session = await get_shared_session()
 
         if self._countries_cache is None:
             try:
-                self._countries_cache = await get_all_countries(session) or []
+                self._countries_cache = await warera.countries.get_all() or []
             except Exception:
                 self._countries_cache = []
 
         issues: list[tuple] = []
 
         # one batched lookup for all members instead of one or more requests per member
-        users = await get_users_by_name([member.display_name for member in members], session)
+        users = await warera.users.find_many_by_name([member.display_name for member in members])
         for member in members:
             user = users.get(member.display_name)
             if not user:
@@ -117,7 +116,7 @@ class CountryStrays(commands.Cog):
 
             if country_name is None:
                 try:
-                    country = await get_country(country_id, session)
+                    country = await warera.countries.get(country_id)
                     if country:
                         country_name = country.get("name")
                         if self._countries_cache is not None:

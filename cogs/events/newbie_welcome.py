@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 
 from config import config
-from utils.api import get_game_config, get_military_units_by_ids, get_shared_session
+from utils.api import warera
 from utils.i18n import Translator, get_translator
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ def open_military_units(mus: dict, game_config: dict | None) -> list[tuple[str, 
     `gameConfig.upgradesConfig.dormitories.levels`; an MU whose level has no capacity there is skipped.
 
     Args:
-        mus: `{muId: mu}` from `mu.getById`, as returned by `get_military_units_by_ids`.
+        mus: `{muId: mu}` from `mu.getById`, as returned by `warera.mus.get_many`.
         game_config: `gameConfig.getGameConfig`, or None when it could not be fetched.
 
     Returns:
@@ -132,11 +132,10 @@ class NewbieWelcome(commands.Cog):
         if not units:
             return []
         try:
-            session = await get_shared_session()
-            mus = await get_military_units_by_ids([unit["id"] for unit in units], session)
+            mus = await warera.mus.get_many([unit["id"] for unit in units])
             if not mus:
                 return None
-            return open_military_units(mus, await get_game_config(session))
+            return open_military_units(mus, await warera.game.get_config())
         except Exception:
             logger.exception("Could not read the military units for the newbie welcome")
             return None

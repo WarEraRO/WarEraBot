@@ -55,18 +55,7 @@ from cogs.tasks.military_unit_contract_monitor import (
 )
 from cogs.tasks.military_unit_daily_report import _fmt_short
 from config import config
-from utils.api import (
-    get_active_battles,
-    get_all_countries,
-    get_battle_loot_summaries,
-    get_battle_orders,
-    get_game_config,
-    get_military_units_by_ids,
-    get_mu_upgrades,
-    get_ranking_pages,
-    get_shared_session,
-    get_users_info,
-)
+from utils.api import warera
 from utils.common import country_with_flag
 from utils.computational import is_economy_build
 from utils.db import get_job_subscribers, remove_job_subscription
@@ -77,7 +66,6 @@ logger = logging.getLogger(__name__)
 # one tick, so a round is looked at about 5 times while it is in the window
 LOOT_ALERT_INTERVAL_MINUTES = 2
 ALERT_WINDOW = timedelta(minutes=10)
-GAME_CONFIG_TTL = 3600
 COUNTRIES_TTL = 3600
 
 # job name and target in the job_subscriptions table. Nothing per battle is stored: a subscriber is
@@ -187,8 +175,6 @@ class LootAlertJob(commands.Cog):
         self._skipped_rounds: set[str] = set()
         # round id -> Discord ids of the subscribers already evaluated for it
         self._handled: dict[str, set[str]] = {}
-        self._game_config: dict = {}
-        self._game_config_at = 0.0
         self._country_names: dict[str, str] = {}
         self._countries_at = 0.0
         self.loot_alert_monitor.start()
@@ -216,8 +202,7 @@ class LootAlertJob(commands.Cog):
         if not api_ids:
             return
 
-        session = await get_shared_session()
-        battles, game_config = await asyncio.gather(get_active_battles(session), self._load_game_config(session))
+        battles, game_config = await asyncio.gather(warera.battles.get_active(), self._load_game_config())
         if battles is None or not game_config:
             return
         now = datetime.now(timezone.utc)
@@ -242,7 +227,7 @@ class LootAlertJob(commands.Cog):
             return
         waiting = {discord_id for _, round_id, _ in pending for discord_id in api_ids if discord_id not in self._handled.get(round_id, set())}
         # one batched request; a subscriber whose stats could not be fetched is retried on the next run
-        users = await get_users_info([api_ids[discord_id] for discord_id in waiting], session)
+        users = await warera.users.get_many([api_ids[discord_id] for discord_id in waiting])
         eligible = {
             discord_id: user for discord_id in waiting
             if (user := users.get(api_ids[discord_id])) and is_economy_build(user) is False and can_fight(user, now)
@@ -257,20 +242,20 @@ class LootAlertJob(commands.Cog):
             for _, round_id, _ in pending
         ]
         hitters_of = await asyncio.gather(*(
-            self._hitters(str(battle["_id"]), players, session) for (battle, _, _), players in zip(pending, players_of)
+            self._hitters(str(battle["_id"]), players) for (battle, _, _), players in zip(pending, players_of)
         ))
         if not any(hitters_of):
             return
 
         hitting = {d: eligible[d] for hitters in hitters_of for d in hitters}
-        await self._load_countries(session)
-        context = await self._player_context(hitting, [item for item, hitters in zip(pending, hitters_of) if hitters], game_config, session, now)
+        await self._load_countries()
+        context = await self._player_context(hitting, [item for item, hitters in zip(pending, hitters_of) if hitters], game_config, now)
         tr = await get_translator()
         alerts: dict[str, list[discord.Embed]] = {}
         for (battle, round_id, eta), hitters in zip(pending, hitters_of):
             if not hitters:
                 continue
-            results = await self._battle_alerts(battle, eta, hitters, context, game_config, session, now, tr)
+            results = await self._battle_alerts(battle, eta, hitters, context, game_config, now, tr)
             for discord_id, embed in results.items():
                 self._handled.setdefault(round_id, set()).add(discord_id)
                 if embed is not None:
@@ -324,19 +309,19 @@ class LootAlertJob(commands.Cog):
                 ending.append((battle, round_id, eta))
         return ending
 
-    async def _hitters(self, battle_id: str, players: dict[str, dict], session) -> dict[str, dict]:
+    async def _hitters(self, battle_id: str, players: dict[str, dict]) -> dict[str, dict]:
         """{Discord id: user} of the `players` who hit the battle; a failed summary counts as no hit."""
         if not players:
             return {}
         discord_ids = {str(user.get("_id")): discord_id for discord_id, user in players.items() if user.get("_id")}
-        summaries = await get_battle_loot_summaries(battle_id, list(discord_ids), session)
+        summaries = await warera.battles.get_loot_summaries(battle_id, list(discord_ids))
         return {
             discord_ids[api_id]: players[discord_ids[api_id]]
             for api_id, summary in summaries.items()
             if api_id in discord_ids and (summary.get("hits") or summary.get("totalDmg"))
         }
 
-    async def _player_context(self, players: dict[str, dict], pending: list, game_config: dict, session, now: datetime) -> dict:
+    async def _player_context(self, players: dict[str, dict], pending: list, game_config: dict, now: datetime) -> dict:
         """What the alerts need about the players: their MUs' members, country and headquarters bonus, and the orders.
 
         Returns {"mu_members": {mu id: set of user ids}, "mu_country": {mu id: country id},
@@ -345,9 +330,9 @@ class LootAlertJob(commands.Cog):
         mu_ids = sorted({str(user.get("mu")) for user in players.values() if user.get("mu")})
         sides = [(str(battle["_id"]), side) for battle, _, _ in pending for side in SIDES]
         military_units, orders, *upgrades = await asyncio.gather(
-            get_military_units_by_ids(mu_ids, session) if mu_ids else asyncio.sleep(0, result={}),
-            get_battle_orders(sides, session),
-            *(get_mu_upgrades(mu_id, ["headquarters"], session) for mu_id in mu_ids),
+            warera.mus.get_many(mu_ids) if mu_ids else asyncio.sleep(0, result={}),
+            warera.battles.get_orders_many(sides),
+            *(warera.mus.get_upgrades(mu_id, ["headquarters"]) for mu_id in mu_ids),
         )
         return {
             "mu_members": {mu_id: {str(member) for member in mu.get("members") or []} for mu_id, mu in military_units.items()},
@@ -361,7 +346,7 @@ class LootAlertJob(commands.Cog):
         }
 
     async def _battle_alerts(
-        self, battle: dict, eta: timedelta, players: dict[str, dict], context: dict, game_config: dict, session,
+        self, battle: dict, eta: timedelta, players: dict[str, dict], context: dict, game_config: dict,
         now: datetime, tr: Translator,
     ) -> dict[str, discord.Embed | None]:
         """{Discord id: embed, or None when nothing is worth a DM} for `players`, who all hit `battle`.
@@ -386,7 +371,7 @@ class LootAlertJob(commands.Cog):
 
         scopes = pool_scopes(battle, tr)
         rankings = await asyncio.gather(*(
-            get_ranking_pages(scope, "damage", "user", "merged", session, stop=found_all, max_pages=MAX_RANKING_PAGES)
+            warera.battles.get_ranking_pages(scope, "damage", "user", "merged", stop=found_all, max_pages=MAX_RANKING_PAGES)
             for _, _, scope in scopes
         ))
         if any(ranking is None for ranking in rankings):
@@ -511,20 +496,15 @@ class LootAlertJob(commands.Cog):
         except discord.HTTPException:
             logger.exception("Could not DM the loot alert to %s", discord_id)
 
-    async def _load_game_config(self, session) -> dict:
-        """gameConfig, refreshed when stale; a failed refresh keeps the last one ({} before the first)."""
-        if self._game_config and time.monotonic() - self._game_config_at < GAME_CONFIG_TTL:
-            return self._game_config
-        game_config = await get_game_config(session)
-        if game_config:
-            self._game_config, self._game_config_at = game_config, time.monotonic()
-        return self._game_config
+    async def _load_game_config(self) -> dict:
+        """gameConfig, or {} when it was never fetched; the client caches it for an hour and keeps the last good copy when a refresh fails."""
+        return await warera.game.get_config() or {}
 
-    async def _load_countries(self, session) -> None:
+    async def _load_countries(self) -> None:
         """Refresh the country names when stale; a failed refresh keeps the previous ones."""
         if self._country_names and time.monotonic() - self._countries_at < COUNTRIES_TTL:
             return
-        countries = await get_all_countries(session)
+        countries = await warera.countries.get_all()
         if not countries:
             return
         for country in countries:

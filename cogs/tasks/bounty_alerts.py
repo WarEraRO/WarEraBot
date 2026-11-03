@@ -35,7 +35,7 @@ from discord.ext import commands, tasks
 from cogs.commands.mu_order_alignment import BATTLE_LINK, COUNTRY_NAME, SIDES
 from cogs.tasks.military_unit_contract_monitor import SIDE_ICONS, can_fight, format_amount
 from config import config
-from utils.api import get_active_battles, get_all_countries, get_alliance, get_battle, get_shared_session, get_users_info
+from utils.api import warera
 from utils.common import country_flag, get_mu_destination
 from utils.computational import is_economy_build
 from utils.db import get_job_subscribers, remove_job_subscription
@@ -189,12 +189,11 @@ class BountyAlertsJob(commands.Cog):
         if not threads:
             return
 
-        session = await get_shared_session()
-        friends = await self._friendly_countries(session)
+        friends = await self._friendly_countries()
         if friends is None:
             return
         friendly_ids, country_names = friends
-        battles = await get_active_battles(session)
+        battles = await warera.battles.get_active()
         if battles is None:
             return
 
@@ -208,7 +207,7 @@ class BountyAlertsJob(commands.Cog):
         unchecked: set[str] = set()
         tracked = {battle_id for posts in self._posts.values() for battle_id in posts}
         for battle_id in tracked - by_id.keys():
-            battle = await get_battle(battle_id, session)
+            battle = await warera.battles.get(battle_id)
             if battle is None:
                 unchecked.add(battle_id)
             else:
@@ -229,7 +228,7 @@ class BountyAlertsJob(commands.Cog):
         if not channels:
             return
 
-        eligible = await self._eligible_subscribers(threads, bounties, guild, session) if bounties else {}
+        eligible = await self._eligible_subscribers(threads, bounties, guild) if bounties else {}
         tr = await get_translator(guild) if bounties else None
         for thread_id, channel in channels.items():
             posts = self._posts.setdefault(thread_id, {})
@@ -250,7 +249,7 @@ class BountyAlertsJob(commands.Cog):
     async def before_bounty_alerts(self):
         await self.bot.wait_until_ready()
 
-    async def _friendly_countries(self, session) -> tuple[set[str], dict[str, str]] | None:
+    async def _friendly_countries(self) -> tuple[set[str], dict[str, str]] | None:
         """The friendly country ids and every country's id -> name, cached for an hour.
 
         A failed refresh keeps the previous result (and retries next run); None when nothing was ever loaded.
@@ -258,18 +257,18 @@ class BountyAlertsJob(commands.Cog):
         now = time.monotonic()
         if self._friends and now - self._friends[2] < FRIENDLY_COUNTRIES_TTL_SECONDS:
             return self._friends[0], self._friends[1]
-        loaded = await self._load_friendly_countries(session)
+        loaded = await self._load_friendly_countries()
         if loaded is None:
             return (self._friends[0], self._friends[1]) if self._friends else None
         self._friends = (*loaded, now)
         return loaded
 
-    async def _load_friendly_countries(self, session) -> tuple[set[str], dict[str, str]] | None:
+    async def _load_friendly_countries(self) -> tuple[set[str], dict[str, str]] | None:
         """Romania, its defensive-pact partners and its alliance's members that are not suspended.
 
         None when the countries or the alliance cannot be fetched, or Romania is missing from the list.
         """
-        countries = await get_all_countries(session)
+        countries = await warera.countries.get_all()
         if not countries:
             return None
         names = {str(country["_id"]): str(country.get("name")) for country in countries if country.get("_id")}
@@ -279,7 +278,7 @@ class BountyAlertsJob(commands.Cog):
             return None
         friendly_ids = {str(romania["_id"])} | {str(partner) for partner in romania.get("defensivePacts") or []}
         if romania.get("allianceId"):
-            alliance = await get_alliance(str(romania["allianceId"]), session)
+            alliance = await warera.countries.get_alliance(str(romania["allianceId"]))
             if alliance is None:
                 return None
             friendly_ids |= {
@@ -345,7 +344,7 @@ class BountyAlertsJob(commands.Cog):
         return True
 
     async def _eligible_subscribers(self, threads: dict[int, list[dict]], bounties: dict[str, list[str]],
-                                    guild: discord.Guild, session) -> dict[int, list[str]]:
+                                    guild: discord.Guild) -> dict[int, list[str]]:
         """Bounty thread id -> Discord ids of the subscribers able to fight for its bounties now.
 
         Only subscribers not yet mentioned in some current post are fetched (one batched request). Those
@@ -369,7 +368,7 @@ class BountyAlertsJob(commands.Cog):
         if not pending:
             return {}
         # a subscriber whose player could not be fetched is not pinged this run
-        users = await get_users_info(pending.values(), session)
+        users = await warera.users.get_many(pending.values())
         unit_threads = {str(unit["id"]): thread_id for thread_id, units in threads.items() for unit in units}
         now = datetime.now(timezone.utc)
         eligible: dict[int, list[str]] = {}

@@ -24,18 +24,16 @@ with skill points or Prestige Points, whichever the build can spare.
 import asyncio
 import logging
 import math
-import time
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.api import _get_batch, get_game_config, get_market_prices, get_shared_session, get_user
+from utils.api import warera
 from utils.i18n import get_translator
 
 logger = logging.getLogger(__name__)
 
-GAME_CONFIG_TTL = 3600
 
 # Net money per 1,000 damage each recommendation may cost.
 COST_BRACKETS = (0.00, 0.05, 0.10, 0.15)
@@ -190,14 +188,14 @@ def _engine_levels(game_config: dict) -> dict:
     return {int(k): float(v["stats"]["dailyProd"]) for k, v in levels.items()}
 
 
-async def _fetch_gear_prices(session) -> dict:
+async def _fetch_gear_prices() -> dict:
     """Average market price per equipment code (undocumented gameStat.getEquipmentAvgByCode)."""
     codes = list(WEAPON_CODES) + [
         f"{slot}{tier}" for slot in GEAR_SLOTS[1:] for tier in range(1, len(RARITIES) + 1)
     ]
-    results = await _get_batch(session, "gameStat.getEquipmentAvgByCode", [{"itemCode": c} for c in codes])
+    averages = await warera.game.get_equipment_averages(codes)
     prices = {}
-    for code, value in zip(codes, results):
+    for code, value in averages.items():
         try:
             if value is not None and float(value) > 0:
                 prices[code] = float(value)
@@ -914,16 +912,10 @@ class _BuildPager(discord.ui.View):
 class DamageBuildHelper(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._game_config = None
-        self._game_config_at = 0.0
 
-    async def _get_game_config(self, session):
-        if self._game_config is None or time.monotonic() - self._game_config_at > GAME_CONFIG_TTL:
-            game_config = await get_game_config(session)
-            if game_config:
-                self._game_config = game_config
-                self._game_config_at = time.monotonic()
-        return self._game_config
+    async def _get_game_config(self):
+        """gameConfig, or None; the client caches it for an hour and keeps the last good copy when a refresh fails."""
+        return await warera.game.get_config()
 
     @app_commands.command(
         name="damage",
@@ -946,17 +938,16 @@ class DamageBuildHelper(commands.Cog):
         await interaction.response.defer(thinking=True)
         tr = await get_translator(interaction.guild_id)
 
-        session = await get_shared_session()
         user_data, game_config, prices_raw, gear_prices = await asyncio.gather(
-            get_user(player_name, session),
-            self._get_game_config(session),
-            get_market_prices(session),
-            _fetch_gear_prices(session),
+            warera.users.find_by_name(player_name),
+            self._get_game_config(),
+            warera.market.get_prices(),
+            _fetch_gear_prices(),
         )
         if not user_data:
             await interaction.followup.send(tr("damage.player_not_found", name=player_name), ephemeral=True)
             return
-        prices = ((prices_raw or {}).get("result") or {}).get("data") or {}
+        prices = prices_raw or {}
         # cases are a large share of the returns, so a missing live case price must not silently count as 0
         required = (PILL_CODE, "case1", "case2") + ((COMPANY_PRODUCT,) if number_of_companies else ())
         if not game_config or not gear_prices or any(code not in prices for code in required):

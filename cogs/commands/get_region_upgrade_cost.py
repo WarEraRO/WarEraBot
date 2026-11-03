@@ -7,13 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.api import (
-    get_all_countries,
-    get_market_prices,
-    get_shared_session,
-    get_country,
-    get_regions_object,
-)
+from utils.api import warera
 from utils.i18n import Translator, get_translator
 
 
@@ -260,8 +254,7 @@ class GetRegionUpgradeCost(commands.Cog):
                 if not self._countries_are_stale():
                     return self._countries
 
-                session = await get_shared_session()
-                countries = await get_all_countries(session)
+                countries = await warera.countries.get_all()
                 if countries:
                     self._countries = countries
                     self._countries_fetched_at = time.monotonic()
@@ -310,12 +303,11 @@ class GetRegionUpgradeCost(commands.Cog):
             )
             return
 
-        session = await get_shared_session()
         country_id = selected_country["_id"]
         regions_object, country_info, market_prices = await asyncio.gather(
-            get_regions_object(session),
-            get_country(country_id, session),
-            get_market_prices(session),
+            warera.regions.get_all(),
+            warera.countries.get(country_id),
+            warera.market.get_prices(),
         )
 
         if not regions_object:

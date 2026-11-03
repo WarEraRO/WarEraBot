@@ -1,5 +1,5 @@
 from discord.ext import commands, tasks
-from utils.api import get_shared_session, get_active_battles, get_countries_by_ids
+from utils.api import warera
 from utils.db import init_db
 from utils.i18n import get_translator
 from config import config
@@ -40,9 +40,8 @@ class BountyMonitorJob(commands.Cog):
         if guild is None:
             return
 
-        session = await get_shared_session()
         try:
-            battles = await get_active_battles(session)
+            battles = await warera.battles.get_active()
         except Exception:
             battles = None
 
@@ -113,7 +112,7 @@ class BountyMonitorJob(commands.Cog):
                 country_ids.append(atk_cid)
             if def_cid:
                 country_ids.append(def_cid)
-        countries = await get_countries_by_ids(country_ids, session)
+        countries = await warera.countries.get_many(country_ids)
         for cid in country_ids:
             cobj = countries.get(cid)
             country_cache[cid] = (cobj.get('name') or cid) if isinstance(cobj, dict) else cid

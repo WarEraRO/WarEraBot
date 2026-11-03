@@ -17,7 +17,6 @@ model below is kept for the rebuild around employees and managers.
 """
 import asyncio
 import logging
-import time
 from datetime import datetime, timezone
 from itertools import product
 
@@ -26,20 +25,11 @@ from discord import app_commands
 from discord.ext import commands
 
 from cogs.commands.progression import _item, _level_table, _skill_level, resolve_player_id
-from utils.api import (
-    get_game_config,
-    get_market_prices,
-    get_production_bonuses,
-    get_shared_session,
-    get_user_companies,
-    get_users_full,
-    get_work_offers,
-)
+from utils.api import warera
 from utils.i18n import Translator, get_translator
 
 logger = logging.getLogger(__name__)
 
-GAME_CONFIG_TTL = 3600
 # WarEra v0.27 removed the job market and Entrepreneurship that the build model needs
 ECONOMY_PAUSED = True
 BUILD_SKILLS = ("production", "energy", "entrepreneurship")
@@ -293,16 +283,10 @@ def build_embed(
 class Economy(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._game_config: dict | None = None
-        self._game_config_at = 0.0
 
-    async def _config(self, session) -> dict | None:
-        """gameConfig, cached for GAME_CONFIG_TTL; the last good copy when a refresh fails."""
-        if self._game_config is None or time.monotonic() - self._game_config_at > GAME_CONFIG_TTL:
-            game_config = await get_game_config(session)
-            if game_config:
-                self._game_config, self._game_config_at = game_config, time.monotonic()
-        return self._game_config
+    async def _config(self) -> dict | None:
+        """gameConfig, or None; the client caches it for an hour and keeps the last good copy when a refresh fails."""
+        return await warera.game.get_config()
 
     @app_commands.command(name="economy", description="Find the best economy build (Production, Energy, Entrepreneurship) from today's market.")
     @app_commands.describe(
@@ -321,29 +305,29 @@ class Economy(commands.Cog):
         if ECONOMY_PAUSED:
             await interaction.followup.send(tr("economy.paused"), ephemeral=True)
             return
-        session = await get_shared_session()
 
-        player_id = await resolve_player_id(interaction, player, session)
+        player_id = await resolve_player_id(interaction, player)
         if not player_id:
             key = "progression.player_not_found" if player else "progression.self_not_found"
             await interaction.followup.send(tr(key, name=discord.utils.escape_markdown(player or "")), ephemeral=True)
             return
 
-        users, owned, game_config, prices, offers = await asyncio.gather(
-            get_users_full([player_id], session),
-            get_user_companies(player_id, session),
-            self._config(session),
-            get_market_prices(session),
-            get_work_offers(session),
+        users, owned, game_config, prices = await asyncio.gather(
+            warera.users.get_full_many([player_id]),
+            warera.companies.get_owned_by(player_id),
+            self._config(),
+            warera.market.get_prices(),
         )
+        # WarEra v0.27 removed the job market (workOffer.* answers 404), so there are no offers until the
+        # model is rebuilt; the command is paused (ECONOMY_PAUSED) and never gets here.
+        offers = None
         user = users.get(player_id)
-        # get_market_prices returns the whole tRPC envelope
-        price_map = ((prices or {}).get("result") or {}).get("data") if isinstance(prices, dict) else None
+        price_map = prices if isinstance(prices, dict) else None
         if not user or owned is None or not game_config or not price_map or offers is None:
             await interaction.followup.send(tr("progression.unavailable"), ephemeral=True)
             return
-        # company.getProductionBonus is not in the public OpenAPI spec (see utils/api.py)
-        bonuses = await get_production_bonuses([str(company.get("_id")) for company in owned], session)
+        # company.getProductionBonus is not in the public OpenAPI spec (see warera/endpoints/companies.py)
+        bonuses = await warera.companies.get_production_bonuses([str(company.get("_id")) for company in owned])
 
         # Companies skill level n allows n + 2 companies (gameConfig value)
         companies_level = companies - 2 if companies is not None else _skill_level(user, "companies")

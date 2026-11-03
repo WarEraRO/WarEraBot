@@ -1,6 +1,6 @@
 import asyncio
 from discord.ext import commands, tasks
-from utils.api import get_shared_session, get_user_info, get_users_by_name
+from utils.api import warera
 from utils.db import init_db, save_user, find_api_id_by_display_name, find_api_id_by_discord_username, find_api_id_by_discord_id, get_api_ids_by_discord_id
 from utils.i18n import Translator, get_translator
 from config import config
@@ -51,10 +51,9 @@ class UnidentifiedMembersJob(commands.Cog):
             members.update(newbie.members)
 
         unidentified = []
-        session = await get_shared_session()
         tr = await get_translator(guild)
         # One batched lookup for all members instead of one or more requests per member
-        users = await get_users_by_name([member.display_name for member in members], session)
+        users = await warera.users.find_many_by_name([member.display_name for member in members])
         # Discord-id mappings, read once (only if some member needs the DB fallback) instead of per member
         api_ids_by_discord_id = None
         if any(users.get(member.display_name) is None for member in members):
@@ -71,7 +70,7 @@ class UnidentifiedMembersJob(commands.Cog):
                 try:
                     api_id = await asyncio.to_thread(self._find_api_id, member, api_ids_by_discord_id, saved_api_ids)
                     if api_id:
-                        info = await get_user_info(api_id, session)
+                        info = await warera.users.get(api_id)
                         if info:
                             # Prefer the API username as the authoritative display name
                             new_display = info.get('username') or None

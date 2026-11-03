@@ -1,15 +1,125 @@
 import asyncio
+import logging
 import time
 import discord
 from discord import app_commands
 from discord.ext import commands
 from datetime import datetime, timezone
-from utils.api import fight_status_from_user, get_military_unit, get_military_units, get_shared_session, get_users_by_name, get_users_info
+from utils.api import warera
+from utils.computational import ECONOMY_SKILLS, triangular
 from utils.i18n import Translator, get_translator
 from config import config
 
-HEADERS = {'X-API-Key': config['api']}
+logger = logging.getLogger(__name__)
 _INACTIVE_THRESHOLD_SECONDS = 3 * 24 * 3600
+
+
+def fight_status_from_user(userId: str, api_result: dict, member: discord.Member | None = None, eco=True) -> dict | None:
+    """get_fight_status() for a user.getUserLite result that was already fetched (no request).
+
+    Returns the same dict, or None for an economy build when `eco` is False or on failure.
+    """
+    try:
+        if not eco:
+            economy_skill_points = 0
+            fight_skill_points = 0
+            for skill_name, skill_data in api_result['skills'].items():
+                level = skill_data['level']
+                if level != 0:
+                    if skill_name in ECONOMY_SKILLS:
+                        economy_skill_points += triangular(level)
+                    else:
+                        fight_skill_points += triangular(level)
+            total_skill_points = api_result['leveling']['totalSkillPoints']
+            unspent_skill_points = api_result['leveling']['availableSkillPoints']
+
+            # division by zero, should not be possible (level 1 = 4 points already)
+            if total_skill_points == 0:
+                return None
+
+            percentage = ((economy_skill_points + unspent_skill_points) / total_skill_points) * 100
+            is_economy = percentage > 50
+            if is_economy:
+                return None
+
+        leveling = api_result.get('leveling', {})
+        level = leveling.get('level', 'N/A')
+        is_active = api_result.get('isActive', False)
+
+        skills = api_result.get('skills', {}) or {}
+        health = skills.get('health', {}) or {}
+        hunger = skills.get('hunger', {}) or {}
+
+        health_curr = health.get('currentBarValue')
+        health_total = health.get('total')
+        hunger_curr = hunger.get('currentBarValue')
+        hunger_total = hunger.get('total')
+
+        buffs = api_result.get('buffs') or {}
+        buff_text = "No buff/debuff"
+        # Prefer debuffEndAt when present, otherwise fall back to buffEndAt
+        buff_end_at = None
+        buff_type = None
+        buff_active = False
+        if isinstance(buffs, dict) and buffs:
+            if 'debuffEndAt' in buffs and buffs.get('debuffEndAt'):
+                buff_end_at = buffs.get('debuffEndAt')
+                buff_type = 'Debuff'
+            elif 'buffEndAt' in buffs and buffs.get('buffEndAt'):
+                buff_end_at = buffs.get('buffEndAt')
+                buff_type = 'Buff'
+
+            if buff_end_at:
+                try:
+                    buff_dt = datetime.fromisoformat(buff_end_at.replace('Z', '+00:00'))
+                    now = datetime.now(timezone.utc)
+                    remaining = buff_dt - now
+                    buff_active = remaining.total_seconds() > 0
+                    if buff_active:
+                        hours = remaining.seconds // 3600
+                        minutes = (remaining.seconds % 3600) // 60
+                        # Provide relative time only (e.g. "Buff ends in 1d 2h 3m")
+                        buff_text = f"{buff_type} ends in {hours}h {minutes}m"
+                    else:
+                        buff_text = f"{buff_type} expired"
+                except Exception:
+                    buff_active = False
+                    buff_text = f"{buff_type}: {buff_end_at}"
+
+        # avatar (may be unused by callers)
+        avatar_url = None
+        display_name = None
+        if member is not None:
+            try:
+                display_name = member.display_name
+                asset = member.display_avatar
+                try:
+                    avatar_url = str(asset.with_size(64))
+                except Exception:
+                    avatar_url = getattr(asset, 'url', None)
+            except Exception:
+                display_name = None
+
+        return {
+            'userId': userId,
+            'warera_name': api_result.get('username'),
+            'display_name': display_name,
+            'avatar_url': avatar_url,
+            'level': level,
+            'last_connection_at': (api_result.get('dates') or {}).get('lastConnectionAt'),
+            'is_active': is_active,
+            'health_curr': health_curr,
+            'health_total': health_total,
+            'hunger_curr': hunger_curr,
+            'hunger_total': hunger_total,
+            'buff_text': buff_text,
+            'buff_type': buff_type,
+            'buff_end_at': buff_end_at,
+            'buff_active': bool(buff_active),
+        }
+    except Exception as e:
+        logger.exception('get_fight_status failed for %s: %s', userId, e)
+        return None
 
 
 def _is_inactive_user(user: dict | None) -> bool:
@@ -96,10 +206,10 @@ class FightStatus(commands.Cog):
             'buff_active': False,
         }
 
-    async def _fetch_infos_for_discord_members(self, members: list[discord.Member], session) -> list[dict]:
+    async def _fetch_infos_for_discord_members(self, members: list[discord.Member]) -> list[dict]:
         infos: list[dict] = []
         # one batched lookup for all members; each status is built from the user already fetched
-        warera_users = await get_users_by_name([member.display_name for member in members], session)
+        warera_users = await warera.users.find_many_by_name([member.display_name for member in members])
         for member in members:
             warera_user = warera_users.get(member.display_name)
 
@@ -121,7 +231,7 @@ class FightStatus(commands.Cog):
     def _is_exact_mu_match(mu: dict, unit_name: str) -> bool:
         return (mu.get('name') or '').strip().lower() == unit_name.strip().lower()
 
-    async def _fetch_cached_military_unit(self, unit_name: str, session) -> dict | None:
+    async def _fetch_cached_military_unit(self, unit_name: str) -> dict | None:
         """The MU named exactly `unit_name`, found in the autocomplete cache and fetched fresh with mu.getById.
 
         Returns None (so the caller lists every MU instead) when the cache is empty or older than its
@@ -132,16 +242,16 @@ class FightStatus(commands.Cog):
         cached = next((mu for mu in self._mu_cache['items'] if self._is_exact_mu_match(mu, unit_name)), None)
         if not cached or not cached.get('_id'):
             return None
-        mu = await get_military_unit(cached['_id'], session)
+        mu = await warera.mus.get(cached['_id'])
         if not isinstance(mu, dict) or not self._is_exact_mu_match(mu, unit_name):
             return None
         return mu
 
-    async def _fetch_infos_for_military_unit(self, unit_name: str, session) -> list[dict] | None:
+    async def _fetch_infos_for_military_unit(self, unit_name: str) -> list[dict] | None:
         # an exact name (what autocomplete offers) costs one request; anything else pages through every MU
-        chosen = await self._fetch_cached_military_unit(unit_name, session)
+        chosen = await self._fetch_cached_military_unit(unit_name)
         if chosen is None:
-            mus = await get_military_units(session)
+            mus = await warera.mus.get_all()
             if not mus:
                 return None
 
@@ -162,7 +272,7 @@ class FightStatus(commands.Cog):
         members = chosen.get('members') or []
         infos: list[dict] = []
         # one batched request for every member
-        users = await get_users_info([str(m) for m in members if m], session)
+        users = await warera.users.get_many([str(m) for m in members if m])
         for m in members:
             user_id = m
 
@@ -206,11 +316,10 @@ class FightStatus(commands.Cog):
         await interaction.response.defer()
 
         infos: list[dict] = []
-        session = await get_shared_session()
         if military_unit is None:
-            infos = await self._fetch_infos_for_discord_members(members, session)
+            infos = await self._fetch_infos_for_discord_members(members)
         else:
-            infos = await self._fetch_infos_for_military_unit(military_unit, session)
+            infos = await self._fetch_infos_for_military_unit(military_unit)
 
         if not infos:
             await interaction.followup.send(tr('fight_status.no_info'))
@@ -247,8 +356,7 @@ class FightStatus(commands.Cog):
             if not self._mu_refresh_task or self._mu_refresh_task.done():
                 async def _refresh():
                     try:
-                        session = await get_shared_session()
-                        new_items = await get_military_units(session)
+                        new_items = await warera.mus.get_all()
                         if new_items:
                             self._mu_cache['items'] = new_items
                             self._mu_cache['fetched_at'] = time.time()

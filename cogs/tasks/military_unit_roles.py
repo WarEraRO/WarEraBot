@@ -1,6 +1,6 @@
 import asyncio
 from discord.ext import commands, tasks
-from utils.api import get_shared_session, get_military_units_by_ids, get_user_ids_by_name, get_users_info
+from utils.api import warera
 from utils.db import init_db, get_api_ids_by_discord_id
 from utils.i18n import Translator, get_translator
 from config import config
@@ -40,9 +40,8 @@ class MilitaryUnitRolesJob(commands.Cog):
         # One batched request for every configured MU. Each MU carries its `members`
         # (user ids, matches each user's `mu` field) and `roles.managers`, so no
         # per-member user fetch is needed.
-        session = await get_shared_session()
         tr = await get_translator(guild)
-        mu_data_by_id = await get_military_units_by_ids(mu_to_role.keys(), session)
+        mu_data_by_id = await warera.mus.get_many(mu_to_role.keys())
 
         # A nickname that doesn't match the linked player loses every configured MU
         # role; that decision needs no MU data, so it also covers MUs that failed to load.
@@ -77,10 +76,10 @@ class MilitaryUnitRolesJob(commands.Cog):
 
         # Current in-game usernames of the linked players (batched). A player missing
         # here failed to load, so that member is skipped rather than stripped.
-        linked_users = await get_users_info(linked.values(), session) if linked else {}
+        linked_users = await warera.users.get_many(linked.values()) if linked else {}
 
         # Unlinked members: Discord display name -> API user id (cached names cost no request)
-        user_ids = await get_user_ids_by_name([m.display_name for m in members if m not in linked], session)
+        user_ids = await warera.users.ids_by_name([m.display_name for m in members if m not in linked])
 
         # track player display names added/removed per role
         added_members: dict = {}

@@ -27,20 +27,7 @@ from cogs.commands.mu_positions import required_region
 from cogs.commands.pills import _unit_ids
 from cogs.tasks.military_unit_contract_monitor import can_fight, format_amount, format_duration
 from cogs.tasks.military_unit_daily_report import _fmt_short, _parse_iso, _pill_settings, pill_state
-from utils.api import (
-    get_active_battles,
-    get_all_countries,
-    get_game_config,
-    get_last_tournament,
-    get_military_unit,
-    get_military_units_by_ids,
-    get_mu_upgrades,
-    get_regions_by_ids,
-    get_shared_session,
-    get_users_equipment,
-    get_users_full,
-    get_won_auctions_by_battles,
-)
+from utils.api import warera
 from utils.common import country_with_flag, to_local
 from utils.computational import is_economy_build
 from utils.i18n import Translator, get_translator
@@ -49,7 +36,6 @@ logger = logging.getLogger(__name__)
 
 MU_NAMES_TTL = 3600
 COUNTRIES_TTL = 3600
-GAME_CONFIG_TTL = 3600
 EMBED_TOTAL_LIMIT = 4000
 # equipped items at or below this share of their durability (state / maxState) are flagged
 LOW_DURABILITY_PERCENT = 20
@@ -132,8 +118,6 @@ class MuReadiness(commands.Cog):
         self._country_names: dict[str, str] = {}
         self._country_id: str | None = None
         self._countries_at = 0.0
-        self._game_config: dict = {}
-        self._game_config_at = 0.0
         # region id -> name; region names do not change
         self._region_names: dict[str, str] = {}
 
@@ -152,9 +136,8 @@ class MuReadiness(commands.Cog):
             return
 
         async def _refresh():
-            session = await get_shared_session()
             unit_ids = _unit_ids()
-            military_units = await get_military_units_by_ids(unit_ids, session)
+            military_units = await warera.mus.get_many(unit_ids)
             for mu_id in unit_ids:
                 military_unit = military_units.get(mu_id)
                 # a failed fetch keeps the name already known
@@ -172,11 +155,11 @@ class MuReadiness(commands.Cog):
                 return mu_id
         return None
 
-    async def _load_countries(self, session) -> bool:
+    async def _load_countries(self) -> bool:
         """Refresh the country names and COUNTRY_NAME's id when stale; False when the id is unknown."""
         if self._country_id and time.monotonic() - self._countries_at < COUNTRIES_TTL:
             return True
-        countries = await get_all_countries(session)
+        countries = await warera.countries.get_all()
         if not countries:
             # a failed refresh keeps the previous list
             return self._country_id is not None
@@ -191,21 +174,16 @@ class MuReadiness(commands.Cog):
         self._countries_at = time.monotonic()
         return self._country_id is not None
 
-    async def _load_game_config(self, session) -> dict:
-        """gameConfig, refreshed when stale; a failed refresh keeps the last one ({} before the first)."""
-        if self._game_config and time.monotonic() - self._game_config_at < GAME_CONFIG_TTL:
-            return self._game_config
-        game_config = await get_game_config(session)
-        if game_config:
-            self._game_config, self._game_config_at = game_config, time.monotonic()
-        return self._game_config
+    async def _load_game_config(self) -> dict:
+        """gameConfig, or {} when it was never fetched; the client caches it for an hour and keeps the last good copy when a refresh fails."""
+        return await warera.game.get_config() or {}
 
-    async def _load_region_names(self, region_ids: set[str], session) -> None:
+    async def _load_region_names(self, region_ids: set[str]) -> None:
         """Fetch the names of the regions not cached yet; regions that fail are shown without a name."""
         missing = [region_id for region_id in region_ids if region_id not in self._region_names]
         if not missing:
             return
-        for region_id, region in (await get_regions_by_ids(missing, session)).items():
+        for region_id, region in (await warera.regions.get_many(missing)).items():
             if isinstance(region, dict) and region.get("name"):
                 self._region_names[region_id] = str(region["name"])
 
@@ -222,14 +200,13 @@ class MuReadiness(commands.Cog):
             return
         await interaction.response.defer()
 
-        session = await get_shared_session()
         mu, battles, countries_loaded, game_config, upgrades, tournament = await asyncio.gather(
-            get_military_unit(mu_id, session),
-            get_active_battles(session),
-            self._load_countries(session),
-            self._load_game_config(session),
-            get_mu_upgrades(mu_id, ["headquarters", "dormitories"], session),
-            get_last_tournament(session),
+            warera.mus.get(mu_id),
+            warera.battles.get_active(),
+            self._load_countries(),
+            self._load_game_config(),
+            warera.mus.get_upgrades(mu_id, ["headquarters", "dormitories"]),
+            warera.tournaments.get_last(),
         )
         if not isinstance(mu, dict) or battles is None or not countries_loaded:
             await interaction.followup.send(tr("mu_readiness.fetch_failed"), ephemeral=True)
@@ -241,8 +218,8 @@ class MuReadiness(commands.Cog):
         leader_ids = list(dict.fromkeys(str(user_id) for user_id in [mu.get("user"), *((mu.get("roles") or {}).get("commanders") or [])] if user_id))
         battles_by_id = {str(battle.get("_id")): battle for battle in battles if battle.get("_id")}
         users, auctions = await asyncio.gather(
-            get_users_full(member_ids + leader_ids, session),
-            get_won_auctions_by_battles(list(battles_by_id), session) if battles_by_id else asyncio.sleep(0, result={}),
+            warera.users.get_full_many(member_ids + leader_ids),
+            warera.contracts.get_won_by_battles(list(battles_by_id)) if battles_by_id else asyncio.sleep(0, result={}),
         )
         members = [users[user_id] for user_id in member_ids if user_id in users]
         fighters = [user for user in members if is_economy_build(user) is False]
@@ -253,8 +230,8 @@ class MuReadiness(commands.Cog):
         targets = [battle for battle, _ in mu_orders] + ([battles_by_id[str(contract["battle"])]] if contract else [])
         region_ids = {region_id for battle in targets for side in ("attacker", "defender") if (region_id := required_region(battle, side))}
         equipment, _ = await asyncio.gather(
-            get_users_equipment([str(user["_id"]) for user in fighters if user.get("_id")], session) if fighters else asyncio.sleep(0, result={}),
-            self._load_region_names(region_ids, session),
+            warera.users.get_equipment_many([str(user["_id"]) for user in fighters if user.get("_id")]) if fighters else asyncio.sleep(0, result={}),
+            self._load_region_names(region_ids),
         )
 
         context = {

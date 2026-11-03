@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from discord.ext import commands, tasks
-from utils.api import get_shared_session, get_military_units_by_ids, get_users_info
+from utils.api import warera
 from utils.db import init_db, save_user, get_record_by_api_id, find_api_id_by_discord_id
 from utils.i18n import Translator, get_translator
 from config import config
@@ -38,7 +38,6 @@ class CommanderRolesJob(commands.Cog):
         if commander_role is None:
             return
 
-        session = await get_shared_session()
         tr = await get_translator(guild)
         military_units = config.get('military_units', [])
         commander_ids = set()
@@ -47,7 +46,7 @@ class CommanderRolesJob(commands.Cog):
         complete = True
 
         # Gather commander api ids from all military units (one batched request for every MU)
-        mu_data_by_id = await get_military_units_by_ids([unit['id'] for unit in military_units], session)
+        mu_data_by_id = await warera.mus.get_many([unit['id'] for unit in military_units])
         for unit in military_units:
             mu_data = mu_data_by_id.get(unit['id'])
             if not mu_data:
@@ -104,7 +103,7 @@ class CommanderRolesJob(commands.Cog):
                         member = display_map[display_name]
             resolved.append((api_id, member))
 
-        infos = await get_users_info([api_id for api_id, member in resolved if member is None], session)
+        infos = await warera.users.get_many([api_id for api_id, member in resolved if member is None])
         for api_id, member in resolved:
             # If not found via DB, try to resolve via API username and match display_name
             if member is None:
