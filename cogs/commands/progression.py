@@ -9,7 +9,6 @@ Inventory and mission progress are not readable with the API, so the plan never 
 """
 import asyncio
 import logging
-import time
 from datetime import datetime, timezone
 
 import discord
@@ -17,14 +16,13 @@ from discord import app_commands
 from discord.ext import commands
 
 from cogs.commands.fight_wealth import _pack
-from utils.api import get_game_config, get_market_prices, get_shared_session, get_user, get_user_companies, get_users_full
+from utils.api import warera
 from utils.computational import is_economy_build
 from utils.db import find_api_id_by_discord_id
 from utils.i18n import Translator, get_translator
 
 logger = logging.getLogger(__name__)
 
-GAME_CONFIG_TTL = 3600
 PROFILE_URL = "https://app.warera.io/user/{id}"
 # the first companies feed the construction chain: concrete builds companies, steel upgrades them
 STARTER_ORDER = ("limestone", "concrete", "iron", "steel")
@@ -265,7 +263,7 @@ def build_embed(user: dict, companies: list[dict], game_config: dict, prices: di
 
     Args:
         user: The player's `user.getUserById` object.
-        companies: The player's companies (`get_user_companies`).
+        companies: The player's companies (`warera.companies.get_owned_by`).
         game_config: `gameConfig.getGameConfig`.
         prices: {item code: market price}; may be empty.
         now: Current time, for the daily reward check.
@@ -360,14 +358,14 @@ def build_embed(user: dict, companies: list[dict], game_config: dict, prices: di
     return embed
 
 
-async def resolve_player_id(interaction: discord.Interaction, player: str | None, session) -> str | None:
+async def resolve_player_id(interaction: discord.Interaction, player: str | None) -> str | None:
     """The WarEra id of `player` (exact username), or of the caller when no player is given.
 
     The caller is found by their Discord-id link in the database first, then by their server nickname,
     which the server keeps equal to the in-game username. Also used by /economy.
     """
     if player:
-        user = await get_user(player.strip(), session)
+        user = await warera.users.find_by_name(player.strip())
         return str(user["_id"]) if user and user.get("_id") else None
     try:
         api_id = await asyncio.to_thread(find_api_id_by_discord_id, interaction.user.id)
@@ -376,49 +374,41 @@ async def resolve_player_id(interaction: discord.Interaction, player: str | None
         api_id = None
     if api_id:
         return str(api_id)
-    user = await get_user(interaction.user.display_name, session)
+    user = await warera.users.find_by_name(interaction.user.display_name)
     return str(user["_id"]) if user and user.get("_id") else None
 
 
 class Progression(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._game_config: dict | None = None
-        self._game_config_at = 0.0
 
-    async def _config(self, session) -> dict | None:
-        """gameConfig, cached for GAME_CONFIG_TTL; the last good copy when a refresh fails."""
-        if self._game_config is None or time.monotonic() - self._game_config_at > GAME_CONFIG_TTL:
-            game_config = await get_game_config(session)
-            if game_config:
-                self._game_config, self._game_config_at = game_config, time.monotonic()
-        return self._game_config
+    async def _config(self) -> dict | None:
+        """gameConfig, or None; the client caches it for an hour and keeps the last good copy when a refresh fails."""
+        return await warera.game.get_config()
 
     @app_commands.command(name="progression", description="Show the next steps for your WarEra account: skill points, companies and daily checklist.")
     @app_commands.describe(player="WarEra username (default: you)")
     async def progression_command(self, interaction: discord.Interaction, player: str | None = None):
         await interaction.response.defer(ephemeral=True)
         tr = await get_translator(interaction.guild_id)
-        session = await get_shared_session()
 
-        player_id = await resolve_player_id(interaction, player, session)
+        player_id = await resolve_player_id(interaction, player)
         if not player_id:
             key = "progression.player_not_found" if player else "progression.self_not_found"
             await interaction.followup.send(tr(key, name=discord.utils.escape_markdown(player or "")), ephemeral=True)
             return
 
         users, companies, game_config, prices = await asyncio.gather(
-            get_users_full([player_id], session),
-            get_user_companies(player_id, session),
-            self._config(session),
-            get_market_prices(session),
+            warera.users.get_full_many([player_id]),
+            warera.companies.get_owned_by(player_id),
+            self._config(),
+            warera.market.get_prices(),
         )
         user = users.get(player_id)
         if not user or companies is None or not game_config:
             await interaction.followup.send(tr("progression.unavailable"), ephemeral=True)
             return
-        # get_market_prices returns the whole tRPC envelope
-        price_map = ((prices or {}).get("result") or {}).get("data") if isinstance(prices, dict) else None
+        price_map = prices if isinstance(prices, dict) else None
         embed = build_embed(user, companies, game_config, price_map or {}, datetime.now(timezone.utc), tr)
         await interaction.followup.send(embed=embed, ephemeral=True)
 

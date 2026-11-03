@@ -7,13 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.api import (
-    get_all_countries,
-    get_country_users,
-    get_shared_session,
-    get_user_transactions,
-    get_users_info,
-)
+from utils.api import warera
 from utils.i18n import Translator, get_translator
 
 
@@ -183,8 +177,7 @@ class TopUserWeeklyDonations(commands.Cog):
                 if not self._countries_are_stale():
                     return self._countries
 
-                session = await get_shared_session()
-                countries = await get_all_countries(session)
+                countries = await warera.countries.get_all()
                 if countries:
                     self._countries = countries
                     self._countries_fetched_at = time.monotonic()
@@ -205,7 +198,6 @@ class TopUserWeeklyDonations(commands.Cog):
     async def _get_donation_total(
         self,
         user: dict,
-        session,
         semaphore: asyncio.Semaphore,
         start: datetime,
         end: datetime,
@@ -217,10 +209,9 @@ class TopUserWeeklyDonations(commands.Cog):
         try:
             async with semaphore:
                 # transactions before the week started are never counted, so paging stops there
-                transactions = await get_user_transactions(
+                transactions = await warera.market.get_user_transactions(
                     user_id,
                     "donation",
-                    session,
                     created_after=start.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
                 )
         except Exception:
@@ -265,8 +256,7 @@ class TopUserWeeklyDonations(commands.Cog):
             )
             return
 
-        session = await get_shared_session()
-        users = await get_country_users(selected_country["_id"], session)
+        users = await warera.users.get_by_country(selected_country["_id"])
         if users is None:
             await interaction.followup.send(
                 tr("weekly_donations.citizens_unavailable"),
@@ -281,7 +271,6 @@ class TopUserWeeklyDonations(commands.Cog):
             *(
                 self._get_donation_total(
                     user,
-                    session,
                     semaphore,
                     start,
                     now,
@@ -297,7 +286,7 @@ class TopUserWeeklyDonations(commands.Cog):
 
         donors = _top_donors(users, totals)
         donor_ids = [user.get("_id") or user.get("userId") or user.get("id") for user, _ in donors]
-        resolved_users = await get_users_info(donor_ids, session)
+        resolved_users = await warera.users.get_many(donor_ids)
         resolved_donors = [
             (resolved_users.get(user_id) or user, total)
             for (user, total), user_id in zip(donors, donor_ids)

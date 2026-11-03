@@ -17,7 +17,7 @@ from discord.ext import commands
 from config import config
 from utils import contests as cx
 from utils import db
-from utils.api import get_military_units_by_ids, get_shared_session, get_user
+from utils.api import warera
 from utils.common import is_developer, to_local
 from utils.i18n import Translator, get_translator
 
@@ -39,13 +39,13 @@ async def _caller_api_id(member) -> str | None:
     api_id = await asyncio.to_thread(db.find_api_id_by_discord_id, member.id)
     if api_id:
         return api_id
-    user = await get_user(getattr(member, "display_name", None) or member.name, await get_shared_session())
+    user = await warera.users.find_by_name(getattr(member, "display_name", None) or member.name)
     return (user or {}).get("_id")
 
 
 async def _load_units() -> dict[str, dict]:
     """mu.getById of every configured MU, {muId: mu}, for the ids that resolved."""
-    return await get_military_units_by_ids(list(_units()), await get_shared_session())
+    return await warera.mus.get_many(list(_units()))
 
 
 def _commanded(mus: dict[str, dict], api_id: str | None) -> set[str]:

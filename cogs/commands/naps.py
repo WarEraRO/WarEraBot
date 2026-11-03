@@ -8,7 +8,7 @@ from discord.ext import commands
 
 from config import config
 from utils import db
-from utils.api import get_all_countries, get_shared_session
+from utils.api import warera
 from utils.i18n import get_translator
 
 
@@ -73,8 +73,7 @@ class NAPs(commands.Cog):
         if items and now - fetched_at <= self._country_ttl:
             return items
 
-        session = await get_shared_session()
-        countries = await get_all_countries(session) or []
+        countries = await warera.countries.get_all() or []
         if countries:
             countries.sort(key=lambda c: str(c.get("name", "")).lower())
             self._country_cache["items"] = countries

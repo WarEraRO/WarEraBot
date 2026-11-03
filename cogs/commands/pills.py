@@ -9,14 +9,13 @@ from discord.ext import commands
 
 from cogs.tasks.military_unit_daily_report import PILL_CODE, _parse_iso, _pill_settings
 from config import config
-from utils.api import get_game_config, get_military_unit, get_military_units_by_ids, get_mu_members, get_shared_session, get_users_info
+from utils.api import warera
 from utils.common import to_local
 from utils.i18n import get_translator
 from utils.computational import is_economy_build
 
 logger = logging.getLogger(__name__)
 
-GAME_CONFIG_TTL = 3600
 MU_NAMES_TTL = 3600
 # per embed, kept below Discord's 4096 description cap; longer lists continue in another embed
 EMBED_TOTAL_LIMIT = 4000
@@ -67,8 +66,6 @@ def _unit_ids() -> list[str]:
 class Pills(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._game_config: dict | None = None
-        self._game_config_at = 0.0
         # MU id -> in-game name (mu.getById), for the configured military units
         self._mu_names: dict[str, str] = {}
         self._mu_names_at = 0.0
@@ -88,9 +85,8 @@ class Pills(commands.Cog):
             return
 
         async def _refresh():
-            session = await get_shared_session()
             unit_ids = _unit_ids()
-            military_units = await get_military_units_by_ids(unit_ids, session)
+            military_units = await warera.mus.get_many(unit_ids)
             for mu_id in unit_ids:
                 military_unit = military_units.get(mu_id)
                 # a failed fetch keeps the name already known
@@ -108,13 +104,9 @@ class Pills(commands.Cog):
                 return mu_id
         return None
 
-    async def _settings(self, session) -> dict:
-        if self._game_config is None or time.monotonic() - self._game_config_at > GAME_CONFIG_TTL:
-            game_config = await get_game_config(session)
-            if game_config:
-                self._game_config, self._game_config_at = game_config, time.monotonic()
+    async def _settings(self) -> dict:
         # falls back to the default pill durations when gameConfig could not be fetched
-        return _pill_settings(self._game_config)
+        return _pill_settings(await warera.game.get_config())
 
     @app_commands.command(name="pills", description="Show who is pilled, in debuff or not pilled in a military unit.")
     @app_commands.describe(military_unit="Military unit (one of the units configured for this server)")
@@ -126,10 +118,9 @@ class Pills(commands.Cog):
             return
         await interaction.response.defer()
 
-        session = await get_shared_session()
-        # muMember.getByMu is not in the public OpenAPI spec (see utils/api.py)
+        # muMember.getByMu is not in the public OpenAPI spec (see warera/endpoints/military_units.py)
         settings, members, military_unit_data = await asyncio.gather(
-            self._settings(session), get_mu_members(mu_id, session), get_military_unit(mu_id, session)
+            self._settings(), warera.mus.get_members(mu_id), warera.mus.get(mu_id)
         )
         if isinstance(military_unit_data, dict) and military_unit_data.get("name"):
             self._mu_names[mu_id] = str(military_unit_data["name"])
@@ -139,7 +130,7 @@ class Pills(commands.Cog):
             return
 
         # one batched request for every member
-        users_by_id = await get_users_info([str(member.get("user")) for member in members], session)
+        users_by_id = await warera.users.get_many([str(member.get("user")) for member in members])
         users = [users_by_id.get(str(member.get("user"))) for member in members]
         now = datetime.now(timezone.utc)
 

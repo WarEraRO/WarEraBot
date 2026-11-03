@@ -279,9 +279,11 @@ def score_player(contest: dict, player: dict, final: bool = False) -> tuple[floa
             if goal > 0:
                 earned = math.floor(money / goal) * points
         elif kind == "company_disabled":
-            if player.get("active_base") is not None and player.get("active_now") is not None:
+            # companies already disabled at the start count too; companies built during the contest don't
+            if player.get("owned_base") is not None and player.get("owned_now") is not None and player.get("active_now") is not None:
                 keep = int(mission.get("keep") or 0)
-                earned = max(0, int(player["active_base"]) - max(int(player["active_now"]), keep)) * points
+                owned = min(int(player["owned_now"]), int(player["owned_base"]))
+                earned = max(0, owned - max(int(player["active_now"]), keep)) * points
         elif kind == "eco_skills":
             if player.get("fight_skill_levels") == 0:
                 earned = points

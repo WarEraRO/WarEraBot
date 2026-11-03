@@ -25,19 +25,7 @@ from cogs.tasks.military_unit_daily_report import _pill_settings, pill_state
 from config import config
 from utils import contests as cx
 from utils import db
-from utils.api import (
-    get_battle_loot_summaries,
-    get_companies_by_ids,
-    get_company_rosters,
-    get_employees_work_stats,
-    get_game_config,
-    get_military_units_by_ids,
-    get_pp_money_value,
-    get_shared_session,
-    get_users_company_ids,
-    get_users_full,
-    get_won_mercenary_auctions,
-)
+from utils.api import warera
 from utils.common import get_mu_destination, to_local
 from utils.i18n import Translator, get_translator
 
@@ -232,7 +220,6 @@ class ContestTrackerJob(commands.Cog):
         failed to load leaves the affected values as they were, so a failed request never takes points away or
         marks a member as gone.
         """
-        session = await get_shared_session()
         state = contest.setdefault("state", {})
         before = {uid: _snapshot(rec) for uid, rec in players.items()}
         today = cx.game_day(now)
@@ -241,7 +228,7 @@ class ContestTrackerJob(commands.Cog):
         # a final refresh long after the end (bot down at the reset) would book post-contest damage on the last day
         count_damage = not final or now - cx.end_at(contest) <= RETRY_EVERY
 
-        mus = await get_military_units_by_ids(contest["mu_ids"], session)
+        mus = await warera.mus.get_many(contest["mu_ids"])
         contest["mu_names"] = {mu_id: mu.get("name") or mu_id for mu_id, mu in mus.items()} or contest.get("mu_names", {})
         member_mu = {str(uid): mu_id for mu_id, mu in mus.items() for uid in mu.get("members") or []}
         for uid, player in players.items():
@@ -254,8 +241,8 @@ class ContestTrackerJob(commands.Cog):
         wanted = [uid for uid, p in players.items() if uid in member_mu]
         if not final:
             wanted += [uid for uid in member_mu if uid not in players]
-        users = await get_users_full(wanted, session) if wanted else {}
-        game_config = await get_game_config(session)
+        users = await warera.users.get_full_many(wanted) if wanted else {}
+        game_config = await warera.game.get_config()
         pill_settings = _pill_settings(game_config)
 
         for uid in wanted:
@@ -338,9 +325,8 @@ class ContestTrackerJob(commands.Cog):
         owners = fighters + economists
         if not owners:
             return
-        session = await get_shared_session()
-        listings = await get_users_company_ids(owners, session)
-        companies = await get_companies_by_ids([cid for ids in listings.values() for cid in ids if cid], session)
+        listings = await warera.companies.get_ids_owned_by_many(owners)
+        companies = await warera.companies.get_many([cid for ids in listings.values() for cid in ids if cid])
         end = cx.end_at(contest)
 
         def owned(uid):
@@ -353,9 +339,11 @@ class ContestTrackerJob(commands.Cog):
             player, items = players[uid], owned(uid)
             if items is None or player.get("company_limit") is None:
                 continue
+            # companies over the Companies skill limit are the disabled ones
+            player["owned_now"] = len(items)
             player["active_now"] = min(len(items), player["company_limit"])
-            if player.get("active_base") is None:
-                player["active_base"] = player["active_now"]
+            if player.get("owned_base") is None:
+                player["owned_base"] = player["owned_now"]
 
         economy_companies = {}
         for uid in economists:
@@ -374,7 +362,7 @@ class ContestTrackerJob(commands.Cog):
 
         if not economy_companies or not cx.has_mission(contest, "recruit_employee", "employee_output"):
             return
-        rosters = await get_company_rosters(list(economy_companies), session)
+        rosters = await warera.companies.get_rosters(list(economy_companies))
         employees = {}
         for company_id, roster in rosters.items():
             uid = economy_companies[company_id]
@@ -392,14 +380,14 @@ class ContestTrackerJob(commands.Cog):
         ]
         if not employees or not output_missions:
             return
-        pp_value = await get_pp_money_value(session)
+        pp_value = await warera.game.get_pp_money_value()
         state = contest.setdefault("state", {})
         if pp_value:
             state["pp_value"] = pp_value
         pp_value = state.get("pp_value")
         if not pp_value:
             return
-        stats = await get_employees_work_stats(list(employees), session)
+        stats = await warera.companies.get_employee_work_stats(list(employees))
         for employee_id, rows in stats.items():
             player = players[employees[employee_id]]
             produced = sum(float(row.get("employeeProd") or 0) for row in rows if row.get("dailyDate") in days) * pp_value
@@ -412,11 +400,10 @@ class ContestTrackerJob(commands.Cog):
 
     async def _refresh_contracts(self, contest: dict, players: dict, now: datetime, final: bool) -> None:
         """Record the contest MUs' won contracts and each fighter's contract money per battle."""
-        session = await get_shared_session()
         state = contest.setdefault("state", {})
         start, end = cx.start_at(contest), cx.end_at(contest)
         scanned = cx.parse_iso(state.get("contracts_scanned_at")) or start
-        auctions = await get_won_mercenary_auctions(session, max(start, scanned - CONTRACT_SCAN_OVERLAP).isoformat())
+        auctions = await warera.contracts.get_won_since(max(start, scanned - CONTRACT_SCAN_OVERLAP).isoformat())
         if auctions is not None:
             for auction in auctions:
                 created = cx.parse_iso(auction.get("createdAt"))
@@ -439,7 +426,7 @@ class ContestTrackerJob(commands.Cog):
         for battle_id, payout in expected.items():
             if battles.get(battle_id, {}).get("done") or not fighters:
                 continue
-            summaries = await get_battle_loot_summaries(battle_id, fighters, session)
+            summaries = await warera.battles.get_loot_summaries(battle_id, fighters)
             paid = 0.0
             for uid, summary in summaries.items():
                 money = float(summary.get("totalMoneyFromContract") or 0)

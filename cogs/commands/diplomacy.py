@@ -4,7 +4,7 @@ from discord.ext import commands
 from typing import Optional, List
 from config import config
 from utils import db
-from utils.api import get_all_country_names
+from utils.api import warera
 from utils.i18n import Translator, get_translator
 import math
 import time
@@ -89,7 +89,7 @@ class Diplomacy(commands.Cog):
         tr = await get_translator(interaction.guild_id)
         guild = await self._get_guild(interaction)
 
-        active = await get_all_country_names()
+        active = await warera.countries.get_names()
         if country_name:
             # show specific country details
             # find best match from config
@@ -148,7 +148,7 @@ class Diplomacy(commands.Cog):
         await paginator.start(interaction)
 
     async def _generate_country_choices(self, current: str) -> List[app_commands.Choice[str]]:
-        # Provide up-to-date autocomplete using a cached fetch of get_all_country_names().
+        # Provide up-to-date autocomplete using a cached fetch of warera.countries.get_names().
         now = time.time()
         items = self._country_cache.get('items') or []
         fetched = self._country_cache.get('fetched_at') or 0.0
@@ -158,7 +158,7 @@ class Diplomacy(commands.Cog):
             if not self._country_refresh_task or self._country_refresh_task.done():
                 async def _refresh():
                     try:
-                        new_items = await get_all_country_names()
+                        new_items = await warera.countries.get_names()
                         if new_items:
                             self._country_cache['items'] = new_items
                             self._country_cache['fetched_at'] = time.time()
@@ -203,7 +203,7 @@ class Diplomacy(commands.Cog):
                 return
 
         # ensure country exists
-        active = await get_all_country_names()
+        active = await warera.countries.get_names()
         match = None
         for c in active:
             if c.lower() == country_name.strip().lower():
@@ -262,7 +262,7 @@ class Diplomacy(commands.Cog):
                 return
 
         # ensure country exists
-        active = await get_all_country_names()
+        active = await warera.countries.get_names()
         match = None
         for c in active:
             if c.lower() == country_name.strip().lower():
@@ -290,7 +290,7 @@ class Diplomacy(commands.Cog):
             await interaction.response.send_message(tr("common.not_authorized"), ephemeral=True)
             return
 
-        active = await get_all_country_names()
+        active = await warera.countries.get_names()
         match = None
         for c in active:
             if c.lower() == country_name.strip().lower():
@@ -316,7 +316,7 @@ class Diplomacy(commands.Cog):
         # defer because fetching country list may take time
         await interaction.response.defer()
 
-        active = await get_all_country_names()
+        active = await warera.countries.get_names()
         match = None
         for c in active:
             if c.lower() == country_name.strip().lower():

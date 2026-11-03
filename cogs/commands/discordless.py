@@ -3,7 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from config import config
-from utils.api import get_all_countries, get_country_users, get_shared_session, get_users_info
+from utils.api import warera
 from utils.i18n import Translator, get_translator
 
 
@@ -147,8 +147,7 @@ class Discordless(commands.Cog):
             if _normalize_name(member.display_name)
         }
 
-        session = await get_shared_session()
-        countries = await get_all_countries(session)
+        countries = await warera.countries.get_all()
         if not countries:
             await interaction.followup.send(
                 tr("common.country_list_unavailable"),
@@ -164,7 +163,7 @@ class Discordless(commands.Cog):
             )
             return
 
-        user_refs = await get_country_users(country["_id"], session)
+        user_refs = await warera.users.get_by_country(country["_id"])
         if user_refs is None:
             await interaction.followup.send(
                 tr("discordless.users_unavailable", country=COUNTRY_NAME),
@@ -178,7 +177,7 @@ class Discordless(commands.Cog):
             for user_id in (_user_id(user_ref) for user_ref in user_refs)
             if user_id and user_id not in self._user_cache
         ]
-        self._user_cache.update(await get_users_info(uncached, session))
+        self._user_cache.update(await warera.users.get_many(uncached))
         resolved_users = [self._user_cache.get(_user_id(user_ref)) for user_ref in user_refs]
         users = [user for user in resolved_users if user is not None]
 

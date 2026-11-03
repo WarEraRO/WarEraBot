@@ -11,7 +11,7 @@ from discord.ext import commands
 
 from cogs.commands.pills import _unit_ids
 from cogs.tasks.military_unit_daily_report import _fmt_short, _wealth_tier_counts, _wealth_tier_label
-from utils.api import get_military_unit, get_military_units_by_ids, get_mu_members, get_shared_session, get_users_full
+from utils.api import warera
 from utils.computational import FIGHT_WEALTH_PARTS, FIGHT_WEALTH_TIERS, fight_wealth, fight_wealth_tier, is_economy_build
 from utils.i18n import Translator, get_translator
 
@@ -83,9 +83,8 @@ class FightWealth(commands.Cog):
             return
 
         async def _refresh():
-            session = await get_shared_session()
             unit_ids = _unit_ids()
-            military_units = await get_military_units_by_ids(unit_ids, session)
+            military_units = await warera.mus.get_many(unit_ids)
             for mu_id in unit_ids:
                 military_unit = military_units.get(mu_id)
                 # a failed fetch keeps the name already known
@@ -116,9 +115,8 @@ class FightWealth(commands.Cog):
             return
         await interaction.response.defer()
 
-        session = await get_shared_session()
-        # muMember.getByMu is not in the public OpenAPI spec (see utils/api.py)
-        members, military_unit_data = await asyncio.gather(get_mu_members(mu_id, session), get_military_unit(mu_id, session))
+        # muMember.getByMu is not in the public OpenAPI spec (see warera/endpoints/military_units.py)
+        members, military_unit_data = await asyncio.gather(warera.mus.get_members(mu_id), warera.mus.get(mu_id))
         if isinstance(military_unit_data, dict) and military_unit_data.get("name"):
             self._mu_names[mu_id] = str(military_unit_data["name"])
         mu_name = discord.utils.escape_markdown(self._mu_names.get(mu_id, mu_id))
@@ -127,7 +125,7 @@ class FightWealth(commands.Cog):
             return
 
         # one batched request for every member; only the full user carries stats.wealth
-        users_by_id = await get_users_full([str(member.get("user")) for member in members], session)
+        users_by_id = await warera.users.get_full_many([str(member.get("user")) for member in members])
         rows = []
         for member in members:
             user = users_by_id.get(str(member.get("user")))

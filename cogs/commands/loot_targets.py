@@ -29,18 +29,7 @@ from cogs.commands.mu_positions import _unicode_flag
 from cogs.commands.mu_readiness import RARITY_ORDER
 from cogs.commands.pills import _unit_ids
 from cogs.tasks.military_unit_daily_report import _fmt_short
-from utils.api import (
-    get_active_battles,
-    get_all_countries,
-    get_battle,
-    get_battle_loot_summaries,
-    get_game_config,
-    get_military_units_by_ids,
-    get_ranking_pages,
-    get_regions_by_ids,
-    get_shared_session,
-    get_users_info,
-)
+from utils.api import warera
 from utils.common import country_with_flag
 from utils.i18n import Translator, get_translator
 
@@ -49,7 +38,6 @@ logger = logging.getLogger(__name__)
 BATTLE_ID_RE = re.compile(r"(?:battle/)?([a-f\d]{24})\b")
 MU_NAMES_TTL = 3600
 COUNTRIES_TTL = 3600
-GAME_CONFIG_TTL = 3600
 BATTLES_TTL = 120
 # a big battle's ranking has a few thousand players (3,746 seen); reading stops once every member who hit
 # the battle is found, and never goes past this many pages of 100
@@ -254,8 +242,6 @@ class LootTargets(commands.Cog):
         self._country_id: str | None = None
         self._country_unicode_flag: str | None = None
         self._countries_at = 0.0
-        self._game_config: dict = {}
-        self._game_config_at = 0.0
         # active battles and their region names, for the battle autocomplete
         self._battles: list[dict] = []
         self._battles_at = 0.0
@@ -279,9 +265,8 @@ class LootTargets(commands.Cog):
             return
 
         async def _refresh():
-            session = await get_shared_session()
             unit_ids = _unit_ids()
-            military_units = await get_military_units_by_ids(unit_ids, session)
+            military_units = await warera.mus.get_many(unit_ids)
             for mu_id in unit_ids:
                 military_unit = military_units.get(mu_id)
                 # a failed fetch keeps the name already known
@@ -297,15 +282,14 @@ class LootTargets(commands.Cog):
             return
 
         async def _refresh():
-            session = await get_shared_session()
-            battles, _ = await asyncio.gather(get_active_battles(session), self._load_countries(session))
+            battles, _ = await asyncio.gather(warera.battles.get_active(), self._load_countries())
             if battles is None:
                 return
             self._battles, self._battles_at = battles, time.monotonic()
             region_ids = {str(region) for battle in battles if (region := (battle.get("defender") or {}).get("region"))}
             missing = [region_id for region_id in region_ids if region_id not in self._region_names]
             if missing:
-                for region_id, region in (await get_regions_by_ids(missing, session)).items():
+                for region_id, region in (await warera.regions.get_many(missing)).items():
                     if region.get("name"):
                         self._region_names[region_id] = str(region["name"])
 
@@ -319,11 +303,11 @@ class LootTargets(commands.Cog):
                 return mu_id
         return None
 
-    async def _load_countries(self, session) -> bool:
+    async def _load_countries(self) -> bool:
         """Refresh the country names and COUNTRY_NAME's id when stale; False when no country list is known."""
         if self._country_names and time.monotonic() - self._countries_at < COUNTRIES_TTL:
             return True
-        countries = await get_all_countries(session)
+        countries = await warera.countries.get_all()
         if not countries:
             # a failed refresh keeps the previous list
             return bool(self._country_names)
@@ -339,14 +323,9 @@ class LootTargets(commands.Cog):
         self._countries_at = time.monotonic()
         return True
 
-    async def _load_game_config(self, session) -> dict:
-        """gameConfig, refreshed when stale; a failed refresh keeps the last one ({} before the first)."""
-        if self._game_config and time.monotonic() - self._game_config_at < GAME_CONFIG_TTL:
-            return self._game_config
-        game_config = await get_game_config(session)
-        if game_config:
-            self._game_config, self._game_config_at = game_config, time.monotonic()
-        return self._game_config
+    async def _load_game_config(self) -> dict:
+        """gameConfig, or {} when it was never fetched; the client caches it for an hour and keeps the last good copy when a refresh fails."""
+        return await warera.game.get_config() or {}
 
     @app_commands.command(
         name="loot_targets",
@@ -371,12 +350,11 @@ class LootTargets(commands.Cog):
                 return
         await interaction.response.defer()
 
-        session = await get_shared_session()
         battle_data, military_units, countries_loaded, game_config = await asyncio.gather(
-            get_battle(battle_id, session),
-            get_military_units_by_ids(_unit_ids(), session),
-            self._load_countries(session),
-            self._load_game_config(session),
+            warera.battles.get(battle_id),
+            warera.mus.get_many(_unit_ids()),
+            self._load_countries(),
+            self._load_game_config(),
         )
         if not isinstance(battle_data, dict) or not military_units or not countries_loaded:
             await interaction.followup.send(tr("loot_targets.fetch_failed"), ephemeral=True)
@@ -393,7 +371,7 @@ class LootTargets(commands.Cog):
         scopes = pool_scopes(battle_data, tr)
 
         # members who hit the battle at all; a member with no hits is not looked for in the rankings
-        summaries = await get_battle_loot_summaries(battle_id, list(listed), session)
+        summaries = await warera.battles.get_loot_summaries(battle_id, list(listed))
         hitters = {user_id for user_id, summary in summaries.items() if (summary.get("hits") or summary.get("totalDmg"))}
 
         game_items = game_config.get("items") or {}
@@ -412,7 +390,7 @@ class LootTargets(commands.Cog):
         # both pools are read at once, each stopping on its own; a member who hit only earlier rounds is never
         # found in the round ranking, so that read can run to its end or to MAX_RANKING_PAGES
         rankings = await asyncio.gather(*(
-            get_ranking_pages(scope, "damage", "user", "merged", session, stop=found_all, max_pages=MAX_RANKING_PAGES)
+            warera.battles.get_ranking_pages(scope, "damage", "user", "merged", stop=found_all, max_pages=MAX_RANKING_PAGES)
             for _, _, scope in scopes
         ))
         if any(ranking is None for ranking in rankings):
@@ -428,7 +406,7 @@ class LootTargets(commands.Cog):
             for (_, label, _), (items, complete) in zip(scopes, rankings)
         ]
         found = {user_id for pool in pools for user_id in pool["index_of"] if user_id in listed}
-        users = await get_users_info(list(found), session) if found else {}
+        users = await warera.users.get_many(list(found)) if found else {}
 
         embeds = self._build_embeds(
             battle_data, pools, listed, member_mu, hitters, users, mu_filter, game_items, datetime.now(timezone.utc), tr

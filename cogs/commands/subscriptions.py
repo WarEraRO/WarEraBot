@@ -14,7 +14,7 @@ from cogs.tasks.loot_alerts import SUBSCRIPTION_JOB as LOOT_SUBSCRIPTION_JOB
 from cogs.tasks.loot_alerts import SUBSCRIPTION_TARGET as LOOT_SUBSCRIPTION_TARGET
 from cogs.tasks.military_unit_contract_monitor import SUBSCRIPTION_JOB, SUBSCRIPTION_TARGET, contract_units
 from config import config
-from utils.api import get_military_unit, get_shared_session, get_user_info
+from utils.api import warera
 from utils.common import get_mu_destination
 from utils.db import (
     add_job_subscription,
@@ -91,8 +91,7 @@ class Subscriptions(commands.Cog):
             await interaction.followup.send(tr("subscriptions.not_linked"), ephemeral=True)
             return
 
-        session = await get_shared_session()
-        user = await get_user_info(api_id, session)
+        user = await warera.users.get(api_id)
         if not user:
             await interaction.followup.send(tr("subscriptions.player_not_found"), ephemeral=True)
             return
@@ -117,7 +116,7 @@ class Subscriptions(commands.Cog):
             await interaction.followup.send(tr("subscriptions.failed"), ephemeral=True)
             return
 
-        military_unit = await get_military_unit(mu_id, session)
+        military_unit = await warera.mus.get(mu_id)
         mu_name = discord.utils.escape_markdown(str((military_unit or {}).get("name") or mu_id))
         if not created:
             await interaction.followup.send(tr("subscriptions.already_subscribed", mu=mu_name), ephemeral=True)
@@ -161,8 +160,7 @@ class Subscriptions(commands.Cog):
             await interaction.followup.send(tr("subscriptions.not_linked"), ephemeral=True)
             return
 
-        session = await get_shared_session()
-        if not await get_user_info(api_id, session):
+        if not await warera.users.get(api_id):
             await interaction.followup.send(tr("subscriptions.player_not_found"), ephemeral=True)
             return
 
@@ -217,8 +215,7 @@ class Subscriptions(commands.Cog):
             await interaction.followup.send(tr("subscriptions.not_linked"), ephemeral=True)
             return
 
-        session = await get_shared_session()
-        user = await get_user_info(api_id, session)
+        user = await warera.users.get(api_id)
         if not user:
             await interaction.followup.send(tr("subscriptions.player_not_found"), ephemeral=True)
             return
@@ -244,7 +241,7 @@ class Subscriptions(commands.Cog):
             await interaction.followup.send(tr("subscriptions.failed"), ephemeral=True)
             return
 
-        military_unit = await get_military_unit(mu_id, session)
+        military_unit = await warera.mus.get(mu_id)
         mu_name = discord.utils.escape_markdown(str((military_unit or {}).get("name") or mu_id))
         if not created:
             await interaction.followup.send(tr("subscriptions.bounty_already_subscribed", mu=mu_name), ephemeral=True)

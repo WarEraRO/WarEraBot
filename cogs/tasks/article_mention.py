@@ -9,7 +9,7 @@ from discord.ext import commands, tasks
 from bs4 import BeautifulSoup
 
 from config import config
-from utils.api import get_all_countries, get_articles, get_regions_object, get_shared_session, get_users_info
+from utils.api import warera
 from utils.common import country_with_flag
 from utils.db import get_api_ids_by_discord_id
 from utils.i18n import get_translator
@@ -208,7 +208,7 @@ class ArticleMentionJob(commands.Cog):
     def cog_unload(self):
         self.article_mention.cancel()
 
-    async def _refresh_romania_ids(self, session) -> frozenset[str] | None:
+    async def _refresh_romania_ids(self) -> frozenset[str] | None:
         """Return Romania's id plus the ids of the regions it owns or started with; None if never loaded.
 
         The same refresh keeps ``_romania_id`` and the ``_countries`` map (id -> country) up to date. The ids are
@@ -217,8 +217,8 @@ class ArticleMentionJob(commands.Cog):
         if self._romania_ids is not None and time.monotonic() - self._romania_ids_at < ROMANIA_IDS_TTL:
             return self._romania_ids
 
-        countries = await get_all_countries(session)
-        regions = await get_regions_object(session)
+        countries = await warera.countries.get_all()
+        regions = await warera.regions.get_all()
         country_id = next(
             (
                 str(country.get("_id"))
@@ -295,12 +295,11 @@ class ArticleMentionJob(commands.Cog):
         post as posted), so articles posted before the restart are not posted again. A run is skipped while
         Romania's ids cannot be loaded, so tagged mentions are not marked checked unseen.
         """
-        session = await get_shared_session()
         # only the newest ARTICLE_LIMIT are read, so the rest of the feed is not paged through
-        articles = await get_articles(session, max_items=ARTICLE_LIMIT)
+        articles = await warera.game.get_articles(max_items=ARTICLE_LIMIT)
         if not articles:
             return
-        romania_ids = await self._refresh_romania_ids(session)
+        romania_ids = await self._refresh_romania_ids()
         if romania_ids is None:
             return
 
@@ -322,7 +321,7 @@ class ArticleMentionJob(commands.Cog):
             return
 
         guild = self.bot.get_guild(config["guild"])
-        authors = await get_users_info([author_id for *_, author_id in pending if author_id], session)
+        authors = await warera.users.get_many([author_id for *_, author_id in pending if author_id])
         member_ids, member_names = await self._romanian_members(guild)
 
         if not self._seeded:

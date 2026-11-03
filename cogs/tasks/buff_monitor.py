@@ -1,6 +1,6 @@
 import asyncio
 from discord.ext import commands, tasks
-from utils.api import get_shared_session, get_user, get_user_info, get_users_by_name, get_users_info
+from utils.api import warera
 from utils.db import init_db, find_api_id_by_display_name, find_api_id_by_discord_username, find_api_id_by_discord_id, get_api_ids_by_discord_id, save_user
 from utils.i18n import get_translator
 from config import config
@@ -74,7 +74,6 @@ class BuffMonitorJob(commands.Cog):
         now = datetime.now(timezone.utc)
         members = fight_role.members if fight_role else []
         seen_api_ids = set()
-        session = await get_shared_session()
         # DMs are sent in the language of the server that triggers them
         tr = await get_translator(guild)
 
@@ -93,14 +92,14 @@ class BuffMonitorJob(commands.Cog):
             entry = self.buff_check_cache.get(api_id) if api_id else None
             if api_id and not (entry and entry.get('next_check') and entry['next_check'] > now):
                 to_fetch.append(api_id)
-        prefetched_by_id = await get_users_info(to_fetch, session)
+        prefetched_by_id = await warera.users.get_many(to_fetch)
         to_fetch = set(to_fetch)
         to_search = {
             member.display_name
             for member, api_id in zip(members, resolved_ids)
             if not api_id or (api_id in to_fetch and api_id not in prefetched_by_id)
         }
-        prefetched_by_name = await get_users_by_name(to_search, session) if to_search else {}
+        prefetched_by_name = await warera.users.find_many_by_name(to_search) if to_search else {}
         # save_user rewrites one record, which can only change the lookup of a member sharing one of its
         # keys (Discord id, display name, username) or resolved to its api id; those are looked up again
         saved_keys: set = set()
@@ -118,14 +117,14 @@ class BuffMonitorJob(commands.Cog):
                             seen_api_ids.add(api_id)
                             continue
 
-                # Retrieve user info. Prefer get_user_info when we already have api_id
+                # Retrieve user info. Prefer warera.users.get when we already have api_id
                 user_obj = None
                 if api_id:
                     if api_id in to_fetch:
                         user_obj = prefetched_by_id.get(api_id)
                     else:
                         try:
-                            user_obj = await get_user_info(api_id, session)
+                            user_obj = await warera.users.get(api_id)
                         except Exception:
                             user_obj = None
 
@@ -133,7 +132,7 @@ class BuffMonitorJob(commands.Cog):
                     if member.display_name in to_search:
                         user_obj = prefetched_by_name.get(member.display_name)
                     else:
-                        user_obj = await get_user(member.display_name, session)
+                        user_obj = await warera.users.find_by_name(member.display_name)
                     if isinstance(user_obj, dict):
                         api_id = user_obj.get('_id') or api_id
                         if api_id:

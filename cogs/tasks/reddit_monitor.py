@@ -51,9 +51,9 @@ class RedditMonitorJob(commands.Cog):
     async def _get_session(self) -> aiohttp.ClientSession:
         """Return this cog's Reddit-only HTTP session, creating it if needed.
 
-        Reddit requests must not use ``utils.api.get_shared_session()``: that
-        session carries the WarEra ``X-API-Key`` header on every request and
-        would leak the key to a third-party host.
+        Reddit requests must not go through ``utils.api.warera``: its session
+        belongs to the WarEra client, which adds the WarEra ``X-API-Key``
+        header to its requests, and the key must never reach a third-party host.
         """
         if self._session is None or self._session.closed:
             self._session = aiohttp.ClientSession()

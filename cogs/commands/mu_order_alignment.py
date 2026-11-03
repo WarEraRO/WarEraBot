@@ -16,15 +16,7 @@ from discord.ext import commands
 
 from cogs.commands.fight_wealth import _messages, _pack
 from cogs.commands.pills import _unit_ids
-from utils.api import (
-    get_active_battles,
-    get_all_countries,
-    get_battle_orders,
-    get_military_unit,
-    get_military_units_by_ids,
-    get_regions_by_ids,
-    get_shared_session,
-)
+from utils.api import warera
 from utils.common import country_flag, country_with_flag
 from utils.i18n import Translator, get_translator
 
@@ -125,9 +117,8 @@ class MuOrderAlignment(commands.Cog):
             return
 
         async def _refresh():
-            session = await get_shared_session()
             unit_ids = _unit_ids()
-            military_units = await get_military_units_by_ids(unit_ids, session)
+            military_units = await warera.mus.get_many(unit_ids)
             for mu_id in unit_ids:
                 military_unit = military_units.get(mu_id)
                 # a failed fetch keeps the name already known
@@ -145,11 +136,11 @@ class MuOrderAlignment(commands.Cog):
                 return mu_id
         return None
 
-    async def _load_countries(self, session) -> bool:
+    async def _load_countries(self) -> bool:
         """Refresh the country names and COUNTRY_NAME's id when stale; False when the id is unknown."""
         if self._country_id and time.monotonic() - self._countries_at < COUNTRIES_TTL:
             return True
-        countries = await get_all_countries(session)
+        countries = await warera.countries.get_all()
         if not countries:
             # a failed refresh keeps the previous list
             return self._country_id is not None
@@ -164,12 +155,12 @@ class MuOrderAlignment(commands.Cog):
         self._countries_at = time.monotonic()
         return self._country_id is not None
 
-    async def _load_region_names(self, region_ids: set[str], session) -> None:
+    async def _load_region_names(self, region_ids: set[str]) -> None:
         """Fetch the names of the regions not cached yet; regions that fail are shown without a name."""
         missing = [region_id for region_id in region_ids if region_id not in self._region_names]
         if not missing:
             return
-        regions = await get_regions_by_ids(missing, session)
+        regions = await warera.regions.get_many(missing)
         for region_id, region in regions.items():
             if isinstance(region, dict) and region.get("name"):
                 self._region_names[region_id] = str(region["name"])
@@ -197,9 +188,8 @@ class MuOrderAlignment(commands.Cog):
             return
         await interaction.response.defer()
 
-        session = await get_shared_session()
         battles, military_unit_data, countries_loaded = await asyncio.gather(
-            get_active_battles(session), get_military_unit(mu_id, session), self._load_countries(session)
+            warera.battles.get_active(), warera.mus.get(mu_id), self._load_countries()
         )
         if isinstance(military_unit_data, dict) and military_unit_data.get("name"):
             self._mu_names[mu_id] = str(military_unit_data["name"])
@@ -213,8 +203,8 @@ class MuOrderAlignment(commands.Cog):
         order_sides = [(str(battle.get("_id")), side) for battle, _ in listed for side in SIDES]
         region_ids = {region_id for battle, _ in listed if (region_id := _region_id(battle))}
         orders, _, numbers = await asyncio.gather(
-            get_battle_orders(order_sides, session) if order_sides else asyncio.sleep(0, result={}),
-            self._load_region_names(region_ids, session),
+            warera.battles.get_orders_many(order_sides) if order_sides else asyncio.sleep(0, result={}),
+            self._load_region_names(region_ids),
             self._priority_numbers(),
         )
 

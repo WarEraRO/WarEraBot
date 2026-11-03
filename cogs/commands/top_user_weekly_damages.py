@@ -6,12 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from utils.api import (
-    get_all_countries,
-    get_shared_session,
-    get_users_info,
-    get_rankings
-)
+from utils.api import warera
 from utils.i18n import Translator, get_translator
 
 
@@ -316,8 +311,7 @@ class TopUserWeeklyDamages(commands.Cog):
                 if not self._countries_are_stale():
                     return self._countries
 
-                session = await get_shared_session()
-                countries = await get_all_countries(session)
+                countries = await warera.countries.get_all()
                 if countries:
                     self._countries = countries
                     self._countries_fetched_at = time.monotonic()
@@ -373,8 +367,7 @@ class TopUserWeeklyDamages(commands.Cog):
             )
             return
 
-        session = await get_shared_session()
-        ranking_data = await get_rankings("weeklyUserDamages", session)
+        ranking_data = await warera.game.get_ranking("weeklyUserDamages")
         ranking_data = ranking_data or {}
         items = ranking_data.get("items") or []
         country_ids = {
@@ -386,7 +379,7 @@ class TopUserWeeklyDamages(commands.Cog):
 
         try:
             # one batched request per 50 players instead of one request each
-            users_by_id = await get_users_info([item["user"] for item in country_items], session)
+            users_by_id = await warera.users.get_many([item["user"] for item in country_items])
             users = [users_by_id.get(item["user"]) for item in country_items]
         except Exception:
             logger.exception("Failed to resolve weekly damage ranking users")

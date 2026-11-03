@@ -24,17 +24,7 @@ from discord.ext import commands
 from cogs.commands.fight_wealth import _messages, _pack
 from cogs.commands.mu_order_alignment import BATTLE_LINK, COUNTRY_NAME, SIDES, TOURNAMENT_BATTLE_TYPE, _opposite, _side_ids
 from cogs.commands.pills import _unit_ids
-from utils.api import (
-    get_active_battles,
-    get_all_countries,
-    get_battle,
-    get_game_config,
-    get_military_unit,
-    get_military_units_by_ids,
-    get_regions_object,
-    get_shared_session,
-    get_users_full,
-)
+from utils.api import warera
 from utils.common import country_flag, country_with_flag
 from utils.computational import is_economy_build
 from utils.i18n import Translator, get_translator
@@ -152,9 +142,8 @@ class MuPositions(commands.Cog):
             return
 
         async def _refresh():
-            session = await get_shared_session()
             unit_ids = _unit_ids()
-            military_units = await get_military_units_by_ids(unit_ids, session)
+            military_units = await warera.mus.get_many(unit_ids)
             for mu_id in unit_ids:
                 military_unit = military_units.get(mu_id)
                 # a failed fetch keeps the name already known
@@ -170,8 +159,7 @@ class MuPositions(commands.Cog):
             return
 
         async def _refresh():
-            session = await get_shared_session()
-            await asyncio.gather(self._load_battles(session, BATTLES_TTL), self._load_regions(session), self._load_countries(session))
+            await asyncio.gather(self._load_battles(BATTLES_TTL), self._load_regions(), self._load_countries())
 
         self._warm_task = asyncio.create_task(_refresh())
 
@@ -183,11 +171,11 @@ class MuPositions(commands.Cog):
                 return mu_id
         return None
 
-    async def _load_countries(self, session) -> bool:
+    async def _load_countries(self) -> bool:
         """Refresh the country names and COUNTRY_NAME's id when stale; False when the id is unknown."""
         if self._country_id and time.monotonic() - self._countries_at < COUNTRIES_TTL:
             return True
-        countries = await get_all_countries(session)
+        countries = await warera.countries.get_all()
         if not countries:
             # a failed refresh keeps the previous list
             return self._country_id is not None
@@ -203,11 +191,11 @@ class MuPositions(commands.Cog):
         self._countries_at = time.monotonic()
         return self._country_id is not None
 
-    async def _load_regions(self, session) -> bool:
+    async def _load_regions(self) -> bool:
         """Refresh the map graph when stale (one ~0.9 MB request); False when no map is known."""
         if self._regions and time.monotonic() - self._regions_at < REGIONS_TTL:
             return True
-        regions = await get_regions_object(session)
+        regions = await warera.regions.get_all()
         if not regions:
             # a failed refresh keeps the previous map
             return bool(self._regions)
@@ -223,21 +211,21 @@ class MuPositions(commands.Cog):
         self._regions_at = time.monotonic()
         return True
 
-    async def _load_battles(self, session, max_age: float) -> list[dict] | None:
+    async def _load_battles(self, max_age: float) -> list[dict] | None:
         """The active battles, refetched when the cache is older than `max_age` seconds; None on failure."""
         if self._battles_at and time.monotonic() - self._battles_at < max_age:
             return self._battles
-        battles = await get_active_battles(session)
+        battles = await warera.battles.get_active()
         if battles is None:
             return None
         self._battles, self._battles_at = battles, time.monotonic()
         return battles
 
-    async def _load_free_travel_home_hours(self, session) -> None:
+    async def _load_free_travel_home_hours(self) -> None:
         """Refresh gameConfig region.freeTravelHomeCooldownHours when stale; failures keep the last value."""
         if self._game_config_at and time.monotonic() - self._game_config_at < GAME_CONFIG_TTL:
             return
-        game_config = await get_game_config(session)
+        game_config = await warera.game.get_config()
         hours = ((game_config or {}).get("region") or {}).get("freeTravelHomeCooldownHours")
         if isinstance(hours, (int, float)) and hours > 0:
             self._free_travel_home_hours = float(hours)
@@ -266,13 +254,12 @@ class MuPositions(commands.Cog):
             battle_id = match.group(1)
         await interaction.response.defer()
 
-        session = await get_shared_session()
         military_unit_data, battle_data, regions_loaded, countries_loaded, _ = await asyncio.gather(
-            get_military_unit(mu_id, session),
-            get_battle(battle_id, session) if battle_id else self._load_battles(session, 0),
-            self._load_regions(session),
-            self._load_countries(session),
-            self._load_free_travel_home_hours(session),
+            warera.mus.get(mu_id),
+            warera.battles.get(battle_id) if battle_id else self._load_battles(0),
+            self._load_regions(),
+            self._load_countries(),
+            self._load_free_travel_home_hours(),
         )
         if not isinstance(military_unit_data, dict) or battle_data is None or not regions_loaded or not countries_loaded:
             await interaction.followup.send(tr("mu_positions.fetch_failed"), ephemeral=True)
@@ -284,7 +271,7 @@ class MuPositions(commands.Cog):
             return
 
         member_ids = [str(user_id) for user_id in military_unit_data.get("members") or []]
-        users = await get_users_full(member_ids, session)
+        users = await warera.users.get_full_many(member_ids)
         members = [self._member_row(users[user_id], tr) for user_id in member_ids if user_id in users]
         mu_name = discord.utils.escape_markdown(self._mu_names.get(mu_id, mu_id))
         now = datetime.now(timezone.utc)

@@ -9,15 +9,7 @@ import discord
 from discord.ext import commands, tasks
 
 from config import config
-from utils.api import (
-    get_active_battles,
-    get_all_countries,
-    get_game_config,
-    get_military_unit,
-    get_mu_members,
-    get_shared_session,
-    get_users_full,
-)
+from utils.api import warera
 from utils.common import country_with_flag, to_local
 from utils.computational import FIGHT_WEALTH_TIERS, fight_wealth, fight_wealth_tier, is_economy_build
 from utils.i18n import Translator, get_translator
@@ -181,12 +173,11 @@ class MilitaryUnitDailyReportJob(commands.Cog):
         if not units:
             return
 
-        session = await get_shared_session()
         now = datetime.now(timezone.utc)
         game_config, battles, countries = await asyncio.gather(
-            get_game_config(session),
-            get_active_battles(session),
-            get_all_countries(session),
+            warera.game.get_config(),
+            warera.battles.get_active(),
+            warera.countries.get_all(),
         )
         settings = _pill_settings(game_config)
         # reports are DMed to the leaders in the language of the configured server
@@ -199,7 +190,7 @@ class MilitaryUnitDailyReportJob(commands.Cog):
 
         for mu_id, unit in units.items():
             try:
-                embeds = await self._build_embeds(mu_id, unit, session, now, settings, battles, country_names, tr)
+                embeds = await self._build_embeds(mu_id, unit, now, settings, battles, country_names, tr)
                 if not embeds:
                     continue
                 leader = await self._leader(unit["leaderId"])
@@ -234,7 +225,6 @@ class MilitaryUnitDailyReportJob(commands.Cog):
         self,
         mu_id: str,
         unit: dict,
-        session,
         now: datetime,
         settings: dict,
         battles: list[dict] | None,
@@ -246,8 +236,8 @@ class MilitaryUnitDailyReportJob(commands.Cog):
         Returns None when the MU has no members or dealt less than MIN_REPORT_DAMAGE this week.
         """
         military_unit, members = await asyncio.gather(
-            get_military_unit(mu_id, session),
-            get_mu_members(mu_id, session),
+            warera.mus.get(mu_id),
+            warera.mus.get_members(mu_id),
         )
         if members is None:
             logger.warning("Skipping daily report for MU %s: members could not be fetched", unit.get("friendlyName"))
@@ -267,7 +257,7 @@ class MilitaryUnitDailyReportJob(commands.Cog):
             return None
 
         # one batched request for every member; the full user also carries stats.wealth
-        users_by_id = await get_users_full([str(member.get("user")) for member in members], session)
+        users_by_id = await warera.users.get_full_many([str(member.get("user")) for member in members])
         users = [users_by_id.get(str(member.get("user"))) for member in members]
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         rows = []

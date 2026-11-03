@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands, tasks
 
 from config import config
-from utils.api import get_active_battles, get_military_unit, get_military_units_by_ids, get_shared_session
+from utils.api import warera
 from utils.db import get_all_naps, init_db
 from utils.i18n import get_translator
 
@@ -68,8 +68,7 @@ class NAPMonitorJob(commands.Cog):
             self._seeded = True
             return
 
-        session = await get_shared_session()
-        battles = await get_active_battles(session)
+        battles = await warera.battles.get_active()
         if not battles:
             self.reported_violations.clear()
             return
@@ -113,7 +112,7 @@ class NAPMonitorJob(commands.Cog):
                     return country_id, mu_name
 
             try:
-                mu = await get_military_unit(mu_id, session)
+                mu = await warera.mus.get(mu_id)
             except Exception:
                 logger.exception("Failed to fetch MU %s for NAP monitor", mu_id)
                 mu = None
@@ -135,7 +134,7 @@ class NAPMonitorJob(commands.Cog):
                     if mu_id and not (cached and now - cached[2] < MU_COUNTRY_CACHE_TTL_SECONDS):
                         mu_ids_to_fetch.append(str(mu_id))
         if mu_ids_to_fetch:
-            mus = await get_military_units_by_ids(mu_ids_to_fetch, session)
+            mus = await warera.mus.get_many(mu_ids_to_fetch)
             now = time.monotonic()
             for mu_id in mu_ids_to_fetch:
                 mu = mus.get(mu_id)

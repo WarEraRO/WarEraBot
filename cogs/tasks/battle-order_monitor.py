@@ -7,15 +7,7 @@ import discord
 from discord.ext import commands, tasks
 
 from config import config
-from utils.api import (
-    get_active_battles,
-    get_all_countries,
-    get_country,
-    get_shared_session,
-    get_region,
-    get_tournament,
-    get_tournament_team,
-)
+from utils.api import warera
 from utils.common import country_flag, country_with_flag
 from utils.i18n import Translator, get_translator
 
@@ -71,11 +63,10 @@ class BattleOrderMonitorJob(commands.Cog):
         if guild is None:
             return 0
 
-        session = await get_shared_session()
-        battles = await get_active_battles(session)
+        battles = await warera.battles.get_active()
         if battles is None:
             return 0
-        romania_id = await self._get_country_id(ROMANIA_NAME, session)
+        romania_id = await self._get_country_id(ROMANIA_NAME)
         if not romania_id:
             return 0
 
@@ -114,7 +105,7 @@ class BattleOrderMonitorJob(commands.Cog):
                 if exists:
                     continue
 
-                tournament = await self._tournament_context(battle, session)
+                tournament = await self._tournament_context(battle)
                 if tournament is not None and tournament["type"] != COUNTRY_TOURNAMENT_TYPE:
                     # MU tournaments are not reported; a failed tournament lookup is retried next cycle
                     continue
@@ -127,7 +118,6 @@ class BattleOrderMonitorJob(commands.Cog):
                     opponent,
                     source="romania",
                     description="",
-                    session=session,
                     tournament=tournament,
                 )
                 new_entries.append(entry)
@@ -163,21 +153,20 @@ class BattleOrderMonitorJob(commands.Cog):
         if not battle_id:
             return False, "battle_orders.invalid_link", None
 
-        session = await get_shared_session()
-        battles = await get_active_battles(session)
+        battles = await warera.battles.get_active()
         if battles is None:
             return False, "battle_orders.fetch_failed", None
         battle = next((item for item in battles if self._battle_id(item) == battle_id), None)
         if not battle:
             return False, "battle_orders.not_active", None
 
-        tournament = await self._tournament_context(battle, session)
+        tournament = await self._tournament_context(battle)
         if tournament is not None and tournament["type"] != COUNTRY_TOURNAMENT_TYPE:
             if tournament["type"] is None:
                 return False, "battle_orders.tournament_fetch_failed", None
             return False, "battle_orders.only_country_tournaments", None
 
-        await self._get_country_id(ROMANIA_NAME, session)
+        await self._get_country_id(ROMANIA_NAME)
         side_name, side, opponent_side_name, opponent = self._preferred_side_for_manual_entry(battle, tournament)
         token = self._entry_token(battle_id, side_name, "manual")
 
@@ -189,7 +178,6 @@ class BattleOrderMonitorJob(commands.Cog):
             opponent,
             source="manual",
             description=description,
-            session=session,
             tournament=tournament,
         )
         entry["token"] = token
@@ -347,14 +335,13 @@ class BattleOrderMonitorJob(commands.Cog):
         opponent: dict,
         source: str,
         description: str,
-        session,
         tournament: dict | None = None,
     ) -> dict:
         battle_id = self._battle_id(battle) or "unknown"
         if tournament is not None:
             side_team_names, opponent_team_names = await asyncio.gather(
-                self._country_names(tournament["teams"].get(side_name, []), session),
-                self._country_names(tournament["teams"].get(opponent_side_name, []), session),
+                self._country_names(tournament["teams"].get(side_name, [])),
+                self._country_names(tournament["teams"].get(opponent_side_name, [])),
             )
             return {
                 "token": self._entry_token(battle_id, side_name, source),
@@ -375,10 +362,10 @@ class BattleOrderMonitorJob(commands.Cog):
         side_country_id = str(side.get("country") or "")
         opponent_country_id = str(opponent.get("country") or "")
         side_country_name, opponent_country_name = await asyncio.gather(
-            self._country_name(side_country_id, session),
-            self._country_name(opponent_country_id, session),
+            self._country_name(side_country_id),
+            self._country_name(opponent_country_id),
         )
-        region_name = await self._region_name(battle, session)
+        region_name = await self._region_name(battle)
 
         return {
             "token": self._entry_token(battle_id, side_name, source),
@@ -420,14 +407,14 @@ class BattleOrderMonitorJob(commands.Cog):
             return "defender", defender, "attacker", attacker
         return "attacker", attacker, "defender", defender
 
-    async def _tournament_context(self, battle: dict, session) -> dict | None:
+    async def _tournament_context(self, battle: dict) -> dict | None:
         """None for regular battles. For tournament battles: {"type", "name", "teams": {side: [country ids]}};
         "type" is None when the tournament could not be fetched, "name" is None when unknown."""
         if battle.get("type") != TOURNAMENT_BATTLE_TYPE:
             return None
         context = {"type": None, "name": None, "teams": {}}
         tournament = await self._cached_lookup(
-            self._tournaments_cache, str(battle.get("tournament") or ""), get_tournament, session
+            self._tournaments_cache, str(battle.get("tournament") or ""), warera.tournaments.get
         )
         if tournament is None:
             return context
@@ -442,8 +429,7 @@ class BattleOrderMonitorJob(commands.Cog):
                 self._cached_lookup(
                     self._tournament_teams_cache,
                     str((battle.get(side_name) or {}).get("tournamentTeam") or ""),
-                    get_tournament_team,
-                    session,
+                    warera.tournaments.get_team,
                 )
                 for side_name in side_names
             )
@@ -452,21 +438,21 @@ class BattleOrderMonitorJob(commands.Cog):
             context["teams"][side_name] = [str(country_id) for country_id in (team or {}).get("countries") or []]
         return context
 
-    async def _cached_lookup(self, cache: dict[str, tuple[dict, float]], key: str, fetch, session) -> dict | None:
+    async def _cached_lookup(self, cache: dict[str, tuple[dict, float]], key: str, fetch) -> dict | None:
         if not key:
             return None
         now = time.monotonic()
         cached = cache.get(key)
         if cached and now - cached[1] < TOURNAMENT_CACHE_TTL_SECONDS:
             return cached[0]
-        value = await fetch(key, session)
+        value = await fetch(key)
         # failures are not cached so the next cycle retries
         if value is not None:
             cache[key] = (value, now)
         return value
 
-    async def _country_names(self, country_ids: list[str], session) -> list[str]:
-        return list(await asyncio.gather(*(self._country_name(country_id, session) for country_id in country_ids)))
+    async def _country_names(self, country_ids: list[str]) -> list[str]:
+        return list(await asyncio.gather(*(self._country_name(country_id) for country_id in country_ids)))
 
     def _format_team(self, country_names: list[str] | None, tr: Translator, compact: bool = False) -> str:
         unknown = tr("common.unknown")
@@ -476,14 +462,14 @@ class BattleOrderMonitorJob(commands.Cog):
             return ", ".join(country_flag(name) or name or unknown for name in country_names)
         return ", ".join(country_with_flag(name, left=True, unknown=unknown) for name in country_names)
 
-    async def _get_country_id(self, country_name: str, session) -> str | None:
+    async def _get_country_id(self, country_name: str) -> str | None:
         now = time.monotonic()
         cache_key = country_name.lower()
         cached = self._country_id_cache.get(cache_key)
         if cached and now - cached[1] < 24 * 60 * 60:
             return cached[0]
 
-        countries = await get_all_countries(session) or []
+        countries = await warera.countries.get_all() or []
         for country in countries:
             name = str(country.get("name") or "")
             country_id = str(country.get("_id") or country.get("id") or "")
@@ -496,18 +482,18 @@ class BattleOrderMonitorJob(commands.Cog):
         self._country_id_cache[cache_key] = (None, now)
         return None
 
-    async def _country_name(self, country_id: str, session) -> str | None:
+    async def _country_name(self, country_id: str) -> str | None:
         # None is shown as a translated "unknown"
         if not country_id:
             return None
         if country_id in self._country_cache:
             return self._country_cache[country_id]
-        country = await get_country(country_id, session)
+        country = await warera.countries.get(country_id)
         name = country.get("name") if isinstance(country, dict) else None
         self._country_cache[country_id] = str(name or country_id)
         return self._country_cache[country_id]
 
-    async def _region_name(self, battle: dict, session) -> str | None:
+    async def _region_name(self, battle: dict) -> str | None:
         region_id = self._region_id(battle)
         # None is shown as a translated "Unknown region"
         if not region_id:
@@ -518,7 +504,7 @@ class BattleOrderMonitorJob(commands.Cog):
         if cached and now - cached[1] < REGION_CACHE_TTL_SECONDS:
             return cached[0]
 
-        region_obj = await get_region(session, region_id)
+        region_obj = await warera.regions.get(region_id)
         if isinstance(region_obj, dict):
             name = str(region_obj.get("name") or region_id)
         else:

@@ -1,5 +1,5 @@
 from discord.ext import commands, tasks
-from utils.api import get_users_by_name, get_all_countries, get_shared_session
+from utils.api import warera
 from utils.db import init_db
 from utils.computational import is_economy_build
 from utils.i18n import Translator, get_translator
@@ -22,8 +22,7 @@ class SkillRolesJob(commands.Cog):
         self.skill_roles.cancel()
 
     async def get_countries(self):
-        session = await get_shared_session()
-        return await get_all_countries(session)
+        return await warera.countries.get_all()
     
     @tasks.loop(hours=1)
     async def skill_roles(self):
@@ -45,9 +44,8 @@ class SkillRolesJob(commands.Cog):
             'fight_added': [],
             'fight_removed': [],
         }
-        session = await get_shared_session()
         # One batched fetch for all members instead of one request per member
-        users = await get_users_by_name([m.display_name for m in members], session)
+        users = await warera.users.find_many_by_name([m.display_name for m in members])
         for member in members:
             user = users.get(member.display_name)
             if user is None:
