@@ -74,6 +74,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.tasks.military_unit_weekly_report")
         await self.load_extension("cogs.tasks.military_unit_daily_report")
         await self.load_extension("cogs.tasks.contests")
+        await self.load_extension("cogs.tasks.gov_weekly_ranking")
 
         await self.load_extension("cogs.commands.fight_status")
         await self.load_extension("cogs.commands.diplomacy")

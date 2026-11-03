@@ -40,3 +40,15 @@ class MarketAPI(Endpoint):
         """
         return await self._collect_since('transaction.getPaginatedTransactions',
                                          {'muId': mu_id, 'transactionType': transaction_type, 'limit': 100}, created_after)
+
+    @guarded()
+    async def get_country_transactions(self, country_id, transaction_type, created_after):
+        """A country's transactions of one type (or a list of types) created at or after `created_after` (ISO string).
+
+        Newest first; requires an API key. With "donation" these are donations *to* the country (donor in
+        `buyerId`, the country in `sellerCountryId`). Paging stops at the first older item. None if any page fails.
+        """
+        # countryId + donation lists donations to that country [observed 2026-11-02, Romania]
+        return await self._collect_since('transaction.getPaginatedTransactions',
+                                         {'countryId': country_id, 'transactionType': transaction_type, 'limit': 100},
+                                         created_after)

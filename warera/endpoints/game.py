@@ -3,7 +3,7 @@ from warera.endpoints.base import Endpoint, guarded
 
 
 class GameAPI(Endpoint):
-    """`gameConfig.getGameConfig`, `gameStat.*`, `ranking.getRanking` and `article.getArticlesPaginated`."""
+    """`gameConfig.getGameConfig`, `gameConfig.getDates`, `gameStat.*`, `ranking.getRanking` and `article.getArticlesPaginated`."""
 
     @guarded()
     async def get_config(self):
@@ -13,6 +13,11 @@ class GameAPI(Endpoint):
         expired copy is returned. The same dict is shared by every caller, so never modify it.
         """
         return await self._get('gameConfig.getGameConfig', {}, allow_empty=True)
+
+    @guarded()
+    async def get_dates(self):
+        """gameConfig.getDates (no input): the game clock as ISO strings (nextDayAt, weeklyMissionRegenAt, ...), or None."""
+        return await self._get('gameConfig.getDates')
 
     @guarded()
     async def get_pp_money_value(self):

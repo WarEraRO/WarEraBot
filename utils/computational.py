@@ -28,6 +28,26 @@ def is_economy_build(user: dict) -> bool | None:
     return (economy_skill_points + unspent_skill_points) / total_skill_points * 100 > 50
 
 
+def fight_percent(user: dict) -> float | None:
+    """Percentage of the user's skill points that are not in economy skills or unspent.
+
+    The complement of the share is_economy_build compares with 50, so a fight build
+    (is_economy_build(user) is False) has a fight percent of at least 50. None when the user has
+    no skill points to judge by.
+    """
+    leveling = user.get('leveling') or {}
+    total_skill_points = leveling.get('totalSkillPoints') or 0
+    if not total_skill_points:
+        return None
+    economy_skill_points = sum(
+        triangular(skill_data.get('level') or 0)
+        for skill_name, skill_data in (user.get('skills') or {}).items()
+        if skill_name in ECONOMY_SKILLS
+    )
+    unspent_skill_points = leveling.get('availableSkillPoints') or 0
+    return 100 - (economy_skill_points + unspent_skill_points) / total_skill_points * 100
+
+
 def fight_wealth(user: dict) -> dict | None:
     """The user's fight wealth: every user.stats.wealth category except companies.
 

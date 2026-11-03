@@ -146,12 +146,19 @@ class Translator:
             "%b": ("dates.months_short", value.month - 1),
             "%B": ("dates.months", value.month - 1),
         }
+        tokens = {}
         for directive, (key, index) in names.items():
             if directive in fmt:
                 values = _lookup(self.lang, key)
                 if isinstance(values, list) and index < len(values):
-                    fmt = fmt.replace(directive, str(values[index]).replace("%", "%%"))
-        return value.strftime(fmt)
+                    token = f"\x01{len(tokens)}\x01"
+                    tokens[token] = str(values[index])
+                    fmt = fmt.replace(directive, token)
+        # the names go in after strftime: on Windows strftime can't encode non-ASCII format text ("marți", "sâm")
+        text = value.strftime(fmt)
+        for token, name in tokens.items():
+            text = text.replace(token, name)
+        return text
 
 
 def _guild_id(guild) -> int | None:

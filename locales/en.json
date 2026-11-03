@@ -469,6 +469,10 @@
                 "name": "contest_tracker — every 5 minutes",
                 "desc": "Runs the contests created with /start_contest: at the start registers the members of the participating units and announces the contest in each unit's contest thread (else its channel, once per channel); refreshes the points hourly from the WarEra API; posts the ranking 15 minutes before each game reset and the final results after the last day. Missed runs are caught up from the saved state."
             },
+            "gov_weekly_ranking": {
+                "name": "gov_weekly_ranking — Sundays, 12 minutes before the weekly reset",
+                "desc": "Shortly before the weekly game reset, posts the government's weekly top article (\"Topul săptămânii\") in the government channel as a ready-to-paste .txt file, Romanian citizens only: the top 5 weekly damage and the top 3 donors to Romania per level bracket, the fight-build player who donated the most, Romanian military units by their Romanian members' damage, the top 10 weekly bounty earners, the 10 richest citizens and everyone who has prestiged. A second file (-diaspora) covers Romanians who aren't Romanian citizens: the server's Citizen/Newbie members and the members of the configured military units with another citizenship, with the same sections except donations, our units by their diaspora members' damage, and each player's citizenship. Players and units are written as links, which the in-game editor turns into mentions. The article is always in Romanian. gov_bounty_tracker (every 15 minutes) reads the bounty of newly ended battles in advance."
+            },
             "newbie_welcome": {
                 "name": "newbie_welcome - when the Newbie role is given",
                 "desc": "When a member receives the Newbie role, mentions them in the newbie chat (chats.ro_newbie) with a welcome message: their server nickname, first steps, up to 5 configured military units with free spots (read live, \"fight\" MUs excluded), promotion to Citizen and where to use bot commands (channels.public_commands). Posts nothing on a restart or for members who already had the role."
@@ -1281,6 +1285,66 @@
             "ammo": "Ammo",
             "heavyAmmo": "Heavy ammo",
             "cocain": "Pill"
+        }
+    },
+    "gov_weekly_ranking": {
+        "title": "[RO-GOV] TOP OF THE WEEK {start} - {end}",
+        "damage_title": "⚔️ Damage",
+        "damage_subtitle": "Top {count} damage / level brackets:",
+        "donations_title": "💝 Donations",
+        "donations_subtitle": "Top {count} donations / level brackets:",
+        "bracket": "- Level {levels} [{label}]:",
+        "entry": "- {url} ({level}) → {value}",
+        "top_entry": "- {url} → {value}",
+        "nobody": "- —",
+        "unavailable": "- (the data could not be loaded from the API)",
+        "built_different": "- The player with the highest fight share who donated the most [❤️ Built Different]:",
+        "built_different_entry": "- {url} ({level}) · {percent}% fight → {value}",
+        "mus_title": "⚔️ Top Military Units",
+        "mus_subtitle": "Romanian military units, by this week's damage of their Romanian members:",
+        "mu_entry": "- {url} → {value} dmg ({members})",
+        "members": {
+            "one": "{count} member",
+            "other": "{count} members"
+        },
+        "bounty_title": "🎯 Top Bounty (weekly)",
+        "bounty_subtitle": "The best-rewarded fighters, by the bounty they earned in battles this week:",
+        "bounty_note": "Bounty from {battles} battles that ended between {start} and {end} ({records} records).",
+        "span_format": "%d %b %H:%M",
+        "wealth_title": "💰 Top Wealth",
+        "wealth_subtitle": "The richest Romanian citizens:",
+        "prestige_title": "⭐ Top Prestige",
+        "prestige_subtitle": "Every player who has prestiged (by number of prestiges, then level):",
+        "prestige_entry": "- {url} → {prestige}× prestige (lvl {level})",
+        "compiled": "This top was compiled on {date}, for the week {start}–{end}.",
+        "signature": "With appreciation, the Government of Romania 🇷🇴",
+        "date_format": "%d %B %Y",
+        "incomplete_players": "[WARNING, delete before publishing: {count} players could not be loaded from the API, so they may be missing from the tops. Run /run_job gov_weekly_ranking again before the reset.]",
+        "incomplete_battles": "[WARNING, delete before publishing: the bounty of {count} battles could not be read completely, so Top Bounty may be incomplete. Run /run_job gov_weekly_ranking again before the reset.]",
+        "diaspora_title": "[RO-GOV] TOP OF THE DIASPORA {start} - {end}",
+        "diaspora_intro": "Romanians outside Romania: members of our Discord server and of our military units who hold a citizenship other than Romanian.",
+        "entry_abroad": "- {url} ({level}) {place} → {value}",
+        "top_entry_abroad": "- {url} {place} → {value}",
+        "prestige_entry_abroad": "- {url} {place} → {prestige}× prestige (lvl {level})",
+        "no_citizenship": "no citizenship",
+        "mus_subtitle_diaspora": "Our military units, by this week's damage of their diaspora members:",
+        "bounty_subtitle_diaspora": "The best-rewarded diaspora fighters, by the bounty they earned in battles this week:",
+        "wealth_subtitle_diaspora": "The richest Romanians abroad:",
+        "incomplete_discord": "[WARNING, delete before publishing: the Discord member list could not be read, so Romanians abroad who aren't in our military units are missing. Run /run_job gov_weekly_ranking again before the reset.]",
+        "incomplete_mus": "[WARNING, delete before publishing: {count} configured military units could not be loaded, so their members may be missing. Run /run_job gov_weekly_ranking again before the reset.]",
+        "brackets": {
+            "wannabes": "🌱 Wannabes",
+            "sweaty_beginners": "⚔️ Sweaty Beginners",
+            "tryhards": "🔥 Tryhards",
+            "damage_addicts": "💉 Damage Addicts",
+            "certified_menaces": "🤓 Certified Menaces",
+            "no_grass_touched": "⚡ No Grass Touched",
+            "war_machines": "👑 War Machines",
+            "nuclear_arsenal": "☢️ Nuclear Arsenal",
+            "pocket_money": "💸 Pocket Money Donors",
+            "tax_evaders": "🤝 Tax Evaders",
+            "big_spenders": "💰 Big Spenders",
+            "sugar_daddies": "🤑 Sugar Daddies"
         }
     }
 }

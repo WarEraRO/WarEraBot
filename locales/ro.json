@@ -470,6 +470,10 @@
                 "name": "contest_tracker — la fiecare 5 minute",
                 "desc": "Rulează concursurile create cu /start_contest: la început înscrie membrii unităților participante și anunță concursul în firul de concurs al fiecărei unități (altfel în canalul ei, o dată pe canal); actualizează punctele din API-ul WarEra în fiecare oră; postează clasamentul cu 15 minute înainte de fiecare resetare și rezultatele finale după ultima zi. Rulările ratate sunt recuperate din starea salvată."
             },
+            "gov_weekly_ranking": {
+                "name": "gov_weekly_ranking — duminica, cu 12 minute înainte de resetarea săptămânală",
+                "desc": "Cu puțin înainte de resetarea săptămânală a jocului, postează în canalul guvernului articolul săptămânal al guvernului („Topul săptămânii”) ca fișier .txt gata de copiat, doar cu cetățeni români: top 5 damage săptămânal și top 3 donatori către România pe fiecare level bracket, jucătorul cu build de luptă care a donat cel mai mult, unitățile militare românești după damage-ul membrilor români, top 10 bounty săptămânal, cei mai bogați 10 cetățeni și toți cei care au dat prestige. Un al doilea fișier („-diaspora”) acoperă românii care nu sunt cetățeni români: membrii serverului cu rol Citizen/Newbie și membrii unităților militare configurate cu altă cetățenie, cu aceleași secțiuni fără donații, unitățile noastre după damage-ul membrilor din diaspora și cetățenia fiecărui jucător. Jucătorii și unitățile apar ca linkuri, pe care editorul din joc le transformă în mențiuni. Articolul este mereu în română. gov_bounty_tracker (la fiecare 15 minute) citește din timp bounty-ul bătăliilor încheiate."
+            },
             "newbie_welcome": {
                 "name": "newbie_welcome - la primirea rolului Newbie",
                 "desc": "Când un membru primește rolul Newbie, îl menționează în chatul pentru începători (chats.ro_newbie) cu un mesaj de bun venit: porecla de pe server, primii pași, până la 5 unități militare configurate cu locuri libere (citite live, fără MU-urile \"fight\"), promovarea la Citizen și unde se folosesc comenzile botului (channels.public_commands). Nu postează nimic la repornire sau pentru membrii care aveau deja rolul."
@@ -1517,6 +1521,67 @@
                 "companies_level": "Nivelul Motorului Automat al acelor companii (0-7). Producția e evaluată ca fier.",
                 "battle_bonus": "Bonusul total de luptă în procente (patriotic, ordine, alianță, ...). Implicit 20."
             }
+        }
+    },
+    "gov_weekly_ranking": {
+        "title": "[RO-GOV] TOPUL SĂPTĂMÂNII {start} - {end}",
+        "damage_title": "⚔️ Damage",
+        "damage_subtitle": "Top {count} damage / level brackets:",
+        "donations_title": "💝 Donații",
+        "donations_subtitle": "Top {count} donații / level brackets:",
+        "bracket": "- Level {levels} [{label}]:",
+        "entry": "- {url} ({level}) → {value}",
+        "top_entry": "- {url} → {value}",
+        "nobody": "- —",
+        "unavailable": "- (datele nu au putut fi încărcate din API)",
+        "built_different": "- Persoana cu cel mai mare procentaj pe fight și donat cel mai mult [❤️ Built Different]:",
+        "built_different_entry": "- {url} ({level}) · {percent}% fight → {value}",
+        "mus_title": "⚔️ Top Unități Militare",
+        "mus_subtitle": "Unitățile militare românești, după damage-ul din această săptămână al membrilor români:",
+        "mu_entry": "- {url} → {value} dmg ({members})",
+        "members": {
+            "one": "{count} membru",
+            "few": "{count} membri",
+            "other": "{count} de membri"
+        },
+        "bounty_title": "🎯 Top Bounty (săptămânal)",
+        "bounty_subtitle": "Cei mai bine recompensați luptători, după bounty-ul încasat din lupte în această săptămână:",
+        "bounty_note": "Bounty din {battles} bătălii încheiate între {start} și {end} ({records} înregistrări).",
+        "span_format": "%d %b %H:%M",
+        "wealth_title": "💰 Top Avuție",
+        "wealth_subtitle": "Cei mai bogați cetățeni români:",
+        "prestige_title": "⭐ Top Prestige",
+        "prestige_subtitle": "Toți jucătorii care au dat prestige (după numărul de prestige-uri, apoi nivel):",
+        "prestige_entry": "- {url} → {prestige}× prestige (lvl {level})",
+        "compiled": "Top-ul a fost alcătuit pe {date}, pentru săptămâna {start}–{end}.",
+        "signature": "Cu apreciere, Guvernul României 🇷🇴",
+        "date_format": "%d %B %Y",
+        "incomplete_players": "[ATENȚIE, ștergeți înainte de publicare: {count} jucători nu au putut fi încărcați din API, așa că pot lipsi din topuri. Rulați din nou /run_job gov_weekly_ranking înainte de resetare.]",
+        "incomplete_battles": "[ATENȚIE, ștergeți înainte de publicare: bounty-ul din {count} bătălii nu a putut fi citit complet, așa că Top Bounty poate fi incomplet. Rulați din nou /run_job gov_weekly_ranking înainte de resetare.]",
+        "diaspora_title": "[RO-GOV] TOPUL DIASPOREI {start} - {end}",
+        "diaspora_intro": "Românii din afara României: membrii serverului nostru de Discord și ai unităților noastre militare care au altă cetățenie decât cea română.",
+        "entry_abroad": "- {url} ({level}) {place} → {value}",
+        "top_entry_abroad": "- {url} {place} → {value}",
+        "prestige_entry_abroad": "- {url} {place} → {prestige}× prestige (lvl {level})",
+        "no_citizenship": "fără cetățenie",
+        "mus_subtitle_diaspora": "Unitățile noastre militare, după damage-ul din această săptămână al membrilor din diaspora:",
+        "bounty_subtitle_diaspora": "Cei mai bine recompensați luptători din diaspora, după bounty-ul încasat din lupte în această săptămână:",
+        "wealth_subtitle_diaspora": "Cei mai bogați români din diaspora:",
+        "incomplete_discord": "[ATENȚIE, ștergeți înainte de publicare: lista membrilor de pe Discord nu a putut fi citită, așa că lipsesc românii din diaspora care nu sunt în unitățile noastre militare. Rulați din nou /run_job gov_weekly_ranking înainte de resetare.]",
+        "incomplete_mus": "[ATENȚIE, ștergeți înainte de publicare: {count} unități militare din configurare nu au putut fi încărcate, așa că membrii lor pot lipsi. Rulați din nou /run_job gov_weekly_ranking înainte de resetare.]",
+        "brackets": {
+            "wannabes": "🌱 Wannabes",
+            "sweaty_beginners": "⚔️ Sweaty Beginners",
+            "tryhards": "🔥 Tryhards",
+            "damage_addicts": "💉 Damage Addicts",
+            "certified_menaces": "🤓 Certified Menaces",
+            "no_grass_touched": "⚡ No Grass Touched",
+            "war_machines": "👑 War Machines",
+            "nuclear_arsenal": "☢️ Nuclear Arsenal",
+            "pocket_money": "💸 Pocket Money Donors",
+            "tax_evaders": "🤝 Tax Evaders",
+            "big_spenders": "💰 Big Spenders",
+            "sugar_daddies": "🤑 Sugar Daddies"
         }
     }
 }
