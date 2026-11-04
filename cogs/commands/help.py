@@ -67,6 +67,7 @@ _JOB_IDS: List[str] = [
     "newbie_welcome",
     "contest_tracker",
     "gov_weekly_ranking",
+    "gov_monthly_ranking",
 ]
 
 _COMMANDS_PER_PAGE = 3

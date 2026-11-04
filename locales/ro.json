@@ -472,7 +472,11 @@
             },
             "gov_weekly_ranking": {
                 "name": "gov_weekly_ranking — duminica, cu 12 minute înainte de resetarea săptămânală",
-                "desc": "Cu puțin înainte de resetarea săptămânală a jocului, postează în canalul guvernului articolul săptămânal al guvernului („Topul săptămânii”) ca fișier .txt gata de copiat, doar cu cetățeni români: top 5 damage săptămânal și top 3 donatori către România pe fiecare level bracket, jucătorul cu build de luptă care a donat cel mai mult, unitățile militare românești după damage-ul membrilor români, top 10 bounty săptămânal, cei mai bogați 10 cetățeni și toți cei care au dat prestige. Un al doilea fișier („-diaspora”) acoperă românii care nu sunt cetățeni români: membrii serverului cu rol Citizen/Newbie și membrii unităților militare configurate cu altă cetățenie, cu aceleași secțiuni fără donații, unitățile noastre după damage-ul membrilor din diaspora și cetățenia fiecărui jucător. Jucătorii și unitățile apar ca linkuri, pe care editorul din joc le transformă în mențiuni. Articolul este mereu în română. gov_bounty_tracker (la fiecare 15 minute) citește din timp bounty-ul bătăliilor încheiate."
+                "desc": "Cu puțin înainte de resetarea săptămânală a jocului, postează în canalul guvernului articolul săptămânal al guvernului („Topul săptămânii”) ca fișier .txt gata de copiat, doar cu cetățeni români: top 5 damage săptămânal și top 3 donatori către România pe fiecare level bracket, jucătorul cu build de luptă care a donat cel mai mult, unitățile militare românești după damage-ul membrilor români, top 10 bounty săptămânal, cei mai bogați 10 cetățeni și toți cei care au dat prestige. Un al doilea fișier („-diaspora”) acoperă românii care nu sunt cetățeni români: membrii serverului cu rol Citizen/Newbie și membrii unităților militare configurate cu altă cetățenie, cu aceleași secțiuni fără donații, unitățile noastre după damage-ul membrilor din diaspora și cetățenia fiecărui jucător. Jucătorii și unitățile apar ca linkuri, pe care editorul din joc le transformă în mențiuni. Articolul este mereu în română. gov_battle_tracker (la fiecare 15 minute) citește din timp bătăliile încheiate."
+            },
+            "gov_monthly_ranking": {
+                "name": "gov_monthly_ranking — ultima zi a lunii, cu 12 minute înainte de resetarea lunară",
+                "desc": "Cu puțin înainte de resetarea lunară, postează în canalul guvernului articolul lunar al guvernului („TOP LUNA ...”) ca fișier .txt gata de copiat, cu aceleași secțiuni ca gov_weekly_ranking (fără fișier de diaspora), pe toată luna: damage-ul jucătorilor și al unităților militare și bounty-ul sunt adunate din toate bătăliile încheiate în lună (o unitate primește damage-ul făcut de membrii ei cât timp erau în ea), donațiile către România de la precedenta rulare lunară. O rulare forțată postează luna de până acum. gov_battle_tracker (la fiecare 15 minute) citește din timp bătăliile încheiate; după o repornire, raportul citește singur restul, ceea ce poate dura câteva minute."
             },
             "newbie_welcome": {
                 "name": "newbie_welcome - la primirea rolului Newbie",
@@ -1583,5 +1587,15 @@
             "big_spenders": "💰 Big Spenders",
             "sugar_daddies": "🤑 Sugar Daddies"
         }
+    },
+    "gov_monthly_ranking": {
+        "title": "[RO-GOV] TOP LUNA {month_upper}",
+        "mus_subtitle": "Unitățile militare românești, după damage-ul lunar acumulat în bătălii de toți membrii lor (membri = cetățenii români din unitate care au făcut damage luna aceasta):",
+        "bounty_title": "🎯 Top Bounty (luna)",
+        "bounty_subtitle": "Cei mai bine recompensați luptători, după bounty-ul încasat din lupte în această lună:",
+        "bounty_note": "Damage și bounty din {battles} bătălii încheiate între {start} și {end} ({records} înregistrări de bounty).",
+        "compiled": "Top-ul a fost alcătuit pe {date}, pentru luna {month} {year} (perioadă acoperită: {start}–{end}).",
+        "incomplete_players": "[ATENȚIE, ștergeți înainte de publicare: {count} jucători nu au putut fi încărcați din API, așa că pot lipsi din topuri. Rulați din nou /run_job gov_monthly_ranking înainte de resetare.]",
+        "incomplete_battles": "[ATENȚIE, ștergeți înainte de publicare: damage-ul sau bounty-ul din {count} bătălii nu a putut fi citit complet, așa că topurile de damage, unități militare și bounty pot fi incomplete. Rulați din nou /run_job gov_monthly_ranking înainte de resetare.]"
     }
 }

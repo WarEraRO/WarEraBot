@@ -471,7 +471,11 @@
             },
             "gov_weekly_ranking": {
                 "name": "gov_weekly_ranking — Sundays, 12 minutes before the weekly reset",
-                "desc": "Shortly before the weekly game reset, posts the government's weekly top article (\"Topul săptămânii\") in the government channel as a ready-to-paste .txt file, Romanian citizens only: the top 5 weekly damage and the top 3 donors to Romania per level bracket, the fight-build player who donated the most, Romanian military units by their Romanian members' damage, the top 10 weekly bounty earners, the 10 richest citizens and everyone who has prestiged. A second file (-diaspora) covers Romanians who aren't Romanian citizens: the server's Citizen/Newbie members and the members of the configured military units with another citizenship, with the same sections except donations, our units by their diaspora members' damage, and each player's citizenship. Players and units are written as links, which the in-game editor turns into mentions. The article is always in Romanian. gov_bounty_tracker (every 15 minutes) reads the bounty of newly ended battles in advance."
+                "desc": "Shortly before the weekly game reset, posts the government's weekly top article (\"Topul săptămânii\") in the government channel as a ready-to-paste .txt file, Romanian citizens only: the top 5 weekly damage and the top 3 donors to Romania per level bracket, the fight-build player who donated the most, Romanian military units by their Romanian members' damage, the top 10 weekly bounty earners, the 10 richest citizens and everyone who has prestiged. A second file (-diaspora) covers Romanians who aren't Romanian citizens: the server's Citizen/Newbie members and the members of the configured military units with another citizenship, with the same sections except donations, our units by their diaspora members' damage, and each player's citizenship. Players and units are written as links, which the in-game editor turns into mentions. The article is always in Romanian. gov_battle_tracker (every 15 minutes) reads newly ended battles in advance."
+            },
+            "gov_monthly_ranking": {
+                "name": "gov_monthly_ranking — the last day of the month, 12 minutes before the monthly reset",
+                "desc": "Shortly before the monthly reset, posts the government's monthly top article (\"TOP LUNA ...\") in the government channel as a ready-to-paste .txt file, with the same sections as gov_weekly_ranking (no diaspora file), over the whole month: player and military unit damage and bounty are summed over every battle that ended in the month (a unit gets the damage its members did while in it), donations to Romania since the previous monthly cut-off. A forced run posts the month so far. gov_battle_tracker (every 15 minutes) reads newly ended battles in advance; after a restart the report reads the rest itself, which can take a few minutes."
             },
             "newbie_welcome": {
                 "name": "newbie_welcome - when the Newbie role is given",
@@ -1346,5 +1350,15 @@
             "big_spenders": "💰 Big Spenders",
             "sugar_daddies": "🤑 Sugar Daddies"
         }
+    },
+    "gov_monthly_ranking": {
+        "title": "[RO-GOV] TOP OF THE MONTH {month_upper}",
+        "mus_subtitle": "Romanian military units, by the damage all their members did in this month's battles (members = Romanian citizens in the unit who did damage this month):",
+        "bounty_title": "🎯 Top Bounty (month)",
+        "bounty_subtitle": "The best-rewarded fighters, by the bounty they earned in battles this month:",
+        "bounty_note": "Damage and bounty from {battles} battles that ended between {start} and {end} ({records} bounty records).",
+        "compiled": "This top was compiled on {date}, for the month of {month} {year} (period covered: {start}–{end}).",
+        "incomplete_players": "[WARNING, delete before publishing: {count} players could not be loaded from the API, so they may be missing from the tops. Run /run_job gov_monthly_ranking again before the reset.]",
+        "incomplete_battles": "[WARNING, delete before publishing: the damage or bounty of {count} battles could not be read completely, so the damage, military unit and bounty tops may be incomplete. Run /run_job gov_monthly_ranking again before the reset.]"
     }
 }

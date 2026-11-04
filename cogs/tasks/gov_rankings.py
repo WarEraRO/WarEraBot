@@ -1,18 +1,23 @@
-"""Weekly government rankings: the Romanian government's "Topul săptămânii" article, built from the API.
+"""Government rankings: the Romanian government's weekly and monthly top articles, built from the API.
 
-Shortly before the weekly reset, the job posts two ready-to-paste articles as .txt files in the government channel
-(config.json channels.government), in the layout of the government's 2026-10-05 article:
+Shortly before the weekly reset (Sunday) and the monthly reset (the last day of the month), a job posts
+ready-to-paste articles as .txt files in the government channel (config.json channels.government), in the layout of
+the government's articles of 2026-10-05 (weekly) and 2026-10-06 ("TOP LUNA SEPTEMBRIE", monthly; the monthly report
+has no diaspora article, user decision 2026-11-04):
 
 - the Romania top (Romanian citizens only): top damage and top donations to Romania per level bracket, the
-  "Built Different" fighter who donated the most, Romanian MUs by their Romanian members' damage, the week's top
+  "Built Different" fighter who donated the most, Romanian MUs by their Romanian members' damage, the period's top
   bounty earners, the richest citizens and every citizen who has prestiged;
 - the diaspora top: Romanians who are not Romanian citizens, i.e. the server's Citizen/Newbie members and the
   members of the configured MUs with another citizenship, with the same sections except donations, the configured
   MUs by their diaspora members' damage, and each player's citizenship next to their name.
 
-Weekly bounty has no ranking of its own: a separate tracker reads each ended battle's money ranking (everyone paid
-there) and the loot summaries of the Romanian and diaspora earners, a few battles per run, so the Sunday report
-only fetches what is left.
+Weekly damage comes from the weeklyUserDamages ranking. The API has no monthly damage or bounty ranking, so the
+monthly article sums every battle that ended in the month (battleRanking damage per player, and per MU for the
+MU section, so damage counts for the MU the player was in when fighting; user decisions 2026-11-04), and both
+reports read bounty per ended battle (money ranking, then the earners' loot summaries).
+A tracker reads newly ended battles every 15 minutes into an in-memory cache, so a report only fetches what is
+left; after a restart the tracker catches up, or the report reads the rest itself.
 """
 import asyncio
 import io
@@ -33,8 +38,9 @@ from utils.i18n import Translator
 
 logger = logging.getLogger(__name__)
 
-# the weekly rankings reset on Monday 00:00 UTC (gameConfig.getDates().weeklyMissionRegenAt), so the article is
-# built REPORT_LEAD before; damage and donations made in those last minutes are not counted
+# the weekly rankings reset on Monday 00:00 UTC (gameConfig.getDates().weeklyMissionRegenAt) and the monthly missions
+# on the 1st 00:00 UTC (monthlyMissionRegenAt), so each article is built REPORT_LEAD before its reset; battles that
+# end in those last minutes count in the next period
 REPORT_LEAD = timedelta(minutes=12)
 REPORT_TIME = dt_time(hour=23, minute=48, tzinfo=timezone.utc)
 SUNDAY = 6
@@ -68,7 +74,7 @@ DONATION_BRACKETS = (
 # one bracket holding every level, for the tops without level brackets
 ALL_LEVELS = ((0, None, None),)
 
-BOUNTY_TRACKER_MINUTES = 15
+TRACKER_MINUTES = 15
 BATTLES_PER_STEP = 30
 # battles last at most ~1 day and are listed newest-created first, so a battle that ended in a window was
 # created at most this long before the window started
@@ -83,6 +89,15 @@ SUMMARY_CHUNK = 200
 TRACKER_MAX_PAIRS = 1000
 # the Sunday report waits at most this long for the remaining battles, then posts with a warning
 BOUNTY_SYNC_TIMEOUT = 480.0
+# a cold month (after a restart) is ~1,250 battles, read in ~3 minutes [observed 2026-11-04]; nothing the monthly
+# report reads is reset-sensitive (battles count by end time, donations from the window start), so it waits longer
+MONTH_SYNC_TIMEOUT = 900.0
+# tracker steps per run: 2 x 30 battles every 15 minutes (~41 battles end per day) catch up a month in ~5 hours
+TRACKER_STEPS = 2
+# locale namespaces: shared strings always come from WEEKLY_TEXTS, the period-specific ones (PERIOD_KEYS) from the
+# article's own namespace
+WEEKLY_TEXTS = "gov_weekly_ranking"
+MONTHLY_TEXTS = "gov_monthly_ranking"
 
 
 def _iso(value: datetime) -> str:
@@ -103,6 +118,24 @@ def bounty_window_start(now: datetime) -> datetime:
     battles that ended up to its own cut-off, so a battle ending between 23:48 and 00:00 goes to the next week.
     """
     return week_start(now + REPORT_LEAD) - REPORT_LEAD
+
+
+def month_start(now: datetime) -> datetime:
+    """The 1st 00:00 UTC of the month that contains `now`."""
+    return now.astimezone(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def next_month(start: datetime) -> datetime:
+    """The 1st 00:00 UTC of the month after the one that starts at `start`."""
+    return (start + timedelta(days=32)).replace(day=1)
+
+
+def month_window_start(now: datetime) -> datetime:
+    """Start of the monthly battle window that contains `now`: the previous monthly report's cut-off.
+
+    Like bounty_window_start, a battle counts in the month it ends, up to each report's cut-off (1st - REPORT_LEAD).
+    """
+    return month_start(now + REPORT_LEAD) - REPORT_LEAD
 
 
 def battles_in_window(battles: list[dict], start: datetime, end: datetime) -> list[dict]:
@@ -307,6 +340,26 @@ def unit_totals(mus: dict[str, dict], damages: dict[str, float], people: set[str
     return entries
 
 
+def battle_mu_top(
+    mu_damage: dict[str, float],
+    mus: dict[str, dict],
+    members: dict[str, int],
+    country_id: str,
+) -> list[tuple[str, float, int]]:
+    """(MU id, damage, members) of the loaded MUs of `country_id` (mu.country) with battle damage, most damage first.
+
+    `mu_damage` is the period's damage per MU summed from the battles' MU rankings: every member's damage counts,
+    for the MU they were in when they fought (user decision 2026-11-04). `members` gives the count shown next to
+    each MU (MUs missing from it show 0).
+    """
+    entries = [
+        (mu_id, damage, members.get(mu_id, 0)) for mu_id, damage in mu_damage.items()
+        if damage > 0 and (mus.get(mu_id) or {}).get("country") == country_id
+    ]
+    entries.sort(key=lambda entry: (-entry[1], entry[0]))
+    return entries
+
+
 def prestige_list(users: dict[str, dict], people: set[str]) -> list[tuple[str, int, int]]:
     """(user id, prestige count, level) of every loaded player in `people` who has prestiged; most prestige, then level."""
     entries = []
@@ -331,21 +384,45 @@ def bounty_totals(
     is unread when its money ranking was never read, or when one of its earners in `people` has no bounty yet.
     """
     totals: dict[str, float] = {}
-    records = unread = 0
+    records = 0
     for battle_id in battle_ids:
         entry = cache.get(battle_id)
         if entry is None:
-            unread += 1
             continue
-        wanted = entry["earners"] & people
-        if any(user_id not in entry["bounty"] for user_id in wanted):
-            unread += 1
-        for user_id in wanted:
+        for user_id in entry["earners"] & people:
             bounty = entry["bounty"].get(user_id) or 0
             if bounty > 0:
                 totals[user_id] = totals.get(user_id, 0) + bounty
                 records += 1
-    return totals, records, unread
+    return totals, records, len(unread_battles(cache, battle_ids, people))
+
+
+def unread_battles(cache: dict[str, dict], battle_ids: list[str], people: set[str]) -> set[str]:
+    """The battles of `battle_ids` whose bounty is not fully read for `people` (see bounty_totals)."""
+    return {
+        battle_id for battle_id in battle_ids
+        if battle_id not in cache
+        or any(user_id not in cache[battle_id]["bounty"] for user_id in cache[battle_id]["earners"] & people)
+    }
+
+
+def bounty_data(
+    snapshot: dict | None,
+    bounty_span: tuple[datetime, datetime],
+    people: set[str],
+) -> tuple[dict[str, float] | None, tuple | None, int]:
+    """(bounty per player in `people`, the bounty note's (battles, records, start, end), unread battles).
+
+    `snapshot` is a report's copy of the battle cache (GovRankingsJob._snapshot) or None when the battle list could
+    not be loaded; `bounty_span` is the (start, end) of its window. Unread battles count a battle once, whether its
+    bounty or (monthly) its damage is missing.
+    """
+    if snapshot is None:
+        return None, None, 0
+    bounty, records, _ = bounty_totals(snapshot["bounty"], snapshot["ids"], people)
+    unread = unread_battles(snapshot["bounty"], snapshot["ids"], people) | snapshot["damage_unread"]
+    start, end = bounty_span
+    return bounty, (len(snapshot["ids"]), records, start, end), len(unread)
 
 
 def format_number(value: float) -> str:
@@ -411,10 +488,10 @@ def _simple_top(
     ] or [tr("gov_weekly_ranking.nobody")]
 
 
-def _warning_lines(tr: Translator, warnings: dict[str, int]) -> list[str]:
-    """The delete-before-publishing warnings for the positive counts in `warnings`, plus a blank line."""
+def _warning_lines(tr: Translator, texts: str, warnings: dict[str, int]) -> list[str]:
+    """The delete-before-publishing warnings (from the `texts` namespace) for the positive counts, plus a blank line."""
     lines = [
-        tr(f"gov_weekly_ranking.incomplete_{name}", count=count)
+        tr(f"{texts}.incomplete_{name}", count=count)
         for name, count in warnings.items() if count
     ]
     return lines + [""] if lines else []
@@ -430,13 +507,19 @@ def _mu_lines(tr: Translator, mus: list[tuple[str, float, int]] | None) -> list[
     ] or [tr("gov_weekly_ranking.nobody")]
 
 
-def _bounty_lines(tr: Translator, data: dict, users: dict[str, dict], places: dict[str, str] | None) -> list[str]:
+def _bounty_lines(
+    tr: Translator,
+    texts: str,
+    data: dict,
+    users: dict[str, dict],
+    places: dict[str, str] | None,
+) -> list[str]:
     lines = _simple_top(tr, data["bounty"], users, BOUNTY_TOP, places)
     if data["bounty_span"] is not None:
         battles, records, start, end = data["bounty_span"]
         span_format = tr("gov_weekly_ranking.span_format")
         lines.append(tr(
-            "gov_weekly_ranking.bounty_note", battles=battles, records=records,
+            f"{texts}.bounty_note", battles=battles, records=records,
             start=tr.strftime(to_local(start), span_format), end=tr.strftime(to_local(end), span_format),
         ))
     return lines
@@ -455,10 +538,10 @@ def _prestige_lines(
     ] or [tr("gov_weekly_ranking.nobody")]
 
 
-def _footer_lines(tr: Translator, now: datetime, week_span: dict) -> list[str]:
+def _footer_lines(tr: Translator, texts: str, now: datetime, span: dict) -> list[str]:
     date_format = tr("gov_weekly_ranking.date_format")
     return [
-        tr("gov_weekly_ranking.compiled", date=tr.strftime(to_local(now), date_format), **week_span),
+        tr(f"{texts}.compiled", date=tr.strftime(to_local(now), date_format), **span),
         "",
         tr("gov_weekly_ranking.signature"),
         tr.strftime(to_local(now), date_format),
@@ -466,28 +549,45 @@ def _footer_lines(tr: Translator, now: datetime, week_span: dict) -> list[str]:
 
 
 def _week_span(week: datetime) -> dict:
+    """The weekly article's title and footer placeholders: the week's first and last day (dd.mm)."""
     return {"start": f"{week:%d.%m}", "end": f"{week + timedelta(days=6):%d.%m}"}
+
+
+def month_span(tr: Translator, month: datetime) -> dict:
+    """The monthly article's title and footer placeholders for the month starting at `month`.
+
+    "month" is the localized month name ("octombrie"), "month_upper" the same in capitals for the title, "year"
+    the year, and "start"/"end" the month's first (dd.mm) and last (dd.mm.yyyy) day.
+    """
+    last = next_month(month) - timedelta(days=1)
+    name = tr.strftime(month, "%B")
+    return {
+        "month": name, "month_upper": name.upper(), "year": month.year,
+        "start": f"{month:%d.%m}", "end": f"{last:%d.%m.%Y}",
+    }
 
 
 def build_article(
     tr: Translator,
-    week: datetime,
+    texts: str,
+    span: dict,
     now: datetime,
     data: dict,
     users: dict[str, dict],
     warnings: dict[str, int],
 ) -> str:
-    """The Romania article text for the week starting `week` (Monday 00:00 UTC), compiled at `now`.
+    """The Romania article text of one period, compiled at `now`.
 
-    `data` holds the week's values, each None when it could not be loaded (its section then says so):
-    "damages", "donations", "wealth", "bounty" ({user id: value}), "mus" (top_mus entries), "prestige"
+    `texts` is the period's locale namespace (WEEKLY_TEXTS or MONTHLY_TEXTS) for the title, subtitles, notes,
+    warnings and footer, and `span` its placeholders (_week_span or month_span). `data` holds the period's
+    values, each None when it could not be loaded (its section then says so):
+    "damages", "donations", "wealth", "bounty" ({user id: value}), "mus" (top_mus or battle_mu_top entries), "prestige"
     (prestige_list entries, or None) and "bounty_span" ((battles, records, start, end) or None). `warnings`
-    maps a warning name ("players": failed to load but could have made a top; "battles": bounty not read
+    maps a warning name ("players": failed to load but could have made a top; "battles": bounty or damage not read
     completely) to a count; each positive count puts a delete-before-publishing warning at the top.
     """
-    week_span = _week_span(week)
-    lines = _warning_lines(tr, warnings)
-    lines += [tr("gov_weekly_ranking.title", **week_span), ""]
+    lines = _warning_lines(tr, texts, warnings)
+    lines += [tr(f"{texts}.title", **span), ""]
 
     lines += [tr("gov_weekly_ranking.damage_title"), tr("gov_weekly_ranking.damage_subtitle", count=DAMAGE_TOP)]
     lines += _bracket_lines(tr, DAMAGE_BRACKETS, data["damages"], users, DAMAGE_TOP)
@@ -509,21 +609,22 @@ def build_article(
         ))
     lines.append("")
 
-    lines += [tr("gov_weekly_ranking.mus_title"), tr("gov_weekly_ranking.mus_subtitle")]
+    lines += [tr("gov_weekly_ranking.mus_title"), tr(f"{texts}.mus_subtitle")]
     lines += _mu_lines(tr, data["mus"]) + [""]
-    lines += [tr("gov_weekly_ranking.bounty_title"), tr("gov_weekly_ranking.bounty_subtitle")]
-    lines += _bounty_lines(tr, data, users, None) + [""]
+    lines += [tr(f"{texts}.bounty_title"), tr(f"{texts}.bounty_subtitle")]
+    lines += _bounty_lines(tr, texts, data, users, None) + [""]
     lines += [tr("gov_weekly_ranking.wealth_title"), tr("gov_weekly_ranking.wealth_subtitle")]
     lines += _simple_top(tr, data["wealth"], users, WEALTH_TOP) + [""]
     lines += [tr("gov_weekly_ranking.prestige_title"), tr("gov_weekly_ranking.prestige_subtitle")]
     lines += _prestige_lines(tr, data["prestige"], None) + [""]
-    lines += _footer_lines(tr, now, week_span)
+    lines += _footer_lines(tr, texts, now, span)
     return "\n".join(lines)
 
 
 def build_diaspora_article(
     tr: Translator,
-    week: datetime,
+    texts: str,
+    span: dict,
     now: datetime,
     data: dict,
     users: dict[str, dict],
@@ -536,21 +637,20 @@ def build_diaspora_article(
     "bounty_span", each None when unavailable. `warnings` may also hold "discord" (the server's member list could
     not be read) and "mus" (configured MUs that failed to load).
     """
-    week_span = _week_span(week)
-    lines = _warning_lines(tr, warnings)
-    lines += [tr("gov_weekly_ranking.diaspora_title", **week_span), tr("gov_weekly_ranking.diaspora_intro"), ""]
+    lines = _warning_lines(tr, texts, warnings)
+    lines += [tr(f"{texts}.diaspora_title", **span), tr("gov_weekly_ranking.diaspora_intro"), ""]
 
     lines += [tr("gov_weekly_ranking.damage_title"), tr("gov_weekly_ranking.damage_subtitle", count=DAMAGE_TOP)]
     lines += _bracket_lines(tr, DAMAGE_BRACKETS, data["damages"], users, DAMAGE_TOP, places)
-    lines += [tr("gov_weekly_ranking.mus_title"), tr("gov_weekly_ranking.mus_subtitle_diaspora")]
+    lines += [tr("gov_weekly_ranking.mus_title"), tr(f"{texts}.mus_subtitle_diaspora")]
     lines += _mu_lines(tr, data["mus"]) + [""]
-    lines += [tr("gov_weekly_ranking.bounty_title"), tr("gov_weekly_ranking.bounty_subtitle_diaspora")]
-    lines += _bounty_lines(tr, data, users, places) + [""]
+    lines += [tr(f"{texts}.bounty_title"), tr(f"{texts}.bounty_subtitle_diaspora")]
+    lines += _bounty_lines(tr, texts, data, users, places) + [""]
     lines += [tr("gov_weekly_ranking.wealth_title"), tr("gov_weekly_ranking.wealth_subtitle_diaspora")]
     lines += _simple_top(tr, data["wealth"], users, WEALTH_TOP, places) + [""]
     lines += [tr("gov_weekly_ranking.prestige_title"), tr("gov_weekly_ranking.prestige_subtitle")]
     lines += _prestige_lines(tr, data["prestige"], places) + [""]
-    lines += _footer_lines(tr, now, week_span)
+    lines += _footer_lines(tr, texts, now, span)
     return "\n".join(lines)
 
 
@@ -564,7 +664,9 @@ async def send_message(destination, content: str, filename: str) -> None:
     await destination.send(file=file)
 
 
-class GovWeeklyRankingJob(commands.Cog):
+class GovRankingsJob(commands.Cog):
+    """The government's weekly and monthly articles, and the battle tracker that prefetches their battles."""
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._country_id: str | None = None
@@ -575,20 +677,30 @@ class GovWeeklyRankingJob(commands.Cog):
         self._romanians_at = float("-inf")
         self._diaspora: set[str] = set()
         self._diaspora_at = float("-inf")
-        # bounty window start -> {battle id: {"earners": set of user ids paid in it, "bounty": {user id: bounty}}}
-        self._bounty: dict[datetime, dict[str, dict]] = {}
-        # bounty window start -> (time.monotonic() of the last listing, its battle ids), so a report whose sync timed
-        # out can still count when that listing was made by the report's own sync
+        # battle id -> {"ended": its endedAt, "earners": user ids paid in its money ranking (None until read),
+        # "bounty": {user id: bounty}, "damage": whether its damage ranking was added to its month's totals}
+        self._battles: dict[str, dict] = {}
+        # month window start -> {user id: damage summed over the window's battles with "damage" True}, every player
+        self._damage: dict[datetime, dict[str, float]] = {}
+        # month window start -> {MU id: damage of the same battles' MU rankings}, every MU
+        self._mu_damage: dict[datetime, dict[str, float]] = {}
+        # window start -> (time.monotonic() of the last listing, its battle ids), so a report whose sync timed out
+        # can still count when that listing was made by the report's own sync
         self._window_battles: dict[datetime, tuple[float, list[str]]] = {}
-        # battle id -> failed money-ranking reads
+        # battle id -> failed ranking reads
         self._attempts: dict[str, int] = {}
-        self._bounty_lock = asyncio.Lock()
+        # every read or write of the battle caches holds this; a report takes it before its sync timeout starts,
+        # so a weekly report queued behind the monthly sync (a month-end Sunday) still gets its full timeout
+        self._battle_lock = asyncio.Lock()
         self.gov_weekly_ranking.start()
-        self.gov_bounty_tracker.start()
+        self.gov_monthly_ranking.start()
+        self.gov_battle_tracker.start()
 
     def cog_unload(self):
+        """Stop the three loops when the cog is unloaded."""
         self.gov_weekly_ranking.cancel()
-        self.gov_bounty_tracker.cancel()
+        self.gov_monthly_ranking.cancel()
+        self.gov_battle_tracker.cancel()
 
     async def _load_country_id(self) -> str | None:
         """Romania's country id (the country list is read once), or None while it can't be loaded."""
@@ -665,99 +777,210 @@ class GovWeeklyRankingJob(commands.Cog):
             self._diaspora |= candidates
         return candidates, mus, warnings
 
-    async def _check_reset(self, week: datetime) -> None:
-        """Warn when the game's weekly reset is not the Monday 00:00 UTC this schedule assumes."""
+    async def _check_reset(self, key: str, expected: datetime) -> None:
+        """Warn when the game's `key` reset (gameConfig.getDates) is not at `expected`, as REPORT_TIME assumes."""
         dates = await warera.game.get_dates()
-        expected = (week + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S")
-        regen_at = (dates or {}).get("weeklyMissionRegenAt")
-        if isinstance(regen_at, str) and not regen_at.startswith(expected):
-            logger.warning("Weekly reset is %s, not %s as REPORT_TIME assumes", regen_at, expected)
+        regen_at = (dates or {}).get(key)
+        if isinstance(regen_at, str) and not regen_at.startswith(expected.strftime("%Y-%m-%dT%H:%M:%S")):
+            logger.warning("%s is %s, not %s as REPORT_TIME assumes", key, regen_at, _iso(expected))
 
-    async def _read_rankings(self, window: datetime, battle_ids: list[str]) -> None:
-        """Read the money ranking of each battle (everyone paid there) into the window's cache."""
-        cache = self._bounty.setdefault(window, {})
+    def _prune(self, now: datetime) -> None:
+        """Drop the battles and windows older than the previous week and month windows.
+
+        The previous windows are kept because a report starts at its own cut-off, the moment the current windows
+        (bounty_window_start, month_window_start) switch to the next period, and still reads the finished one. A
+        kept battle whose month totals were dropped is marked unread, so its damage could never go missing silently.
+        """
+        week = bounty_window_start(now)
+        month = month_window_start(now)
+        cut = min(week - timedelta(days=7), month_window_start(month - timedelta(seconds=1)))
+        cut_iso = _iso(cut)
+        self._battles = {battle_id: entry for battle_id, entry in self._battles.items() if entry["ended"] >= cut_iso}
+        for cache in (self._damage, self._mu_damage, self._window_battles):
+            for start in [start for start in cache if start < cut]:
+                cache.pop(start, None)
+        oldest_totals = _iso(min(self._damage)) if self._damage else None
+        for entry in self._battles.values():
+            if entry["damage"] and (oldest_totals is None or entry["ended"] < oldest_totals):
+                entry["damage"] = False
+
+    async def _read_battles(self, battle_ids: list[str], damage_windows: dict[str, datetime]) -> None:
+        """Read the missing money rankings of `battle_ids`, and the user and MU damage rankings in `damage_windows`.
+
+        `damage_windows` maps a battle id to the month window its damage counts in. A battle's user and MU damage
+        are added to that window's totals together, only after both whole rankings came back (get_ranking answers
+        None when any page fails), with no await in between, so a cancelled or failed read never counts a battle
+        partly or twice.
+        """
+        money_ids = [battle_id for battle_id in battle_ids if self._battles[battle_id]["earners"] is None]
+        damage_ids = [
+            battle_id for battle_id in battle_ids
+            if battle_id in damage_windows and not self._battles[battle_id]["damage"]
+        ]
         rankings = await asyncio.gather(
-            *(warera.battles.get_ranking(battle_id, "money", "user", "merged") for battle_id in battle_ids)
+            *(warera.battles.get_ranking(battle_id, "money", "user", "merged") for battle_id in money_ids),
+            *(warera.battles.get_ranking(battle_id, "damage", "user", "merged") for battle_id in damage_ids),
+            *(warera.battles.get_ranking(battle_id, "damage", "mu", "merged") for battle_id in damage_ids),
         )
-        for battle_id, items in zip(battle_ids, rankings):
+        failed = set()
+        for battle_id, items in zip(money_ids, rankings[:len(money_ids)]):
             if items is None:
-                self._attempts[battle_id] = self._attempts.get(battle_id, 0) + 1
+                failed.add(battle_id)
                 continue
-            self._attempts.pop(battle_id, None)
-            cache[battle_id] = {
-                "earners": {item["user"] for item in items if item.get("user") and (item.get("value") or 0) > 0},
-                "bounty": {},
+            self._battles[battle_id]["earners"] = {
+                item["user"] for item in items if item.get("user") and (item.get("value") or 0) > 0
             }
+        user_rankings = rankings[len(money_ids):len(money_ids) + len(damage_ids)]
+        mu_rankings = rankings[len(money_ids) + len(damage_ids):]
+        for battle_id, user_items, mu_items in zip(damage_ids, user_rankings, mu_rankings):
+            if user_items is None or mu_items is None:
+                failed.add(battle_id)
+                continue
+            window = damage_windows[battle_id]
+            for totals, items, key in ((self._damage.setdefault(window, {}), user_items, "user"),
+                                       (self._mu_damage.setdefault(window, {}), mu_items, "mu")):
+                for item in items:
+                    value = item.get("value") or 0
+                    if item.get(key) and value > 0:
+                        totals[item[key]] = totals.get(item[key], 0) + value
+            self._battles[battle_id]["damage"] = True
+        for battle_id in battle_ids:
+            if battle_id in failed:
+                self._attempts[battle_id] = self._attempts.get(battle_id, 0) + 1
+            else:
+                self._attempts.pop(battle_id, None)
 
-    async def _fill_bounty(
-        self,
-        window: datetime,
-        battle_ids: list[str],
-        people: set[str],
-        max_pairs: int | None = None,
-    ) -> None:
-        """Read the bounty of the earners in `people` that the cached battles don't have yet (at most `max_pairs`).
+    async def _fill_bounty(self, battle_ids: list[str], people: set[str], max_pairs: int | None = None) -> None:
+        """Read the bounty of the earners in `people` that the read battles don't have yet (at most `max_pairs`).
 
         The money ranking mixes bounty with contract pay; the loot summary splits them. A summary of None is a 404
         (no hits in that battle, so no bounty); a failed summary stays missing and is retried by the next call.
         Results are saved per SUMMARY_CHUNK, so a cancelled call keeps the chunks already read.
         """
-        cache = self._bounty.get(window, {})
         pairs = [
             (battle_id, user_id)
-            for battle_id in battle_ids if battle_id in cache
-            for user_id in cache[battle_id]["earners"] & people if user_id not in cache[battle_id]["bounty"]
+            for battle_id in battle_ids if (self._battles.get(battle_id) or {}).get("earners")
+            for user_id in self._battles[battle_id]["earners"] & people
+            if user_id not in self._battles[battle_id]["bounty"]
         ][:max_pairs]
         for start in range(0, len(pairs), SUMMARY_CHUNK):
             summaries = await warera.battles.get_loot_summaries_many(pairs[start:start + SUMMARY_CHUNK])
             for (battle_id, user_id), summary in summaries.items():
-                cache[battle_id]["bounty"][user_id] = (summary or {}).get("totalMoneyFromBounty") or 0
+                self._battles[battle_id]["bounty"][user_id] = (summary or {}).get("totalMoneyFromBounty") or 0
 
-    async def _sync_bounty(
+    async def _sync_battles(
         self,
-        window: datetime,
-        end: datetime,
+        ranges: list[tuple[datetime, datetime, bool]],
         people: set[str],
         max_steps: int | None = None,
         retry_failed: bool = False,
-    ) -> list[str] | None:
-        """Read the battles that ended in [window, end) and the bounty of their earners in `people`.
+    ) -> dict[datetime, list[str]] | None:
+        """Read the battles that ended in each (start, end, with damage) range and the bounty of their earners.
 
-        Reads at most `max_steps` steps of BATTLES_PER_STEP new battles (all with None), saving each step's
-        results, so a cancelled sync keeps its progress; the battle list is saved in `_window_battles` first.
-        Battles whose ranking failed MAX_BATTLE_ATTEMPTS times are skipped unless `retry_failed`. Returns the ids
-        of every battle in [window, end), or None when the battle list could not be loaded.
+        The caller holds `_battle_lock`. Every battle's money ranking is read; the damage ranking only for ranges
+        with damage (the month). Reads at most `max_steps` steps of BATTLES_PER_STEP battles (all with None),
+        saving each step's results, so a cancelled sync keeps its progress; each range's battle list is saved in
+        `_window_battles` first. Battles whose rankings failed MAX_BATTLE_ATTEMPTS times are skipped unless
+        `retry_failed`. Returns {range start: ids of the battles in that range}, or None when the battle list
+        could not be loaded.
         """
-        async with self._bounty_lock:
-            # only this window and the previous one can still be reported
-            for stale in [start for start in self._bounty if start < window - timedelta(days=7)]:
-                self._bounty.pop(stale, None)
-                self._window_battles.pop(stale, None)
-            ended = await warera.battles.get_ended_since(_iso(window - BATTLE_MAX_AGE))
-            if ended is None:
-                return None
-            battle_ids = [battle["_id"] for battle in battles_in_window(ended, window, end)]
-            self._window_battles[window] = (time.monotonic(), battle_ids)
-            # failure counts of battles outside the current listing can't be used again
-            self._attempts = {b: n for b, n in self._attempts.items() if b in set(battle_ids)}
-            cache = self._bounty.setdefault(window, {})
-            todo = [
-                battle_id for battle_id in battle_ids
-                if battle_id not in cache and (retry_failed or self._attempts.get(battle_id, 0) < MAX_BATTLE_ATTEMPTS)
-            ]
-            steps = 0
-            while todo and (max_steps is None or steps < max_steps):
-                step, todo = todo[:BATTLES_PER_STEP], todo[BATTLES_PER_STEP:]
-                await self._read_rankings(window, step)
-                await self._fill_bounty(window, step, people)
-                steps += 1
-            # earners added to `people` since a battle was read (new members, a late member list) are read now
-            await self._fill_bounty(window, battle_ids, people, None if max_steps is None else TRACKER_MAX_PAIRS)
-            return battle_ids
+        self._prune(datetime.now(timezone.utc))
+        oldest = min(start for start, _, _ in ranges)
+        ended = await warera.battles.get_ended_since(_iso(oldest - BATTLE_MAX_AGE))
+        if ended is None:
+            return None
+        listed: dict[datetime, list[str]] = {}
+        damage_windows: dict[str, datetime] = {}
+        for start, end, with_damage in ranges:
+            battles = battles_in_window(ended, start, end)
+            for battle in battles:
+                self._battles.setdefault(
+                    battle["_id"], {"ended": battle["endedAt"], "earners": None, "bounty": {}, "damage": False},
+                )
+                if with_damage:
+                    damage_windows[battle["_id"]] = start
+            if with_damage:
+                self._damage.setdefault(start, {})
+                self._mu_damage.setdefault(start, {})
+            listed[start] = [battle["_id"] for battle in battles]
+            self._window_battles[start] = (time.monotonic(), listed[start])
+        battle_ids = list(dict.fromkeys(battle_id for ids in listed.values() for battle_id in ids))
+        # failure counts of battles outside the current listing can't be used again
+        self._attempts = {b: n for b, n in self._attempts.items() if b in set(battle_ids)}
+        todo = [
+            battle_id for battle_id in battle_ids
+            if (
+                self._battles[battle_id]["earners"] is None
+                or (battle_id in damage_windows and not self._battles[battle_id]["damage"])
+            )
+            and (retry_failed or self._attempts.get(battle_id, 0) < MAX_BATTLE_ATTEMPTS)
+        ]
+        steps = 0
+        while todo and (max_steps is None or steps < max_steps):
+            step, todo = todo[:BATTLES_PER_STEP], todo[BATTLES_PER_STEP:]
+            await self._read_battles(step, damage_windows)
+            await self._fill_bounty(step, people)
+            steps += 1
+        # earners added to `people` since a battle was read (new members, a late member list) are read now
+        await self._fill_bounty(battle_ids, people, None if max_steps is None else TRACKER_MAX_PAIRS)
+        return listed
 
-    @tasks.loop(minutes=BOUNTY_TRACKER_MINUTES)
-    async def gov_bounty_tracker(self):
-        """Read the bounty of a few newly ended battles of the current window, so the Sunday report has little left."""
+    def _snapshot(self, start: datetime, battle_ids: list[str], with_damage: bool) -> dict:
+        """A report's copy of the battle cache for one window, so later tracker runs can't change it.
+
+        {"ids": the window's battle ids, "bounty": {battle id: {"earners", "bounty"}} of the battles whose money
+        ranking was read (the bounty_totals cache shape), "damage": the window's {user id: damage} and
+        "mu_damage" its {MU id: damage} (each None without damage), "damage_unread": the battles whose damage
+        rankings were not read (empty without damage)}.
+        """
+        entries = [(battle_id, self._battles.get(battle_id)) for battle_id in battle_ids]
+        return {
+            "ids": list(battle_ids),
+            "bounty": {
+                battle_id: {"earners": set(entry["earners"]), "bounty": dict(entry["bounty"])}
+                for battle_id, entry in entries if entry and entry["earners"] is not None
+            },
+            "damage": dict(self._damage.get(start, {})) if with_damage else None,
+            "mu_damage": dict(self._mu_damage.get(start, {})) if with_damage else None,
+            "damage_unread": (
+                {battle_id for battle_id, entry in entries if not (entry and entry["damage"])} if with_damage else set()
+            ),
+        }
+
+    async def _battle_snapshot(
+        self,
+        start: datetime,
+        end: datetime,
+        people: set[str],
+        with_damage: bool,
+        timeout: float,
+    ) -> dict | None:
+        """Sync the battles that ended in [start, end) (at most `timeout` seconds) and return their _snapshot.
+
+        The timeout starts once the lock is held. When the sync times out, the battles not read yet count as unread;
+        a listing older than this sync (it timed out before relisting) could miss battles, so the result is then
+        None, like a battle list that could not be loaded.
+        """
+        async with self._battle_lock:
+            sync_started = time.monotonic()
+            try:
+                listed = await asyncio.wait_for(
+                    self._sync_battles([(start, end, with_damage)], people, retry_failed=True), timeout,
+                )
+                battle_ids = listed[start] if listed is not None else None
+            except asyncio.TimeoutError:
+                listed_at, battle_ids = self._window_battles.get(start, (float("-inf"), None))
+                if listed_at < sync_started:
+                    battle_ids = None
+                logger.warning("Government ranking: battle sync timed out (%s)",
+                               "posting with what was read" if battle_ids is not None else "no fresh battle list")
+            if battle_ids is None:
+                return None
+            return self._snapshot(start, battle_ids, with_damage)
+
+    @tasks.loop(minutes=TRACKER_MINUTES)
+    async def gov_battle_tracker(self):
+        """Read a few newly ended battles of the current week and month, so the reports have little left."""
         try:
             now = datetime.now(timezone.utc)
             country_id = await self._load_country_id()
@@ -766,11 +989,13 @@ class GovWeeklyRankingJob(commands.Cog):
             romanians = await self._load_romanians(country_id)
             if time.monotonic() - self._diaspora_at >= PLAYER_SETS_TTL:
                 await self._load_diaspora()
-            await self._sync_bounty(bounty_window_start(now), now, romanians | self._diaspora, max_steps=1)
+            ranges = [(bounty_window_start(now), now, False), (month_window_start(now), now, True)]
+            async with self._battle_lock:
+                await self._sync_battles(ranges, romanians | self._diaspora, max_steps=TRACKER_STEPS)
         except Exception:
             # an uncaught error would stop the loop until the next restart
-            logger.exception("Government bounty tracker failed")
-            if asyncio.current_task() is not self.gov_bounty_tracker.get_task():
+            logger.exception("Government battle tracker failed")
+            if asyncio.current_task() is not self.gov_battle_tracker.get_task():
                 raise  # /run_job reports the error to whoever forced the run
 
     @tasks.loop(time=REPORT_TIME)
@@ -781,11 +1006,25 @@ class GovWeeklyRankingJob(commands.Cog):
         if now.weekday() != SUNDAY and asyncio.current_task() is self.gov_weekly_ranking.get_task():
             return
         try:
-            await self._post_rankings(now)
+            await self._post_weekly(now)
         except Exception:
             # an uncaught error would stop the loop until the next restart, skipping every later Sunday
             logger.exception("Government weekly ranking failed")
             if asyncio.current_task() is not self.gov_weekly_ranking.get_task():
+                raise  # /run_job reports the error to whoever forced the run
+
+    @tasks.loop(time=REPORT_TIME)
+    async def gov_monthly_ranking(self):
+        """Build the month's Romania article and post it as a .txt file in the government channel (no diaspora)."""
+        now = datetime.now(timezone.utc)
+        # the loop fires daily but only the month's last day posts; /run_job always posts (the month so far)
+        if (now + timedelta(days=1)).day != 1 and asyncio.current_task() is self.gov_monthly_ranking.get_task():
+            return
+        try:
+            await self._post_monthly(now)
+        except Exception:
+            logger.exception("Government monthly ranking failed")
+            if asyncio.current_task() is not self.gov_monthly_ranking.get_task():
                 raise  # /run_job reports the error to whoever forced the run
 
     async def _load_users(self, user_ids: list[str], users: dict[str, dict] | None = None) -> dict[str, dict]:
@@ -801,20 +1040,32 @@ class GovWeeklyRankingJob(commands.Cog):
                 logger.warning("Government ranking: %d players could not be loaded", still)
         return users
 
-    async def _post_rankings(self, now: datetime) -> None:
-        """Fetch the week's data, build both articles and send them to the government channel.
-
-        The week is fixed from `now` at the start; the weekly rankings and donations are read first, before the
-        bounty sync that may take minutes, so they still describe this week if the sync runs past the reset. The
-        diaspora article is built and sent after the Romania one, and its failure never affects that one.
-        """
+    def _government_channel(self):
+        """The government channel (config.json channels.government), or None with a warning."""
         guild = self.bot.get_guild(config["guild"])
         channel_id = config.get("channels", {}).get("government")
         channel = guild.get_channel_or_thread(channel_id) if guild and channel_id else None
         if channel is None:
-            logger.warning("Government channel %s not found; weekly ranking not posted", channel_id)
-            return
+            logger.warning("Government channel %s not found; government ranking not posted", channel_id)
+        return channel
 
+    async def _read_diaspora(self) -> tuple[set[str], dict[str, dict], dict[str, int]] | None:
+        """_load_diaspora, or None (logged) when it fails, so the Romania article is posted anyway."""
+        try:
+            return await self._load_diaspora()
+        except Exception:
+            logger.exception("Government ranking: diaspora members could not be read")
+            return None
+
+    async def _post_weekly(self, now: datetime) -> None:
+        """Fetch the week's data, build both articles and send them to the government channel.
+
+        The week is fixed from `now` at the start; the weekly rankings and donations are read first, before the
+        battle sync that may take minutes, so they still describe this week if the sync runs past the reset.
+        """
+        channel = self._government_channel()
+        if channel is None:
+            return
         week = week_start(now)
         country_id = await self._load_country_id()
         if country_id is None:
@@ -824,85 +1075,118 @@ class GovWeeklyRankingJob(commands.Cog):
             warera.game.get_ranking("weeklyUserDamages"),
             warera.game.get_ranking("userWealth"),
             warera.market.get_country_transactions(country_id, "donation", _iso(week)),
-            self._check_reset(week),
+            self._check_reset("weeklyMissionRegenAt", week + timedelta(days=7)),
         )
         for name, value in (("damage ranking", damage_ranking), ("wealth ranking", wealth_ranking),
                             ("donations", transactions)):
             if value is None:
                 logger.warning("Government ranking: %s unavailable", name)
         romanians = await self._load_romanians(country_id, wealth_ranking)
-        try:
-            diaspora = await self._load_diaspora()
-        except Exception:
-            logger.exception("Government ranking: diaspora members could not be read")
-            diaspora = None
-        candidates = diaspora[0] if diaspora else set()
+        diaspora = await self._read_diaspora()
 
         # this report counts the battles that ended since the previous report's cut-off, up to its own
         window = week - REPORT_LEAD
         bounty_end = min(now, week + timedelta(days=7) - REPORT_LEAD)
-        sync_started = time.monotonic()
-        try:
-            battle_ids = await asyncio.wait_for(
-                self._sync_bounty(window, bounty_end, romanians | candidates, retry_failed=True), BOUNTY_SYNC_TIMEOUT,
-            )
-        except asyncio.TimeoutError:
-            # the listing is saved before the reading starts, so the battles not read yet count as unread; a listing
-            # older than this sync (it timed out before relisting) could miss battles, so bounty is then unavailable
-            listed_at, listed = self._window_battles.get(window, (float("-inf"), None))
-            battle_ids = listed if listed_at >= sync_started else None
-            logger.warning("Government ranking: bounty sync timed out (%s)",
-                           "posting with what was read" if battle_ids is not None else "no fresh battle list")
-        bounty_span = None
-        if battle_ids is not None:
-            bounty_span = (len(battle_ids), window, bounty_end)
+        snapshot = await self._battle_snapshot(
+            window, bounty_end, romanians | (diaspora[0] if diaspora else set()), False, BOUNTY_SYNC_TIMEOUT,
+        )
+        has_damage = damage_ranking is not None
+        await self._post_articles(
+            channel, f"{week + timedelta(days=6):%Y-%m-%d}", WEEKLY_TEXTS, _week_span(week), now, country_id,
+            damages=country_values(damage_ranking, country_id) if has_damage else None,
+            user_mus=ranking_mus(damage_ranking, country_id) if has_damage else {},
+            all_damages=ranking_values(damage_ranking) if has_damage else None,
+            wealth_ranking=wealth_ranking,
+            donations=donation_totals(transactions, country_id, week) if transactions is not None else None,
+            romanians=romanians, diaspora=diaspora, snapshot=snapshot, bounty_span=(window, bounty_end),
+        )
 
+    async def _post_monthly(self, now: datetime) -> None:
+        """Fetch the month's data, build the Romania article and send it to the government channel.
+
+        Damage (players and MUs) and bounty come from every battle that ended in the month window [previous
+        cut-off, this cut-off), donations from the window start, wealth and prestige as they are now. There is no
+        diaspora article (user decision 2026-11-04).
+        """
+        channel = self._government_channel()
+        if channel is None:
+            return
+        month = month_start(now)
+        country_id = await self._load_country_id()
+        if country_id is None:
+            logger.warning("Country %s not found; monthly ranking not posted", COUNTRY_NAME)
+            return
+        window = month - REPORT_LEAD
+        end = min(now, next_month(month) - REPORT_LEAD)
+        wealth_ranking, transactions, _ = await asyncio.gather(
+            warera.game.get_ranking("userWealth"),
+            warera.market.get_country_transactions(country_id, "donation", _iso(window)),
+            self._check_reset("monthlyMissionRegenAt", next_month(month)),
+        )
+        for name, value in (("wealth ranking", wealth_ranking), ("donations", transactions)):
+            if value is None:
+                logger.warning("Government ranking: %s unavailable", name)
+        romanians = await self._load_romanians(country_id, wealth_ranking)
+        snapshot = await self._battle_snapshot(window, end, romanians, True, MONTH_SYNC_TIMEOUT)
+        totals = snapshot["damage"] if snapshot is not None else None
+        await self._post_articles(
+            channel, f"{month:%Y-%m}", MONTHLY_TEXTS, month_span(Translator(ARTICLE_LANGUAGE), month), now,
+            country_id,
+            # the totals hold every player; the wealth ranking's Romanians are the citizens to load and check
+            damages=restrict(totals, romanians), user_mus=None, all_damages=totals,
+            wealth_ranking=wealth_ranking,
+            donations=donation_totals(transactions, country_id, window) if transactions is not None else None,
+            romanians=romanians, diaspora=None, snapshot=snapshot, bounty_span=(window, end),
+            mu_damage=snapshot["mu_damage"] if snapshot is not None else None,
+        )
+
+    async def _post_articles(
+        self, channel, filename: str, texts: str, span: dict, now: datetime, country_id: str, *,
+        damages, user_mus, all_damages, wealth_ranking, donations, romanians, diaspora, snapshot, bounty_span,
+        mu_damage=None,
+    ) -> None:
+        """Build and send the Romania article, then the diaspora one, as `filename`.txt and `filename`-diaspora.txt.
+
+        `diaspora` (_load_diaspora's result) None skips the diaspora article. `mu_damage` ({MU id: damage} from the
+        battles' MU rankings, monthly) ranks the Romanian MUs instead of their members' summed damage.
+
+        `damages` are the period's damages of the Romanian candidates and `all_damages` every player's (each None
+        when unavailable); `user_mus` maps a player to the MU their damage counts for (None: their current MU,
+        read from the loaded users). The diaspora article's failure never affects the Romania one.
+        """
         users: dict[str, dict] = {}
         tr = Translator(ARTICLE_LANGUAGE)
         content = await self._romania_article(
-            tr, week, now, country_id, damage_ranking, wealth_ranking, transactions, romanians,
-            battle_ids, bounty_span, users,
+            tr, texts, span, now, country_id, damages, user_mus, wealth_ranking, donations, romanians,
+            snapshot, bounty_span, users, mu_damage,
         )
-        filename = f"{week + timedelta(days=6):%Y-%m-%d}"
         try:
             await send_message(channel, content, f"{filename}.txt")
         except discord.HTTPException:
-            logger.exception("Failed to post the government weekly ranking in channel %s", channel_id)
+            logger.exception("Failed to post the government ranking %s in channel %s", filename, channel.id)
 
         if diaspora is None:
             return
         try:
             content = await self._diaspora_article(
-                tr, week, now, country_id, damage_ranking, wealth_ranking, diaspora, battle_ids, bounty_span, users,
+                tr, texts, span, now, country_id, all_damages, wealth_ranking, diaspora, snapshot, bounty_span, users,
             )
             await send_message(channel, content, f"{filename}-diaspora.txt")
         except Exception:
-            logger.exception("Failed to build or post the government diaspora ranking")
-
-    def _bounty_data(
-        self,
-        window: datetime,
-        battle_ids: list[str] | None,
-        bounty_span: tuple | None,
-        people: set[str],
-    ) -> tuple[dict[str, float] | None, tuple | None, int]:
-        """(bounty per player in `people`, the bounty note's (battles, records, start, end), unread battles)."""
-        if battle_ids is None:
-            return None, None, 0
-        bounty, records, unread = bounty_totals(self._bounty.get(window, {}), battle_ids, people)
-        battles, start, end = bounty_span
-        return bounty, (battles, records, start, end), unread
+            logger.exception("Failed to build or post the government diaspora ranking %s", filename)
 
     async def _romania_article(
-        self, tr, week, now, country_id, damage_ranking, wealth_ranking, transactions, romanians,
-        battle_ids, bounty_span, users,
+        self, tr, texts, span, now, country_id, damages, user_mus, wealth_ranking, donations, romanians,
+        snapshot, bounty_span, users, mu_damage=None,
     ) -> str:
-        """The Romania article; loads its players into `users` for the diaspora article to reuse."""
-        damages = country_values(damage_ranking, country_id) if damage_ranking is not None else None
-        user_mus = ranking_mus(damage_ranking, country_id) if damage_ranking is not None else {}
+        """The Romania article; loads its players into `users` for the diaspora article to reuse.
+
+        With `mu_damage` (monthly) the Romanian MUs are ranked by their battle damage, each showing how many of
+        its current members are citizens who did damage this period; without it, by their loaded Romanian
+        members' damage.
+        """
         wealth = country_values(wealth_ranking, country_id) if wealth_ranking is not None else None
-        donations = donation_totals(transactions, country_id, week) if transactions is not None else None
-        bounty, span, unread = self._bounty_data(week - REPORT_LEAD, battle_ids, bounty_span, romanians)
+        bounty, span_note, unread = bounty_data(snapshot, bounty_span, romanians)
 
         # only players with something to rank can appear, plus every Romanian in the rankings for Top Prestige
         await self._load_users([
@@ -915,9 +1199,19 @@ class GovWeeklyRankingJob(commands.Cog):
         donations = citizens_only(donations, users, country_id)
         wealth = citizens_only(wealth, users, country_id)
         bounty = citizens_only(bounty, users, country_id)
+        if user_mus is None:
+            user_mus = {user_id: str(user["mu"]) for user_id, user in users.items() if user.get("mu")}
 
         mus = None
-        if damages is not None:
+        if mu_damage is not None and damages is not None:
+            wanted = [mu_id for mu_id, value in mu_damage.items() if value > 0]
+            mu_objects = await warera.mus.get_many(wanted)
+            members = {mu_id: count for mu_id, (_, count) in mu_totals(damages, user_mus, users, country_id).items()}
+            mus = battle_mu_top(mu_damage, mu_objects, members, country_id)
+            if len(mu_objects) < len(wanted):
+                # an unloaded MU's country is unknown, so it can't be shown even if it is Romanian
+                logger.warning("Government ranking: %d MUs could not be loaded", len(wanted) - len(mu_objects))
+        elif damages is not None:
             totals = mu_totals(damages, user_mus, users, country_id)
             mu_objects = await warera.mus.get_many(list(totals))
             mus = top_mus(totals, mu_objects, country_id)
@@ -940,12 +1234,12 @@ class GovWeeklyRankingJob(commands.Cog):
             "bounty": bounty,
             "mus": mus,
             "prestige": prestige_list(users, citizens) if wealth is not None else None,
-            "bounty_span": span,
+            "bounty_span": span_note,
         }
-        return build_article(tr, week, now, data, users, {"players": len(missing), "battles": unread})
+        return build_article(tr, texts, span, now, data, users, {"players": len(missing), "battles": unread})
 
     async def _diaspora_article(
-        self, tr, week, now, country_id, damage_ranking, wealth_ranking, diaspora, battle_ids, bounty_span, users,
+        self, tr, texts, span, now, country_id, all_damages, wealth_ranking, diaspora, snapshot, bounty_span, users,
     ) -> str:
         """The diaspora article: candidates who aren't Romanian citizens, with their citizenship on each line."""
         candidates, unit_mus, warnings = diaspora
@@ -956,9 +1250,9 @@ class GovWeeklyRankingJob(commands.Cog):
         }
         # players who failed to load stay in the values for missing_that_matter; they never reach a top
         unknown = {user_id for user_id in candidates if user_id not in users}
-        damages = restrict(ranking_values(damage_ranking), abroad | unknown) if damage_ranking is not None else None
+        damages = restrict(all_damages, abroad | unknown)
         wealth = restrict(ranking_values(wealth_ranking), abroad | unknown) if wealth_ranking is not None else None
-        bounty, span, unread = self._bounty_data(week - REPORT_LEAD, battle_ids, bounty_span, abroad | unknown)
+        bounty, span_note, unread = bounty_data(snapshot, bounty_span, abroad | unknown)
 
         places = {}
         for user_id in abroad:
@@ -981,21 +1275,29 @@ class GovWeeklyRankingJob(commands.Cog):
             "bounty": bounty,
             "mus": unit_totals(unit_mus, damages, abroad) if damages is not None else None,
             "prestige": prestige_list(users, abroad),
-            "bounty_span": span,
+            "bounty_span": span_note,
         }
         return build_diaspora_article(
-            tr, week, now, data, users, places,
+            tr, texts, span, now, data, users, places,
             {**warnings, "players": len(missing), "battles": unread},
         )
 
     @gov_weekly_ranking.before_loop
     async def before_gov_weekly_ranking(self):
+        """Wait until the bot is ready before the first weekly run."""
         await self.bot.wait_until_ready()
 
-    @gov_bounty_tracker.before_loop
-    async def before_gov_bounty_tracker(self):
+    @gov_monthly_ranking.before_loop
+    async def before_gov_monthly_ranking(self):
+        """Wait until the bot is ready before the first monthly run."""
+        await self.bot.wait_until_ready()
+
+    @gov_battle_tracker.before_loop
+    async def before_gov_battle_tracker(self):
+        """Wait until the bot is ready before the first tracker run."""
         await self.bot.wait_until_ready()
 
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(GovWeeklyRankingJob(bot))
+    """Load the government rankings cog (discord.py extension entry point)."""
+    await bot.add_cog(GovRankingsJob(bot))
