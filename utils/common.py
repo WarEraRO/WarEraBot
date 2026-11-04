@@ -225,6 +225,14 @@ def is_commander(member) -> bool:
     return bool(commander_role_id) and any(role.id == commander_role_id for role in getattr(member, "roles", []))
 
 
+def is_government(member) -> bool:
+    """True when the member has one of the government roles (config.json roles.government, a list); False in DMs."""
+    government_ids = config.get("roles", {}).get("government") or []
+    if isinstance(government_ids, int):
+        government_ids = [government_ids]
+    return any(role.id in government_ids for role in getattr(member, "roles", []))
+
+
 async def get_mu_destination(guild: discord.Guild, unit: dict, thread_key: str):
     """Where an MU's posts go: the thread in threadIds[thread_key] when set, otherwise the MU's channelId.
 

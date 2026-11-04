@@ -46,6 +46,7 @@ _COMMAND_IDS: List[str] = [
     "server_ids",
     "start_contest",
     "contest",
+    "gov_challenge",
 ]
 
 _JOB_IDS: List[str] = [
@@ -66,6 +67,7 @@ _JOB_IDS: List[str] = [
     "article_mention",
     "newbie_welcome",
     "contest_tracker",
+    "mu_challenge_tracker",
     "gov_weekly_ranking",
     "gov_monthly_ranking",
 ]
