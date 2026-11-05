@@ -106,7 +106,8 @@
             "leaderId": 711121837274300466,
             "threadIds": {
                 "contractsId": 1557442480142684280,
-                "weeklyReportId": 1557443140561019040
+                "weeklyReportId": 1557443140561019040,
+                "contestId": 1566370969847865394
             },
             "friendlyName": "SIAS"
         },
@@ -114,6 +115,11 @@
             "id" : "69976c2fdcd6dac676a8f1ff",
             "roleId": 1494963502874366022,
             "channelId": 1413530594419282066,
+            "threadIds": {
+                "contractsId": 1557442480142684280,
+                "weeklyReportId": 1557443140561019040,
+                "contestId": 1566370969847865394
+            },
             "friendlyName": "WolfPack"
         },
         {
@@ -123,7 +129,8 @@
             "leaderId": 711121837274300466,
             "threadIds": {
                 "contractsId": 1557442480142684280,
-                "weeklyReportId": 1557443140561019040
+                "weeklyReportId": 1557443140561019040,
+                "contestId": 1566370969847865394
             },
             "friendlyName": "WolvesOfDacia"
         },
@@ -134,7 +141,8 @@
             "leaderId": 711121837274300466,
             "threadIds": {
                 "contractsId": 1557442480142684280,
-                "weeklyReportId": 1557443140561019040
+                "weeklyReportId": 1557443140561019040,
+                "contestId": 1566370969847865394
             },
             "friendlyName": "Structura"
         },
@@ -151,7 +159,8 @@
             "leaderId": 711121837274300466,
             "threadIds": {
                 "contractsId": 1557442480142684280,
-                "weeklyReportId": 1557443140561019040
+                "weeklyReportId": 1557443140561019040,
+                "contestId": 1566370969847865394
             },
             "friendlyName": "F.E.R."
         }
