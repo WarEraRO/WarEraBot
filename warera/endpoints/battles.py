@@ -1,6 +1,6 @@
 """Battles, rounds, battle rankings, orders and loot; tournaments; mercenary contracts."""
 from warera.endpoints.base import Endpoint, guarded, log_failure
-from warera.exceptions import NotFoundError, WarEraAPIError
+from warera.exceptions import NotFoundError, ProcedureNotFoundError, WarEraAPIError
 
 
 class BattlesAPI(Endpoint):
@@ -90,6 +90,29 @@ class BattlesAPI(Endpoint):
         """
         return await self._get_keyed('battleLootSummary.getByBattleAndUser', user_ids,
                                      lambda uid: {'battleId': battle_id, 'userId': uid}, expected=(NotFoundError,))
+
+    @guarded(dict)
+    async def get_loot_summaries_many(self, pairs):
+        """Batched battleLootSummary.getByBattleAndUser over many battles: {(battleId, userId): summary or None}.
+
+        The (battleId, userId) pairs may span battles, so they share batches. Unlike get_loot_summaries,
+        "no hits in that battle" (404) is kept apart from a failure: such a pair maps to None, while a pair
+        whose call failed for another reason is missing from the dict, so callers know what to retry.
+        """
+        pairs = list(dict.fromkeys(pairs))
+        if not pairs:
+            return {}
+        values = await self.client.call_many('battleLootSummary.getByBattleAndUser',
+                                             [{'battleId': battle_id, 'userId': user_id} for battle_id, user_id in pairs])
+        result = {}
+        for pair, value in zip(pairs, values):
+            if isinstance(value, WarEraAPIError):
+                log_failure('battleLootSummary.getByBattleAndUser', value, expected=(NotFoundError,))
+                if isinstance(value, NotFoundError) and not isinstance(value, ProcedureNotFoundError):
+                    result[pair] = None
+            elif isinstance(value, dict) and value:
+                result[pair] = value
+        return result
 
 
 

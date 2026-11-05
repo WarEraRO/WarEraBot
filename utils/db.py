@@ -3,10 +3,11 @@ import sqlite3
 from typing import Optional, Dict
 import json
 import utils.dynamo as dynamo
-from config import config
+from config import config, TEST_MODE
 
-# When AWS credentials are present every function delegates to dynamo.py
-_USE_DYNAMO: bool = bool(
+# When AWS credentials are present every function delegates to dynamo.py;
+# --test always uses the local SQLite database in database/
+_USE_DYNAMO: bool = not TEST_MODE and bool(
     config.get("AWS_ACCESS_KEY_ID") and config.get("AWS_SECRET_ACCESS_KEY")
 )
 
@@ -23,7 +24,7 @@ def _connect():
 
 
 def init_db() -> None:
-    """Create tables / confirm they exist.  Uses DynamoDB when credentials are present."""
+    """Create tables / confirm they exist.  Uses DynamoDB when credentials are present, except with --test."""
     if _USE_DYNAMO:
         try:
             created = dynamo.ensure_tables()
@@ -579,3 +580,29 @@ def delete_contest(contest_id: str) -> None:
         cur.execute("DELETE FROM contests WHERE contest_id = ?", (contest_id,))
         cur.execute("DELETE FROM contests WHERE contest_id = ? AND record_id = ?", (CONTEST_INDEX_ID, contest_id))
         conn.commit()
+
+
+# Government MU challenges (/gov_challenge) share the `contests` table under their own index row
+# (MU_CHALLENGE_INDEX_ID, <challenge id>), so get_contests() and the points-contest tracker never see them;
+# each participating MU's progress is a row (<challenge id>, <MU id>).
+MU_CHALLENGE_INDEX_ID = "__mu_challenges__"
+
+
+def save_mu_challenge(challenge: Dict, units: Optional[Dict[str, Dict]] = None) -> None:
+    """Insert or replace a challenge record (keyed by its "id") and, optionally, MU records by MU id.
+
+    The MU records are written first and the challenge record last, as in save_contest: the DynamoDB batch
+    is not atomic, and a challenge record saved alone would mark battles read whose money was never stored.
+    """
+    _save_contest_rows([(challenge["id"], mu_id, unit) for mu_id, unit in (units or {}).items()])
+    _save_contest_rows([(MU_CHALLENGE_INDEX_ID, challenge["id"], challenge)])
+
+
+def get_mu_challenges() -> list[Dict]:
+    """Every challenge record, in any status."""
+    return list(_contest_rows(MU_CHALLENGE_INDEX_ID).values())
+
+
+def get_mu_challenge_units(challenge_id: str) -> Dict[str, Dict]:
+    """Every MU record of one challenge, {mu_id: record}."""
+    return _contest_rows(challenge_id)
