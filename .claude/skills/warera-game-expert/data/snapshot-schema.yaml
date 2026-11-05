@@ -1,0 +1,280 @@
+# Normalized game-state schema used by scripts/validate_game_snapshot.py and references/data-model.md.
+# A snapshot is a JSON object: {"as_of": "<ISO UTC>", "game_version": "...", "<entity>": {...} | "<entity plural>": [...]}
+#
+# Field spec keys:
+#   type: string|int|number|bool|datetime|object|list
+#   required: true if the entity is useless without it
+#   unit: percent (canonical = percentage points, e.g. 37 means 37%), money, pp, hours, ...
+#   min/max: hard bounds -> violation is reported as ERROR (impossible value)
+#   warn_min/warn_max: soft bounds -> reported as WARNING (suspicious, not corrected)
+#   volatile: changes frequently; always timestamp it
+#   derived: computed from other fields; never trust a supplied value without recomputing
+#   never_assume: if missing, do NOT default it - ask for it or state the gap
+schema_version: 1
+canonical_percent: points
+
+entities:
+  player:
+    plural: players
+    fields:
+      id: {type: string, required: true}
+      name: {type: string}
+      level: {type: int, required: true, min: 1, max: 50}
+      current_xp: {type: int, min: 0}
+      lifetime_xp: {type: int, min: 0}
+      prestige_level: {type: int, min: 0}
+      prestige_points_unspent: {type: int, min: 0}
+      citizenship_country_id: {type: string, never_assume: true}
+      residence_region_id: {type: string}
+      current_region_id: {type: string, volatile: true, never_assume: true}
+      military_unit_id: {type: string}
+      military_rank: {type: int, min: 0, max: 120}
+      total_damage: {type: number, min: 0, note: "lifetime damage; derives military rank and its bonus (data/military-ranks.yaml)"}
+      skills: {type: object, note: "keys = skill codes from data/progression-values.yaml; values = levels 0..10 (+prestige bonus levels)"}
+      energy: {type: number, min: 0, volatile: true}
+      entrepreneurship: {type: number, min: 0, volatile: true}
+      health: {type: number, min: 0, volatile: true}
+      hunger: {type: number, min: 0, volatile: true}
+      stamina: {type: number, min: 0, max: 100, volatile: true}
+      money: {type: number, min: 0, unit: money, volatile: true}
+      pill_consumed_at: {type: datetime, volatile: true, note: "derive buff/debuff phase from this"}
+      pill_phase: {type: string, derived: true, enum: [none, buff, debuff]}
+      last_login_at: {type: datetime, volatile: true}
+      is_inactive: {type: bool, derived: true}
+
+  country:
+    plural: countries
+    fields:
+      id: {type: string, required: true}
+      name: {type: string}
+      development: {type: number, min: 0, volatile: true}
+      active_population: {type: int, min: 0, volatile: true}
+      citizens: {type: int, min: 0, volatile: true}
+      treasury_money: {type: number, min: 0, unit: money, volatile: true}
+      treasury_paper: {type: number, min: 0, volatile: true}
+      treasury_oil: {type: number, min: 0, volatile: true}
+      tax_percent: {type: number, unit: percent, min: 0, max: 45}
+      specialization_item: {type: string}
+      ruling_ethics: {type: list}
+      alliance_id: {type: string}
+      main_enemy_country_id: {type: string}
+      main_enemy_days: {type: int, min: 0}
+      capital_region_id: {type: string}
+      capital_occupied: {type: bool}
+      unrest_percent: {type: number, unit: percent, min: 0, max: 100, volatile: true}
+      strategic_resources: {type: list}
+      resistance_focus_region_id: {type: string}
+
+  region:
+    plural: regions
+    fields:
+      id: {type: string, required: true}
+      name: {type: string}
+      owner_country_id: {type: string, required: true, volatile: true}
+      core_country_id: {type: string}
+      development: {type: number, min: 0}
+      linked_to_capital: {type: bool, volatile: true}
+      deposit_item: {type: string}
+      deposit_bonus_percent: {type: number, unit: percent, min: 0, max: 100, warn_min: 20, warn_max: 40, volatile: true, note: "guide: 20-40 variable; config: 30"}
+      deposit_expires_at: {type: datetime, volatile: true}
+      production_bonus_percent: {type: number, unit: percent, warn_max: 150, volatile: true, note: "total for an item - prefer API tooltip value"}
+      bunker_level: {type: int, min: 0, max: 5}
+      bunker_active: {type: bool, volatile: true}
+      base_level: {type: int, min: 0, max: 5}
+      base_active: {type: bool, volatile: true}
+      pacification_center_level: {type: int, min: 0, max: 5}
+      resistance: {type: number, min: 0, volatile: true}
+      resistance_max: {type: number, min: 0}
+
+  company:
+    plural: companies
+    fields:
+      id: {type: string, required: true}
+      owner_player_id: {type: string}
+      product: {type: string, required: true, note: "item code from data/recipes.yaml"}
+      region_id: {type: string, required: true}
+      active: {type: bool}
+      engine_level: {type: int, min: 1, max: 7}
+      storage_level: {type: int, min: 1, max: 7}
+      break_room_level: {type: int, min: 1, max: 5}
+      stored_pp: {type: number, min: 0, volatile: true}
+      storage_capacity_pp: {type: number, min: 0, max: 1400, derived: true}
+      production_bonus_percent: {type: number, unit: percent, warn_max: 150, volatile: true, never_assume: true}
+      wage_per_pp: {type: number, min: 0, unit: money_per_pp}
+      workers: {type: list}
+      wage_balance: {type: number, min: 0, unit: money, volatile: true}
+
+  job:
+    plural: jobs
+    fields:
+      company_id: {type: string, required: true}
+      worker_player_id: {type: string}
+      wage_per_pp: {type: number, min: 0, unit: money_per_pp, required: true}
+      loyalty_percent: {type: number, unit: percent, min: 0, max: 10}
+      started_at: {type: datetime}
+
+  market_order:
+    plural: market_orders
+    fields:
+      item: {type: string, required: true}
+      side: {type: string, required: true, enum: [buy, sell]}
+      price: {type: number, required: true, min: 0, unit: money, volatile: true}
+      quantity: {type: number, min: 0, volatile: true}
+      observed_at: {type: datetime, required: true}
+
+  inventory_item:
+    plural: inventory
+    fields:
+      item: {type: string, required: true}
+      quantity: {type: number, min: 0}
+      rarity: {type: string, enum: [common, uncommon, rare, epic, legendary, mythic]}
+      durability_percent: {type: number, unit: percent, min: 0, max: 100}
+      stats: {type: object}
+      equipped: {type: bool}
+
+  battle:
+    plural: battles
+    fields:
+      id: {type: string, required: true}
+      attacker_country_id: {type: string, required: true}
+      defender_country_id: {type: string, required: true}
+      region_id: {type: string, required: true}
+      launch_region_id: {type: string, note: "attack origin; attackers had to stand here until v0.27.4 (v0.28: hit from anywhere)"}
+      type: {type: string, enum: [attack, revolt, civil_war, tournament, qualification]}
+      round: {type: int, min: 1, max: 15}
+      rounds_won_attacker: {type: int, min: 0, max: 2}
+      rounds_won_defender: {type: int, min: 0, max: 2}
+      terrain_attacker: {type: number, min: 0, max: 300, volatile: true}
+      terrain_defender: {type: number, min: 0, max: 300, volatile: true}
+      damage_pool_attacker: {type: number, min: 0, volatile: true, note: "current tick"}
+      damage_pool_defender: {type: number, min: 0, volatile: true}
+      round_damage_total: {type: number, min: 0, volatile: true}
+      battle_damage_total: {type: number, min: 0, volatile: true}
+      ended_at: {type: datetime}
+
+  battle_order:
+    plural: battle_orders
+    fields:
+      battle_id: {type: string, required: true}
+      issuer_type: {type: string, required: true, enum: [country, mu]}
+      issuer_id: {type: string, required: true}
+      side_country_id: {type: string, required: true}
+      priority: {type: string, required: true, enum: [low, medium, high]}
+      rank: {type: int, min: 1, max: 99, note: "display order #1.. ; does NOT change bonus"}
+      description: {type: string}
+
+  military_unit:
+    plural: military_units
+    fields:
+      id: {type: string, required: true}
+      owner_player_id: {type: string}
+      commander_ids: {type: list}
+      member_ids: {type: list}
+      country_id: {type: string}
+      hq_level: {type: int, min: 0, max: 4}
+      hq_active: {type: bool, volatile: true}
+      dormitories_level: {type: int, min: 1, max: 5}
+      oil: {type: number, min: 0, volatile: true}
+      paper: {type: number, min: 0, volatile: true}
+      money: {type: number, min: 0, volatile: true}
+      reputation: {type: number, volatile: true}
+      active_contract_id: {type: string}
+
+  government:
+    plural: governments
+    fields:
+      country_id: {type: string, required: true}
+      president_id: {type: string}
+      vice_president_id: {type: string}
+      minister_defense_id: {type: string}
+      minister_economy_id: {type: string, note: "guide permission table calls it Minister of Finance"}
+      minister_foreign_affairs_id: {type: string}
+      congress_member_ids: {type: list}
+
+  alliance:
+    plural: alliances
+    fields:
+      id: {type: string, required: true}
+      member_country_ids: {type: list, required: true}
+      world_development_share_percent: {type: number, unit: percent, min: 0, max: 100, never_assume: true}
+
+  treaty:
+    plural: treaties
+    fields:
+      type: {type: string, required: true, enum: [defensive_pact, nap, main_enemy, economic_agreement, non_aggression_window]}
+      country_a_id: {type: string, required: true}
+      country_b_id: {type: string}
+      started_at: {type: datetime}
+      expires_at: {type: datetime}
+      in_game: {type: bool, note: "NAPs are community agreements, not in-game objects"}
+
+  mission:
+    plural: missions
+    fields:
+      period: {type: string, required: true, enum: [beginner, daily, weekly, monthly]}
+      description: {type: string}
+      progress: {type: number, min: 0}
+      target: {type: number, min: 0}
+      completed: {type: bool}
+      claimed: {type: bool}
+      reroll_index: {type: int, min: 0, max: 20}
+
+  milestone:
+    plural: milestones
+    fields:
+      ladder: {type: string, required: true}
+      tier_claimed: {type: int, min: 0}
+      progress: {type: number, min: 0}
+      next_target: {type: number, min: 0}
+
+  tournament:
+    plural: tournaments
+    fields:
+      id: {type: string, required: true}
+      edition: {type: string, required: true, enum: [country, mu]}
+      registration_closes_at: {type: datetime}
+      skill_bonus: {type: object}
+      max_rarity: {type: string, enum: [common, uncommon, rare, epic, legendary, mythic]}
+      registered_ids: {type: list}
+
+  transaction:
+    plural: transactions
+    fields:
+      id: {type: string}
+      from_id: {type: string, required: true}
+      to_id: {type: string, required: true}
+      type: {type: string, note: "donation, trade, wage, transfer, ..."}
+      item: {type: string}
+      quantity: {type: number, min: 0}
+      price: {type: number, min: 0}
+      reference_price: {type: number, min: 0, note: "market price at the time - needed for boosting checks"}
+      at: {type: datetime, required: true}
+
+  bounty:
+    plural: bounties
+    fields:
+      battle_id: {type: string, required: true}
+      side_country_id: {type: string, required: true}
+      rate_per_1k: {type: number, min: 0, required: true}
+      budget_remaining: {type: number, min: 0, volatile: true}
+      posted_at: {type: datetime}
+      active_from: {type: datetime, derived: true, note: "posted_at + ~3 min"}
+
+  mercenary_contract:
+    plural: mercenary_contracts
+    fields:
+      battle_id: {type: string, required: true}
+      side_country_id: {type: string, required: true}
+      budget: {type: number, min: 0, required: true}
+      min_damage: {type: number, min: 0}
+      rate_per_1k: {type: number, min: 0}
+      mu_id: {type: string}
+      status: {type: string, enum: [auction, active, completed, cancelled, failed]}
+      progress_damage: {type: number, volatile: true}
+
+  patch_version:
+    plural: patch_versions
+    fields:
+      version: {type: string, required: true}
+      released_at: {type: datetime}
+      changes: {type: list}

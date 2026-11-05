@@ -1,0 +1,74 @@
+# WarEra cooldowns, durations and windows. Volatile items reference mechanics.yaml ids (mechanic_id).
+# authority: game_mechanic unless stated. Disputed values are marked and explained in mechanics.yaml.
+table_version: 1
+as_of: "2026-11-02"
+
+personal:
+  - {name: Skill reset, value: "7 days", mechanic_id: respec.cooldown_days}
+  - {name: Pill buff, value: "8 h", mechanic_id: consumables.pill}
+  - {name: Pill debuff, value: "15.5 h (after buff)", mechanic_id: consumables.pill}
+  - {name: Stamina regen, value: "+10/h, max 100 (10 regions per full bar, ~24 regions/day from regen); bar removed with movement ~2026-11-10 (v0.28)", mechanic_id: map.stamina}
+  - {name: Energy/Entrepreneurship regen, value: "10% of max every hour on the hour (UTC)", mechanic_id: economy.regen_fraction_per_hour}
+  - {name: Move home, value: "12 h; costs 100 concrete regardless of distance; the free trip home ends with movement ~2026-11-10 (v0.28)", mechanic_id: map.move_home}
+  - {name: Wooden case lifetime, value: "48 h; max 5 pending (hourly roll skipped while 5 pending); no map spawns from ~2026-11-10 (v0.28)", mechanic_id: map.wooden_case}
+  - {name: Citizenship change, value: "30 days", mechanic_id: citizenship.change_cooldown}
+  - {name: Comeback reward, value: "max once per 14 days", mechanic_id: rewards.comeback}
+  - {name: Inactive flag, value: "3 days (since v0.15.1, 2025-05-04)", mechanic_id: progression.inactive_after_days}
+  - {name: Leave a company after joining, value: "24 h (v0.17.7)", mechanic_id: economy.job_leave_lock}
+  - {name: Vote after citizenship change, value: "7 days (live-only); none during a new country's first 14 days since v0.27.4", mechanic_id: election.vote_citizenship_lock}
+
+military_unit:
+  - {name: MU help request, value: "12 h", mechanic_id: mu.limits}
+  - {name: MU nationality change, value: "7 days", mechanic_id: mu.limits}
+  - {name: HQ activation, value: "3 h + time to the next hourly tick (3-4 h)", mechanic_id: bonus.headquarters}
+  - {name: MU announcement, value: "max 2/h, active 24 h then archived", mechanic_id: announcements.limits}
+  - {name: Tournament registration, value: "Mon 00:00 UTC - Fri 18:00 UTC", mechanic_id: tournament.schedule}
+
+battle_economy:
+  - {name: Battle tick, value: "2 min", mechanic_id: battle.tick}
+  - {name: Re-attack same region after battle, value: "1 h (owner may use it as launch region meanwhile)", mechanic_id: battle.region_attack_cooldown}
+  - {name: Region building upgrade/downgrade, value: "8 h default; Expansionist 4 h; Fanatic Expansionist 2 h (bases)", source: GUIDE}
+  - {name: Bunker/Base/Pacification Center activation, value: "~12 h", mechanic_id: bonus.bunker}
+  - {name: Resistance contribution after a revolt, value: "24 h", mechanic_id: region.resistance}
+  - {name: Bounty activation delay, value: "~3 min (damage before activation does not count)", mechanic_id: bounty.rules}
+  - {name: Bounty cancel lock, value: "60 s after activation (also across round change)", mechanic_id: bounty.rules}
+  - {name: Mercenary auction, value: "5-25 min; late bids extend the timer (config threshold 60, extension 60)", mechanic_id: contract.auction}
+  - {name: Declare War priority, value: "24 h for the initiating country (meaning undocumented)", mechanic_id: war.declaration}
+  - {name: New country protection, value: "7 days without attacking or being attacked", mechanic_id: war.declaration}
+  - {name: New deposits, value: "spawn every 12 h; depletion 0.5% of initial quantity per hour", mechanic_id: production.deposit_depletion}
+  - {name: Country specialization change, value: "10 days", source: GUIDE}
+  - {name: Party ethic change, value: "14 days (ethics removed in v0.27, 2026-10-26)", source: GUIDE}
+  - {name: Government type change, value: "30 days after the first pick (v0.27, 2026-10-26)", mechanic_id: government.types, source: PATCH_0_27}
+  - {name: Employee training draw, value: "1 per employee per day, 10 Energy (v0.27)", mechanic_id: employees.training, source: PATCH_0_27}
+  - {name: Employee candidates, value: "3 per company at 00:00 UTC; extra sets 10 Energy, doubling (v0.27)", mechanic_id: employees.hiring, source: PATCH_0_27}
+  - {name: Employee event auto-resolve, value: "36 h (v0.27)", mechanic_id: employees.events, source: PATCH_0_27}
+  - {name: Manager contract lock, value: "24 h after hiring (v0.27)", mechanic_id: employees.managers, source: PATCH_0_27}
+  - {name: Removed map links, value: "stay open 10 days after the v0.27 update", source: PATCH_0_27}
+  - {name: Defensive Pact proposal, value: "12 h", source: GUIDE}
+  - {name: Leave/kicked from alliance, value: "7 days without any alliance", mechanic_id: alliance.cooldowns}
+  - {name: Rejoin same alliance, value: "14 days", mechanic_id: alliance.cooldowns}
+
+political:
+  - {name: Region transfer/liberation law, value: "12 h between proposals", source: GUIDE}
+  - {name: Government renomination, value: "5 days after leaving/dismissal", mechanic_id: government.renomination_cooldown}
+  - {name: Leave one government and run for president elsewhere, value: "no cooldown (community observation)", authority: community_observation}
+  - {name: Country takeover, value: "1 day cooldown, min level 25 (5 days was the v0.15.0 rule)", mechanic_id: government.takeover}
+  - {name: Civil war motion, value: "48 h", mechanic_id: unrest.civil_war}
+  - {name: Unrest contribution after a revolution, value: "72 h", mechanic_id: unrest.civil_war}
+  - {name: Law vote, value: "24 h (live)", mechanic_id: law.voting}
+  - {name: Election phases, value: "24 h candidacy then 24 h vote", mechanic_id: election.calendar}
+
+protection_windows:
+  - {name: Liberation after owner change, value: "5 days", source: [GUIDE, LIVECFG], config_path: region.liberationDaysCooldown}
+  - {name: Region transfer cooldown, value: "5 days (live-only key region.transferDaysCooldown; semantics undocumented)", source: LIVECFG}
+  - {name: Non-aggression after liberation, value: "24 h, bilateral", mechanic_id: region.non_aggression_windows}
+  - {name: Non-aggression after peace, value: "72 h", mechanic_id: region.non_aggression_windows}
+  - {name: Non-aggression after alliance break, value: "72 h", mechanic_id: region.non_aggression_windows}
+  - {name: Takeover of a country, value: "requires government AND congress inactive (threshold disputed: 3 vs 4 days)", mechanic_id: government.takeover}
+
+resets:
+  - {name: Game day / daily missions, value: "00:00 UTC"}
+  - {name: Weekly missions, value: "Monday 00:00 UTC"}
+  - {name: Monthly missions, value: "1st of month 00:00 UTC"}
+  - {name: Regen tick, value: "every hour on the hour (UTC)"}
+  - {name: Always read live dates from gameConfig.getDates, value: "never compute election/reset timestamps from this table"}

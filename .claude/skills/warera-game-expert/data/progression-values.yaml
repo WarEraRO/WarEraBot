@@ -1,0 +1,224 @@
+# Progression tables (skills, missions, milestones, login rewards, prestige).
+# Volatile scalars are mirrored from mechanics.yaml - mechanics.yaml wins on any mismatch.
+# The skills table below is pre-v0.27; from 2026-10-26 see mechanics.yaml skills.economy_values (Entrepreneurship removed,
+# Energy 100+10, Production 30+3, Leadership added). v0.27 missions: self-work counts for work missions; new train/event/care missions.
+table_version: 1
+as_of: "2026-10-04"
+source: [LIVECFG, GUIDE]
+
+skill_points_per_level: 4
+
+# XP needed per level (warera.wiki/en/experience-xp, page 2026-02-01). Cumulative total at level 50 = 86,600,
+# matching the guide and Prestige examples (86,600 - 65,000 = 21,600 = exactly level 25). Skill points = 4 x level.
+xp_table:
+  source: [WIKI, GUIDE]
+  levels:
+    - {level: 1, xp_from_previous: 0, cumulative_xp: 0, total_skill_points: 4}
+    - {level: 2, xp_from_previous: 100, cumulative_xp: 100, total_skill_points: 8}
+    - {level: 3, xp_from_previous: 100, cumulative_xp: 200, total_skill_points: 12}
+    - {level: 4, xp_from_previous: 100, cumulative_xp: 300, total_skill_points: 16}
+    - {level: 5, xp_from_previous: 200, cumulative_xp: 500, total_skill_points: 20}
+    - {level: 6, xp_from_previous: 200, cumulative_xp: 700, total_skill_points: 24}
+    - {level: 7, xp_from_previous: 200, cumulative_xp: 900, total_skill_points: 28}
+    - {level: 8, xp_from_previous: 300, cumulative_xp: 1200, total_skill_points: 32}
+    - {level: 9, xp_from_previous: 400, cumulative_xp: 1600, total_skill_points: 36}
+    - {level: 10, xp_from_previous: 500, cumulative_xp: 2100, total_skill_points: 40}
+    - {level: 11, xp_from_previous: 600, cumulative_xp: 2700, total_skill_points: 44}
+    - {level: 12, xp_from_previous: 700, cumulative_xp: 3400, total_skill_points: 48}
+    - {level: 13, xp_from_previous: 800, cumulative_xp: 4200, total_skill_points: 52}
+    - {level: 14, xp_from_previous: 900, cumulative_xp: 5100, total_skill_points: 56}
+    - {level: 15, xp_from_previous: 1000, cumulative_xp: 6100, total_skill_points: 60}
+    - {level: 16, xp_from_previous: 1100, cumulative_xp: 7200, total_skill_points: 64}
+    - {level: 17, xp_from_previous: 1200, cumulative_xp: 8400, total_skill_points: 68}
+    - {level: 18, xp_from_previous: 1300, cumulative_xp: 9700, total_skill_points: 72}
+    - {level: 19, xp_from_previous: 1400, cumulative_xp: 11100, total_skill_points: 76}
+    - {level: 20, xp_from_previous: 1500, cumulative_xp: 12600, total_skill_points: 80}
+    - {level: 21, xp_from_previous: 1600, cumulative_xp: 14200, total_skill_points: 84}
+    - {level: 22, xp_from_previous: 1700, cumulative_xp: 15900, total_skill_points: 88}
+    - {level: 23, xp_from_previous: 1800, cumulative_xp: 17700, total_skill_points: 92}
+    - {level: 24, xp_from_previous: 1900, cumulative_xp: 19600, total_skill_points: 96}
+    - {level: 25, xp_from_previous: 2000, cumulative_xp: 21600, total_skill_points: 100}
+    - {level: 26, xp_from_previous: 2000, cumulative_xp: 23600, total_skill_points: 104}
+    - {level: 27, xp_from_previous: 2000, cumulative_xp: 25600, total_skill_points: 108}
+    - {level: 28, xp_from_previous: 2000, cumulative_xp: 27600, total_skill_points: 112}
+    - {level: 29, xp_from_previous: 2000, cumulative_xp: 29600, total_skill_points: 116}
+    - {level: 30, xp_from_previous: 2000, cumulative_xp: 31600, total_skill_points: 120}
+    - {level: 31, xp_from_previous: 2500, cumulative_xp: 34100, total_skill_points: 124}
+    - {level: 32, xp_from_previous: 2500, cumulative_xp: 36600, total_skill_points: 128}
+    - {level: 33, xp_from_previous: 2500, cumulative_xp: 39100, total_skill_points: 132}
+    - {level: 34, xp_from_previous: 2500, cumulative_xp: 41600, total_skill_points: 136}
+    - {level: 35, xp_from_previous: 2500, cumulative_xp: 44100, total_skill_points: 140}
+    - {level: 36, xp_from_previous: 2500, cumulative_xp: 46600, total_skill_points: 144}
+    - {level: 37, xp_from_previous: 2500, cumulative_xp: 49100, total_skill_points: 148}
+    - {level: 38, xp_from_previous: 2500, cumulative_xp: 51600, total_skill_points: 152}
+    - {level: 39, xp_from_previous: 2500, cumulative_xp: 54100, total_skill_points: 156}
+    - {level: 40, xp_from_previous: 2500, cumulative_xp: 56600, total_skill_points: 160}
+    - {level: 41, xp_from_previous: 3000, cumulative_xp: 59600, total_skill_points: 164}
+    - {level: 42, xp_from_previous: 3000, cumulative_xp: 62600, total_skill_points: 168}
+    - {level: 43, xp_from_previous: 3000, cumulative_xp: 65600, total_skill_points: 172}
+    - {level: 44, xp_from_previous: 3000, cumulative_xp: 68600, total_skill_points: 176}
+    - {level: 45, xp_from_previous: 3000, cumulative_xp: 71600, total_skill_points: 180}
+    - {level: 46, xp_from_previous: 3000, cumulative_xp: 74600, total_skill_points: 184}
+    - {level: 47, xp_from_previous: 3000, cumulative_xp: 77600, total_skill_points: 188}
+    - {level: 48, xp_from_previous: 3000, cumulative_xp: 80600, total_skill_points: 192}
+    - {level: 49, xp_from_previous: 3000, cumulative_xp: 83600, total_skill_points: 196}
+    - {level: 50, xp_from_previous: 3000, cumulative_xp: 86600, total_skill_points: 200}
+
+skill_cost: "level n costs n points; cumulative n*(n+1)/2"
+skill_cumulative_cost: [0, 1, 3, 6, 10, 15, 21, 28, 36, 45, 55]
+
+# value(level) = base + step * level, levels 0..10 (LIVECFG skills.*). unlock = player level needed.
+skills:
+  energy:           {kind: bar,  unlock: 1,  base: 30,  step: 10, max: 130, group: economy}
+  entrepreneurship: {kind: bar,  unlock: 1,  base: 30,  step: 5,  max: 80,  group: economy}
+  production:       {kind: stat, unlock: 1,  base: 10,  step: 3,  max: 40,  group: economy, note: "config marks it a bar; acts as PP per work action"}
+  companies:        {kind: stat, unlock: 5,  base: 2,   step: 1,  max: 12,  group: economy, note: "max active companies"}
+  management:       {kind: stat, unlock: 10, base: 4,   step: 2,  max: 24,  group: economy, note: "maximum number of workers you can employ (WIKI skills page)"}
+  attack:           {kind: stat, unlock: 1,  base: 100, step: 25, max: 350, group: combat}
+  precision:        {kind: stat, unlock: 1,  base: 50,  step: 5,  max: 100, group: combat, overflow: "each % over 100 -> +4 attack"}
+  criticalChance:   {kind: stat, unlock: 5,  base: 10,  step: 5,  max: 60,  group: combat, overflow: "each % over 100 -> +4 crit damage"}
+  criticalDamages:  {kind: stat, unlock: 10, base: 100, step: 20, max: 300, group: combat}
+  armor:            {kind: stat, unlock: 5,  base: 0,   step: 6,  max: 60,  group: combat, note: "softCap 40 = constant K in total/(total+40)"}
+  dodge:            {kind: stat, unlock: 10, base: 0,   step: 4,  max: 40,  group: combat, note: "softCap 40"}
+  health:           {kind: bar,  unlock: 5,  base: 100, step: 10, max: 200, group: combat}
+  hunger:           {kind: bar,  unlock: 10, base: 4,   step: 1,  max: 14,  group: combat}
+  lootChance:       {kind: stat, unlock: 1,  base: 5,   step: 2,  max: 25,  group: combat, unit: percent}
+  stamina:          {kind: bar,  unlock: 1,  base: 100, step: 0,  max: 100, group: map, note: "only level 0 exists"}
+
+missions:
+  beginner: {count: 25, xp_each: "disputed: 50 (live) / 100 (guide)", set_reward: "disputed - see mechanics.yaml", resets: never}
+  daily:    {count: 10, xp_each: 10,  set_threshold: 7, set_reward: {xp: 100,  money: 10, cases: 1}, resets: "daily 00:00 UTC"}
+  weekly:   {count: 10, xp_each: 50,  set_threshold: 7, set_reward: {xp: 500,  money: 30, cases: 3}, resets: "Monday 00:00 UTC"}
+  monthly:  {count: 10, xp_each: 100, set_threshold: 7, set_reward: {xp: 1000, money: 50, cases: 5}, resets: "1st 00:00 UTC"}
+  max_xp_per_period: {daily: 200, weekly: 1000, monthly: 2000}
+  reroll_cost_by_index: [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40]
+  mid_period_start: "A set received mid-period starts partially complete (e.g. monthly set on Aug 22 starts at 21/31 per target); progress stops one step short of completion."
+  claiming: "Manual only (since v0.25.5, 2026-08-29; auto-claim existed 2026-06-14 -> 2026-08-29, see missions.claiming). At reset the board regenerates first, then the claimed flag is cleared - unclaimed set bonuses of the ended period are lost."
+
+beginner_mission_list:
+  - Upgrade a company
+  - Reach level 5
+  - Reach level 10
+  - Reach level 15
+  - Reach level 20
+  - Reach level 25
+  - Upgrade your skills 5 times
+  - Create a new company
+  - Open the chat
+  - Join a Military Unit
+  - Send 1 message
+  - Like 1 message
+  - Set your profile picture
+  - Reach military rank 5
+  - Reach military rank 10
+  - Reach military rank 20
+  - Join a political party
+  - Vote in an election
+  - Reset your skills
+  - Earn a badge (any)
+  - Find a job at a company
+  - Set your username
+# Guide lists 21 explicit missions + level ladder 5/10/15/20/25 (15 and 25 not pictured). Total stated: 25.
+# Three missions are not named in the guide.
+
+daily_mission_pool:
+  - "Deal ___ damage in battles"
+  - "Participate in 2 battles"
+  - "Deal ___ damage for allies or your country"
+  - "Buy items worth ___ money from the market"
+  - "Eat ___ (specific food)"
+  - "Reduce damage taken with Armor by ___"
+  - "Craft 1 item"
+  - "Hit 15 times in battles"
+  - "Collect ___ on the map"
+  - "Work ___ times for an employer"
+  - "Donate ___ to MU or country"
+  - "Deal ___ damage on country/MU orders"
+  - "Travel to another region ___ times"
+  - "Work ___ times in own companies"
+  - "Earn ___ money from market sales"
+  - "Open ___ cases"
+  - "Produce items ___ times"
+  - "Eat ___ food items"
+  - "Open the chat"
+  - "Move somewhere / Collect a wooden case (also weekly and monthly)"
+  # v0.28: missions asking for travel or wooden cases ('Travel ...', 'Collect ___ on the map', 'Move somewhere / Collect a wooden case')
+  # are replaced by other missions once movement is off (~2026-11-10); the replacements aren't named [GAP].
+
+weekly_mission_pool:
+  - "Deal ___ damage on country/MU orders"
+  - "Buy items worth 20 money from the market"
+  - "Deal ___ damage in battles"
+  - "Eat ___ (specific food)"
+  - "Collect ___ on the map"
+  - "Deal ___ damage for allies or your country"
+  - "Participate in 10 battles"
+  - "Reduce damage taken with Armor by ___"
+  - "Read ___ articles"
+  - "Work ___ times for an employer"
+  - "Donate ___ money to MU or country"
+  - "Craft ___ items"
+
+monthly_mission_pool:
+  - "Use ___ pills (1-3, from level 5, monthly only)"
+  - "Craft ___ items"
+  - "Deal ___ damage for allies or your country"
+  - "Deal ___ damage on country/MU orders"
+  - "Eat ___ steaks"
+  - "Hit ___ times in battles"
+  - "Travel to another region ___ times"
+  - "Move a company to another region (costs 5 concrete)"  # removed in v0.27 (2026-10-26)
+  - "Read ___ articles"
+  - "Sell for ___ money on the market"
+  - "Work in own companies ___ times"
+  - "Work ___ times for an employer"
+
+milestones:
+  ladders:
+    - Donate ___ money to MU or country
+    - Deal ___ damage in battles
+    - Participate in ___ battles
+    - Earn ___ XP total
+    - Contribute to resistance ___ times
+    - Craft ___ items
+    - Obtain ___ items from battlefield loot
+    - Open ___ cases
+    - Help ___ MU members
+    - Dismantle ___ items
+    - Hit ___ times in battles
+    - Obtain ___ cases from battle loot
+    - Cross ___ regions on the map        # disabled ~2026-11-10 (v0.28), level saved (milestones.map_ladders)
+    - Collect ___ wooden cases from the map  # disabled ~2026-11-10 (v0.28), level saved
+    - Eat ___ food items
+  xp_by_tier_known: {6: 60, 7: 70, 9: 90, "10+": 100}
+  rarity: "share of ACTIVE players who reached the tier or higher; recomputed daily; informational only"
+  claiming: "manual; crossing several tiers at once pays all in one claim"
+
+login_calendar:
+  - {day: 1, xp: 10, money: 5,  cases: 1}
+  - {day: 2, xp: 10, money: 10, cases: 1}
+  - {day: 3, xp: 10, money: 15, cases: 1}
+  - {day: 4, xp: 10, money: 20, cases: 2}
+  - {day: 5, xp: 10, money: 25, cases: 2}
+  - {day: 6, xp: 10, money: 30, cases: 2}
+  - {day: 7, xp: 10, money: 35, cases: 3, gems: 10}
+login_week_total: {xp: 70, money: 140, cases: 12, gems: 10}
+
+comeback:
+  - {min_absence_days: 3,  xp: 150, money: 50,  cases: 2}
+  - {min_absence_days: 7,  xp: 400, money: 150, cases: 3}
+  - {min_absence_days: 30, xp: 800, money: 400, cases: 5}
+comeback_frequency: "max once per 14 days"
+
+prestige:
+  enabled_level: 50
+  xp_penalty: 65000
+  xp_level_50: 86600
+  xp_bonus_percent: {1: 50, 2: 60, 3: 70, formula: "50 + 10*(p-1)"}
+  bonus_inactive_at_level_50: true
+  grants: ["permanent XP bonus", "1 Prestige Point", "free full respec", "Prestige badge"]
+  point_cost_same_skill: [1, 2, 4, 8]
+  examples:
+    - {total_xp_before: 86600,  approx_level_after: 25}
+    - {total_xp_before: 150000, approx_level_after: 49}
+  lifetime_xp: "tracked separately; Prestige does not erase it"
