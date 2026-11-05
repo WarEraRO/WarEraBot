@@ -217,17 +217,12 @@ __marimo__/
 .streamlit/secrets.toml
 
 # claude (nobody is going to see the secret sauce)
+.claude
 .prompts
+.agents
 tools/
-.claude/agents
-.claude/skills/end-session/
-.claude/skills/discord-api/
-.claude/skills/python-documentation/
-.claude/skills/warerabot-dev/
-.claude/skills/end-session/
-.claude/settings.json
-AGENTS.md
 CLAUDE.md
+AGENTS.md
 
 # garbage
 .discard
