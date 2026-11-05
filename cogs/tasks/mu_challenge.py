@@ -6,7 +6,7 @@ One loop ticks every minute and decides from the stored state what is due, so a 
   and the MU money ranking of every battle that ended in the window (for bounty);
 - at the cut-off (Sunday 23:48 UTC, REPORT_LEAD before the weekly reset) a final refresh adds the donations
   and the rest of the battles, and the article (utils.mu_challenge.article_text) is posted as a .txt file in
-  the government channel (config.json channels.government).
+  the government rankings thread (config.json channels.government_rankings).
 Everything collected is saved, so the final run after a restart only reads what is missing. If the bot is
 down at the cut-off, the article is posted when it is back, with a warning to check it: the weekly counters
 (muMember, muWeeklyDamages) are then taken from the last hourly read before the reset.
@@ -27,6 +27,7 @@ from config import config
 from utils import db
 from utils import mu_challenge as mc
 from utils.api import warera
+from utils.common import get_government_rankings_channel
 from utils.contests import parse_iso
 from utils.i18n import Translator
 
@@ -106,7 +107,7 @@ class MuChallengeJob(commands.Cog):
 
     async def _finish(self, challenge: dict, now: datetime) -> None:
         """Final refresh, mark the challenge ended with the article's warnings, then post the article."""
-        if self._government_channel() is None:
+        if await self._government_channel() is None:
             return  # retried every tick until the channel is configured
         units = await asyncio.to_thread(db.get_mu_challenge_units, challenge["id"])
         changed = await self._refresh(challenge, units, now, final=True)
@@ -127,12 +128,12 @@ class MuChallengeJob(commands.Cog):
         await self._post_article(challenge, units)
 
     async def _post_article(self, challenge: dict, units: dict) -> None:
-        """Build the article from the stored records and post it in the government channel.
+        """Build the article from the stored records and post it in the government rankings thread.
 
         `results_posted` is saved before sending, so a failed save can't repeat the post every minute; a failed
         send clears it again, for at most MAX_POST_ATTEMPTS tries.
         """
-        channel = self._government_channel()
+        channel = await self._government_channel()
         if channel is None:
             return
         state = challenge["state"]
@@ -154,12 +155,12 @@ class MuChallengeJob(commands.Cog):
                 state.update(results_posted=False, post_attempts=attempts)
                 await asyncio.to_thread(db.save_mu_challenge, challenge)
 
-    def _government_channel(self):
-        guild = self.bot.get_guild(config["guild"])
-        channel_id = config.get("channels", {}).get("government")
-        channel = guild.get_channel_or_thread(channel_id) if guild and channel_id else None
+    async def _government_channel(self):
+        """The government rankings thread (utils.common.get_government_rankings_channel), or None with a warning."""
+        channel = await get_government_rankings_channel(self.bot.get_guild(config["guild"]))
         if channel is None:
-            logger.warning("Government channel %s not found; MU challenge article not posted", channel_id)
+            logger.warning("Government rankings channel %s not found; MU challenge article not posted",
+                           config.get("channels", {}).get("government_rankings"))
         return channel
 
     async def _save(self, challenge: dict, units: dict, changed: set) -> None:

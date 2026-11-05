@@ -251,6 +251,26 @@ async def get_mu_destination(guild: discord.Guild, unit: dict, thread_key: str):
     return target
 
 
+async def get_government_rankings_channel(guild: discord.Guild | None):
+    """Where the government's ranking and MU challenge articles go: config.json channels.government_rankings.
+
+    Falls back to channels.government when government_rankings is unset. The target is usually a thread that
+    auto-archives between weekly posts; archived threads are not in the cache, so they are fetched (sending to
+    an archived thread that is not locked unarchives it). Returns None when the guild or channel is missing.
+    """
+    channels = config.get("channels", {})
+    target_id = channels.get("government_rankings") or channels.get("government")
+    if guild is None or not target_id:
+        return None
+    target = guild.get_channel_or_thread(int(target_id))
+    if target is None:
+        try:
+            target = await guild.fetch_channel(int(target_id))
+        except discord.HTTPException:
+            return None
+    return target
+
+
 @cache
 def local_timezone() -> tzinfo:
     """The timezone report times are shown in: config.json "timezone", an IANA name such as Europe/Bucharest,

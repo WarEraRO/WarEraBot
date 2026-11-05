@@ -1,7 +1,7 @@
 """Government rankings: the Romanian government's weekly and monthly top articles, built from the API.
 
 Shortly before the weekly reset (Sunday) and the monthly reset (the last day of the month), a job posts
-ready-to-paste articles as .txt files in the government channel (config.json channels.government), in the layout of
+ready-to-paste articles as .txt files in the government rankings thread (config.json channels.government_rankings), in the layout of
 the government's articles of 2026-10-05 (weekly) and 2026-10-06 ("TOP LUNA SEPTEMBRIE", monthly; the monthly report
 has no diaspora article, user decision 2026-11-04):
 
@@ -31,7 +31,7 @@ from discord.ext import commands, tasks
 from cogs.commands.mu_positions import _unicode_flag
 from config import config
 from utils.api import warera
-from utils.common import to_local
+from utils.common import get_government_rankings_channel, to_local
 from utils.computational import fight_percent, is_economy_build
 from utils.db import get_api_ids_by_discord_id
 from utils.i18n import Translator
@@ -1000,7 +1000,7 @@ class GovRankingsJob(commands.Cog):
 
     @tasks.loop(time=REPORT_TIME)
     async def gov_weekly_ranking(self):
-        """Build the week's Romania and diaspora articles and post them as .txt files in the government channel."""
+        """Build the week's Romania and diaspora articles and post them as .txt files in the government rankings thread."""
         now = datetime.now(timezone.utc)
         # the loop fires daily but only Sunday's run posts; /run_job calls it from another task and always posts
         if now.weekday() != SUNDAY and asyncio.current_task() is self.gov_weekly_ranking.get_task():
@@ -1015,7 +1015,7 @@ class GovRankingsJob(commands.Cog):
 
     @tasks.loop(time=REPORT_TIME)
     async def gov_monthly_ranking(self):
-        """Build the month's Romania article and post it as a .txt file in the government channel (no diaspora)."""
+        """Build the month's Romania article and post it as a .txt file in the government rankings thread (no diaspora)."""
         now = datetime.now(timezone.utc)
         # the loop fires daily but only the month's last day posts; /run_job always posts (the month so far)
         if (now + timedelta(days=1)).day != 1 and asyncio.current_task() is self.gov_monthly_ranking.get_task():
@@ -1040,13 +1040,12 @@ class GovRankingsJob(commands.Cog):
                 logger.warning("Government ranking: %d players could not be loaded", still)
         return users
 
-    def _government_channel(self):
-        """The government channel (config.json channels.government), or None with a warning."""
-        guild = self.bot.get_guild(config["guild"])
-        channel_id = config.get("channels", {}).get("government")
-        channel = guild.get_channel_or_thread(channel_id) if guild and channel_id else None
+    async def _government_channel(self):
+        """The government rankings thread (utils.common.get_government_rankings_channel), or None with a warning."""
+        channel = await get_government_rankings_channel(self.bot.get_guild(config["guild"]))
         if channel is None:
-            logger.warning("Government channel %s not found; government ranking not posted", channel_id)
+            logger.warning("Government rankings channel %s not found; government ranking not posted",
+                           config.get("channels", {}).get("government_rankings"))
         return channel
 
     async def _read_diaspora(self) -> tuple[set[str], dict[str, dict], dict[str, int]] | None:
@@ -1058,12 +1057,12 @@ class GovRankingsJob(commands.Cog):
             return None
 
     async def _post_weekly(self, now: datetime) -> None:
-        """Fetch the week's data, build both articles and send them to the government channel.
+        """Fetch the week's data, build both articles and send them to the government rankings thread.
 
         The week is fixed from `now` at the start; the weekly rankings and donations are read first, before the
         battle sync that may take minutes, so they still describe this week if the sync runs past the reset.
         """
-        channel = self._government_channel()
+        channel = await self._government_channel()
         if channel is None:
             return
         week = week_start(now)
@@ -1102,13 +1101,13 @@ class GovRankingsJob(commands.Cog):
         )
 
     async def _post_monthly(self, now: datetime) -> None:
-        """Fetch the month's data, build the Romania article and send it to the government channel.
+        """Fetch the month's data, build the Romania article and send it to the government rankings thread.
 
         Damage (players and MUs) and bounty come from every battle that ended in the month window [previous
         cut-off, this cut-off), donations from the window start, wealth and prestige as they are now. There is no
         diaspora article (user decision 2026-11-04).
         """
-        channel = self._government_channel()
+        channel = await self._government_channel()
         if channel is None:
             return
         month = month_start(now)
