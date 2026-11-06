@@ -1,5 +1,6 @@
-# skills that count toward an economy build; WarEra v0.27 replaced Entrepreneurship with Management and Leadership
-ECONOMY_SKILLS = ('energy', 'companies', 'management', 'leadership', 'production')
+# skills that count toward an economy build; WarEra v0.27 replaced Entrepreneurship with Management and Leadership.
+# Loot Chance counts as an economy skill (user decision, 2026-11-06).
+ECONOMY_SKILLS = ('energy', 'companies', 'management', 'leadership', 'production', 'lootChance')
 # user.stats.wealth categories a player can spend on fighting; companies are left out
 FIGHT_WEALTH_PARTS = ('money', 'items', 'equipments', 'weapons')
 # fight wealth tiers, highest first: (tier, minimum fight wealth)

@@ -18,7 +18,8 @@ The model (game rules from gameConfig and the warera-game-expert references):
 - Skill points: level x 4. Prestige Points (`leveling.prestigeLevel`, one per Prestige) add bonus levels on top of
   any base level, k levels on one skill costing 2^k - 1 points; skill values continue past level 10 with the same
   step. Checked against the API on 2026-10-26: `skills.<s>.value` = table value at `level + prestige`.
-Economy skills are never used; Companies only takes the level needed for the companies the user asks for, paid
+Loot Chance is optimized for its case returns even though the bot classes it as an economy skill; the other
+economy skills are never used, and Companies only takes the level needed for the companies the user asks for, paid
 with skill points or Prestige Points, whichever the build can spare.
 """
 import asyncio
@@ -40,7 +41,8 @@ COST_BRACKETS = (0.00, 0.05, 0.10, 0.15)
 # Patriotic bonus only: a conservative default, the real total comes from the battle tooltip.
 DEFAULT_BATTLE_BONUS = 20
 
-# Combat skills only, in display order.
+# Skills the optimizer spends points on, in display order: the combat skills plus Loot Chance, which the bot
+# classes as an economy skill (utils.computational.ECONOMY_SKILLS) but which pays out per hit.
 SKILLS = ("attack", "precision", "criticalChance", "criticalDamages",
           "armor", "dodge", "health", "hunger", "lootChance")
 ATK, PRC, CRIT, CRITD, ARM, DDG, HP, HUN, LOOT = range(len(SKILLS))
