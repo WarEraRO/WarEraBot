@@ -8,7 +8,7 @@ from typing import List
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
-from utils.common import is_commander, is_developer
+from utils.common import is_commander, is_developer, is_government
 from utils.i18n import Translator, get_translator
 
 logger = logging.getLogger(__name__)
@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 TASKS_MODULE_PREFIX = "cogs.tasks."
 # jobs members with the Commander role may force; developers may force every job
 COMMANDER_JOBS = frozenset({"military_unit_roles", "skill_roles"})
+# jobs members with a government role may force (on top of COMMANDER_JOBS when they are also commanders)
+GOVERNMENT_JOBS = frozenset({"fight_ready"})
 
 
 def _format_interval(loop: tasks.Loop, tr: Translator) -> str:
@@ -36,12 +38,21 @@ class RunJob(commands.Cog):
         self._forced_running: set[str] = set()
 
     def _allowed_jobs(self, member: discord.abc.User) -> dict[str, tasks.Loop]:
-        """The jobs this member may force: all of them for developers, COMMANDER_JOBS for commanders, none otherwise."""
+        """Return the jobs this member may force, keyed by job name.
+
+        Developers get every job. Otherwise commanders get COMMANDER_JOBS and government members get
+        GOVERNMENT_JOBS (both sets when they hold both roles); anyone else gets none.
+        """
         if is_developer(member):
             return self._get_jobs()
+        allowed = set()
         if is_commander(member):
-            return {name: loop for name, loop in self._get_jobs().items() if name in COMMANDER_JOBS}
-        return {}
+            allowed |= COMMANDER_JOBS
+        if is_government(member):
+            allowed |= GOVERNMENT_JOBS
+        if not allowed:
+            return {}
+        return {name: loop for name, loop in self._get_jobs().items() if name in allowed}
 
     def _get_jobs(self) -> dict[str, tasks.Loop]:
         """Collect every tasks.Loop exposed by the cogs loaded from cogs/tasks/*.py, keyed by job name."""
@@ -100,12 +111,12 @@ class RunJob(commands.Cog):
                 break
         return choices
 
-    @app_commands.command(name="run_job", description="Force a background job to run now, outside its loop timer (developers and commanders only).")
+    @app_commands.command(name="run_job", description="Force a background job to run now, outside its loop timer (developers, commanders, government).")
     @app_commands.describe(job_name="Background job to execute")
     @app_commands.autocomplete(job_name=job_name_autocomplete)
     async def run_job(self, interaction: discord.Interaction, job_name: str):
         tr = await get_translator(interaction.guild_id)
-        if not (is_developer(interaction.user) or is_commander(interaction.user)):
+        if not (is_developer(interaction.user) or is_commander(interaction.user) or is_government(interaction.user)):
             await interaction.response.send_message(tr("common.not_authorized"), ephemeral=True)
             return
 
