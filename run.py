@@ -59,6 +59,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.tasks.military_unit_roles")
         await self.load_extension("cogs.tasks.commander_roles")
         await self.load_extension("cogs.tasks.skill_roles")
+        await self.load_extension("cogs.tasks.fight_ready")
         await self.load_extension("cogs.tasks.takeover_countries")
         await self.load_extension("cogs.tasks.bounty_monitor")
         await self.load_extension("cogs.tasks.unidentified_members")

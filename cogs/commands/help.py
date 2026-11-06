@@ -51,6 +51,7 @@ _COMMAND_IDS: List[str] = [
 
 _JOB_IDS: List[str] = [
     "skill_roles",
+    "fight_ready",
     "military_unit_roles",
     "commander_roles",
     "unidentified_members",

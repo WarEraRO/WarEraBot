@@ -37,9 +37,10 @@ DRAFT_TTL = timedelta(days=7)
 RANKING_LEAD = timedelta(minutes=15)
 
 # Skills that make a build a fight build (user.skills keys, gameConfig skills). Since v0.27.3 the point-buyable
-# skills are these plus energy, companies, production and management (Leadership was merged into Management).
+# skills are these plus energy, companies, production, management (Leadership was merged into Management) and
+# lootChance, which counts as an economy skill (user decision, 2026-11-06).
 FIGHT_SKILLS = (
-    "health", "hunger", "attack", "criticalChance", "criticalDamages", "armor", "precision", "dodge", "lootChance",
+    "health", "hunger", "attack", "criticalChance", "criticalDamages", "armor", "precision", "dodge",
 )
 
 # Predefined missions; only the bot developer adds types. `fields` are the goal values the creator sets

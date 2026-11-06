@@ -522,7 +522,7 @@
             },
             "run_job": {
                 "name": "/run_job job_name",
-                "desc": "Doar pentru dezvoltatori; comandanții pot rula doar skill_roles și military_unit_roles. Rulează acum o sarcină de fundal, o singură dată, fără să-i schimbe programul. E refuzată dacă sarcina rulează deja; o rulare programată care cade în timpul unei rulări forțate este sărită. Câmpul are sugestii."
+                "desc": "Doar pentru dezvoltatori; comandanții pot rula doar skill_roles și military_unit_roles, membrii Guvernului doar fight_ready. Rulează acum o sarcină de fundal, o singură dată, fără să-i schimbe programul. E refuzată dacă sarcina rulează deja; o rulare programată care cade în timpul unei rulări forțate este sărită. Câmpul are sugestii."
             },
             "setlang": {
                 "name": "/setlang language",
@@ -549,6 +549,10 @@
             "skill_roles": {
                 "name": "skill_roles — la fiecare oră",
                 "desc": "Verifică membrii cu rolul Citizen și le acordă/elimină rolurile Economy sau Fighter în funcție de distribuția abilităților din joc. Trimite un rezumat în canalul de rapoarte când apar modificări."
+            },
+            "fight_ready": {
+                "name": "fight_ready — la fiecare 5 minute",
+                "desc": "Acordă rolul Fight Ready membrilor cu rolul Fighter al căror jucător nu e în debuff și îl elimină de la luptătorii în debuff și de la membrii fără rolul Fighter. Dacă datele jucătorului nu se pot încărca, rolul rămâne neschimbat. Nu trimite raport. Membrii Guvernului îl pot rula cu /run_job."
             },
             "military_unit_roles": {
                 "name": "military_unit_roles — la fiecare 3 ore",
@@ -1134,6 +1138,11 @@
         "reason_fight_added": "Abilități economice <= 50",
         "reason_economy_removed": "Economie <= 50, se elimină rolul economic"
     },
+    "fight_ready": {
+        "reason_ready": "Luptător fără debuff",
+        "reason_debuff": "Luptător în debuff",
+        "reason_not_fighter": "Fără rolul Fighter"
+    },
     "commander_roles": {
         "title": "Roluri de comandant actualizate",
         "description": "Rezumatul sincronizării rolului de comandant:",
@@ -1456,7 +1465,7 @@
             "description": "Listează toate canalele, firele și rolurile acestui server, cu id-urile lor (doar pentru dezvoltatori)."
         },
         "run_job": {
-            "description": "Rulează acum o sarcină de fundal, în afara programului ei (doar pentru dezvoltatori și comandanți).",
+            "description": "Rulează acum o sarcină de fundal, în afara programului ei (dezvoltatori, comandanți, Guvern).",
             "params": {"job_name": "Sarcina de fundal de rulat"}
         },
         "fightstatus": {

@@ -519,7 +519,7 @@
             },
             "run_job": {
                 "name": "/run_job job_name",
-                "desc": "Developers only; commanders can run only skill_roles and military_unit_roles. Force a background job to run once now, without waiting for or changing its loop timer. Refused while the job is already running; a scheduled run due during a forced run is skipped. The job field supports autocomplete."
+                "desc": "Developers only; commanders can run only skill_roles and military_unit_roles, government members only fight_ready. Force a background job to run once now, without waiting for or changing its loop timer. Refused while the job is already running; a scheduled run due during a forced run is skipped. The job field supports autocomplete."
             },
             "setlang": {
                 "name": "/setlang language",
@@ -546,6 +546,10 @@
             "skill_roles": {
                 "name": "skill_roles — every 1 hour",
                 "desc": "Scans server members with the Citizen role and assigns/removes Economy or Fighter roles based on their in-game skill distribution. Sends a summary to the reports channel when changes occur."
+            },
+            "fight_ready": {
+                "name": "fight_ready — every 5 minutes",
+                "desc": "Gives the Fight Ready role to members with the Fighter role whose player is not in a debuff, and removes it from fighters in a debuff and from members without the Fighter role. A fighter whose player can't be loaded keeps their current role. Posts no report. Government members can force it with /run_job."
             },
             "military_unit_roles": {
                 "name": "military_unit_roles — every 3 hours",
@@ -1124,6 +1128,11 @@
         "reason_fight_removed": "Economy > 50, remove fighter role",
         "reason_fight_added": "Economy skill <= 50",
         "reason_economy_removed": "Economy <= 50, remove economy role"
+    },
+    "fight_ready": {
+        "reason_ready": "Fighter without a debuff",
+        "reason_debuff": "Fighter in a debuff",
+        "reason_not_fighter": "No Fighter role"
     },
     "commander_roles": {
         "title": "Commander Roles Updated",
