@@ -157,6 +157,26 @@
             "friendlyName": "F.E.R."
         }
     ],
+    "political_parties": [
+        {
+            "id" : "698cf8b286ebfe6f3783bf44",
+            "roleId" : 1568714405410246737,
+            "leaderId" : 1568714498452230195,
+            "friendly_name": "Partidul Amicitie"
+        },
+        {
+            "id" : "6993755bb2f1839ec12b51c3",
+            "roleId" : 1568714688039096491,
+            "leaderId" : 1568714757932843018,
+            "friendly_name": "Partidul Inovatie"
+        },
+        {
+            "id" : "6aecff0a1cc6715ca482d95c",
+            "roleId" : 1568714842377027696,
+            "leaderId" : 1568714881887248404,
+            "friendly_name": "Falanga"
+        }
+    ],
     "active_countries": [
         "South Africa",
         "Chile",

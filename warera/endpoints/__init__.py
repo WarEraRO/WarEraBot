@@ -5,7 +5,8 @@ from warera.endpoints.countries import CountriesAPI, RegionsAPI
 from warera.endpoints.game import GameAPI
 from warera.endpoints.market import MarketAPI
 from warera.endpoints.military_units import MilitaryUnitsAPI
+from warera.endpoints.parties import PartiesAPI
 from warera.endpoints.users import UsersAPI
 
 __all__ = ['BattlesAPI', 'CompaniesAPI', 'ContractsAPI', 'CountriesAPI', 'GameAPI', 'MarketAPI', 'MilitaryUnitsAPI',
-           'RegionsAPI', 'TournamentsAPI', 'UsersAPI']
+           'PartiesAPI', 'RegionsAPI', 'TournamentsAPI', 'UsersAPI']

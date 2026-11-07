@@ -16,6 +16,7 @@ from warera.endpoints import (
     GameAPI,
     MarketAPI,
     MilitaryUnitsAPI,
+    PartiesAPI,
     RegionsAPI,
     TournamentsAPI,
     UsersAPI,
@@ -68,6 +69,7 @@ class WarEraClient:
         self.game = GameAPI(self)
         self.market = MarketAPI(self)
         self.mus = MilitaryUnitsAPI(self)
+        self.parties = PartiesAPI(self)
         self.regions = RegionsAPI(self)
         self.tournaments = TournamentsAPI(self)
         self.users = UsersAPI(self)
