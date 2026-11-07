@@ -5,6 +5,36 @@ from utils.db import init_db
 from utils.i18n import Translator, get_translator
 from config import config
 
+# the three fixed minister seats that v0.28.1 (2026-11-07) replaced with `ministers`; a few
+# governments still carry them next to the new list [observed 2026-11-07]
+_LEGACY_MINISTER_KEYS = ('minOfForeignAffairs', 'minOfEconomy', 'minOfDefense')
+
+
+def is_empty_government(government: dict | None) -> bool:
+    """Whether a government.getByCountryId object has nobody in office, so the country can be taken over.
+
+    Empty means no president, no vice president, no minister (the v0.28.1 `ministers` list or the
+    legacy fixed seats) and no congress member. This reads the values rather than counting keys: since
+    v0.28.1 every government also has `dates` and most have `ministers`, so the old "exactly 4 keys"
+    test never matched.
+
+    Args:
+        government: The government object, or None when it could not be fetched.
+
+    Returns:
+        False for None or an object without a `congressMembers` list, so a failed or partial
+        fetch is never reported as an empty country.
+    """
+    # a partial object without the congress list is not proof of an empty country
+    if not isinstance(government, dict) or not isinstance(government.get('congressMembers'), list):
+        return False
+    if government.get('president') or government.get('vicePresident'):
+        return False
+    if government.get('ministers') or any(government.get(key) for key in _LEGACY_MINISTER_KEYS):
+        return False
+    return not government.get('congressMembers')
+
+
 class TakeoverCountriesJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -41,9 +71,7 @@ class TakeoverCountriesJob(commands.Cog):
         # one batched request per 50 countries instead of one request per country
         governments = await warera.countries.get_governments([country['_id'] for country in to_check])
         for country in to_check:
-            government = governments.get(country['_id'])
-            # country is empty, api displays only _id, country, __v, and congressMembers keys .
-            if government is not None and len(government.keys()) == 4 and len(government['congressMembers']) == 0:
+            if is_empty_government(governments.get(country['_id'])):
                 empty_countries.append((country['name'], country['_id']))
         # Always send an embed reporting the results (may be empty)
         if len(empty_countries) == 0:

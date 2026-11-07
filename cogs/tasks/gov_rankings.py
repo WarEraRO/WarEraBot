@@ -1028,13 +1028,17 @@ class GovRankingsJob(commands.Cog):
                 raise  # /run_job reports the error to whoever forced the run
 
     async def _load_users(self, user_ids: list[str], users: dict[str, dict] | None = None) -> dict[str, dict]:
-        """Batched users by id, added to `users` (whose ids aren't fetched again); failed ids are retried once."""
+        """Batched users by id, added to `users` (whose ids aren't fetched again); failed ids are retried once.
+
+        Full users (user.getUserById): the build split reads `skills`, which getUserLite stopped
+        returning in v0.28.1 (2026-11-07).
+        """
         users = users if users is not None else {}
         wanted = [user_id for user_id in dict.fromkeys(user_ids) if user_id not in users]
-        users.update(await warera.users.get_many(wanted))
+        users.update(await warera.users.get_full_many(wanted))
         missing = [user_id for user_id in wanted if user_id not in users]
         if missing:
-            users.update(await warera.users.get_many(missing))
+            users.update(await warera.users.get_full_many(missing))
             still = sum(1 for user_id in missing if user_id not in users)
             if still:
                 logger.warning("Government ranking: %d players could not be loaded", still)

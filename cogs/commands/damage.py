@@ -941,7 +941,7 @@ class DamageBuildHelper(commands.Cog):
         tr = await get_translator(interaction.guild_id)
 
         user_data, game_config, prices_raw, gear_prices = await asyncio.gather(
-            warera.users.find_by_name(player_name),
+            warera.users.find_by_name(player_name, full=True),  # skills.attack: not in getUserLite since v0.28.1
             self._get_game_config(),
             warera.market.get_prices(),
             _fetch_gear_prices(),

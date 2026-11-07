@@ -48,8 +48,8 @@ class BattlesAPI(Endpoint):
     async def get_ranking(self, battle_id, data_type, ranking_type, side):
         """Every entry of a battle leaderboard, or None if any page fails.
 
-        `data_type` is damage, points or money; `ranking_type` user, country or mu; `side` attacker,
-        defender or merged.
+        `data_type` is damage, points or money; `ranking_type` user, country, mu or alliance
+        (alliance since v0.28.1, 2026-11-07); `side` attacker, defender or merged.
         """
         return await self._collect('battleRanking.getRanking', {
             'battleId': battle_id, 'dataType': data_type, 'type': ranking_type, 'side': side, 'limit': 100,

@@ -49,8 +49,9 @@ class CompaniesAPI(Endpoint):
     async def get_production_bonuses(self, company_ids):
         """Batched company.getProductionBonus: {companyId: bonus} for the ids that resolved.
 
-        Not in the official spec (explorer-documented). A bonus is {strategicBonus, depositBonus,
-        ethicSpecializationBonus, ethicDepositBonus, total}, in percent [observed 2026-10-25].
+        Not in the official spec (explorer-documented). A bonus is {depositBonus, total}, in percent
+        [observed 2026-11-07]; strategicBonus and the ethic bonuses were dropped in v0.27
+        (2026-10-25), when strategic resources stopped boosting production and party ethics ended.
         """
         return await self._get_keyed('company.getProductionBonus', company_ids, lambda cid: {'companyId': cid})
 

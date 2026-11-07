@@ -92,14 +92,15 @@ class BuffMonitorJob(commands.Cog):
             entry = self.buff_check_cache.get(api_id) if api_id else None
             if api_id and not (entry and entry.get('next_check') and entry['next_check'] > now):
                 to_fetch.append(api_id)
-        prefetched_by_id = await warera.users.get_many(to_fetch)
+        # full users: the health/hunger check reads skills (getUserById: lite has no skills since v0.28.1)
+        prefetched_by_id = await warera.users.get_full_many(to_fetch)
         to_fetch = set(to_fetch)
         to_search = {
             member.display_name
             for member, api_id in zip(members, resolved_ids)
             if not api_id or (api_id in to_fetch and api_id not in prefetched_by_id)
         }
-        prefetched_by_name = await warera.users.find_many_by_name(to_search) if to_search else {}
+        prefetched_by_name = await warera.users.find_many_by_name(to_search, full=True) if to_search else {}
         # save_user rewrites one record, which can only change the lookup of a member sharing one of its
         # keys (Discord id, display name, username) or resolved to its api id; those are looked up again
         saved_keys: set = set()
@@ -117,14 +118,14 @@ class BuffMonitorJob(commands.Cog):
                             seen_api_ids.add(api_id)
                             continue
 
-                # Retrieve user info. Prefer warera.users.get when we already have api_id
+                # Retrieve user info. Prefer warera.users.get_full when we already have api_id
                 user_obj = None
                 if api_id:
                     if api_id in to_fetch:
                         user_obj = prefetched_by_id.get(api_id)
                     else:
                         try:
-                            user_obj = await warera.users.get(api_id)
+                            user_obj = await warera.users.get_full(api_id)
                         except Exception:
                             user_obj = None
 
@@ -132,7 +133,7 @@ class BuffMonitorJob(commands.Cog):
                     if member.display_name in to_search:
                         user_obj = prefetched_by_name.get(member.display_name)
                     else:
-                        user_obj = await warera.users.find_by_name(member.display_name)
+                        user_obj = await warera.users.find_by_name(member.display_name, full=True)
                     if isinstance(user_obj, dict):
                         api_id = user_obj.get('_id') or api_id
                         if api_id:

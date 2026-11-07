@@ -166,7 +166,8 @@ class Promotions(commands.Cog):
         data_issues = []
 
         # one batched lookup for all members instead of one or more requests per member
-        users = await warera.users.find_many_by_name([member.display_name for member in members])
+        # (getUserById: lite has no skills since v0.28.1)
+        users = await warera.users.find_many_by_name([member.display_name for member in members], full=True)
         for member in members:
             try:
                 user = users.get(member.display_name)

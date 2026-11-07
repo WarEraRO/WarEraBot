@@ -227,7 +227,8 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
         if not api_ids:
             return []
         # one batched request; a subscriber whose stats could not be fetched is not pinged
-        users = await warera.users.get_many(api_ids.values())
+        # (getUserById: lite has no skills since v0.28.1)
+        users = await warera.users.get_full_many(api_ids.values())
         now = datetime.now(timezone.utc)
         return [
             f"<@{discord_id}>"

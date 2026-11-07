@@ -26,8 +26,10 @@ class SkillRolesJob(commands.Cog):
     
     @tasks.loop(hours=1)
     async def skill_roles(self):
-        """Parses all members of the server that hold the citizen role and assigns
-           roles based on their assigned skills (economy or fighter)
+        """Give every citizen-role member the Economy or Fighter role that matches their skill build.
+
+        Members are looked up by display name with full users (user.getUserById), because
+        user.getUserLite stopped returning skills in v0.28.1 (2026-11-07).
         """
         guild = self.bot.get_guild(config['guild'])
         if guild is None:
@@ -45,7 +47,8 @@ class SkillRolesJob(commands.Cog):
             'fight_removed': [],
         }
         # One batched fetch for all members instead of one request per member
-        users = await warera.users.find_many_by_name([m.display_name for m in members])
+        # (getUserById: lite has no skills since v0.28.1)
+        users = await warera.users.find_many_by_name([m.display_name for m in members], full=True)
         for member in members:
             user = users.get(member.display_name)
             if user is None:

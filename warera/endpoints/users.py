@@ -26,20 +26,33 @@ class UsersAPI(Endpoint):
 
     @guarded()
     async def get(self, user_id):
-        """The user.getUserLite object of `user_id`, or None."""
+        """The user.getUserLite object of `user_id`, or None.
+
+        Since v0.28.1 (2026-11-07) lite has no `skills`, `skillsExpiration` or `equipment`; use
+        get_full() when the caller reads skills, bars or the attack breakdown.
+        """
         return await self._get('user.getUserLite', {'userId': user_id})
+
+    @guarded()
+    async def get_full(self, user_id):
+        """The user.getUserById object of `user_id` (lite fields plus skills, stats, region), or None."""
+        return await self._get('user.getUserById', {'userId': user_id})
 
     @guarded(dict)
     async def get_many(self, user_ids):
-        """Batched user.getUserLite: {userId: user} for the ids that resolved."""
+        """Batched user.getUserLite: {userId: user} for the ids that resolved.
+
+        No `skills` since v0.28.1 (see get()); use get_full_many() when the caller reads them.
+        """
         return await self._get_keyed('user.getUserLite', user_ids, lambda uid: {'userId': uid})
 
     @guarded(dict)
     async def get_full_many(self, user_ids):
         """Batched user.getUserById: {userId: user} for the ids that resolved.
 
-        Same request cost as get_many. The full user carries the getUserLite fields the bot reads
-        (skills, buffs, dates, leveling, mu) plus stats.wealth, region and location [observed 2026-10-14].
+        Same request cost as get_many. The full user carries every getUserLite field (40 of 40 users,
+        subkeys included [observed 2026-11-07]) plus skills, skillsExpiration, equipment, stats.wealth,
+        region and location. Since v0.28.1 (2026-11-07) it is the official way to read skills.
         """
         return await self._get_keyed('user.getUserById', user_ids, lambda uid: {'userId': uid})
 
@@ -62,20 +75,27 @@ class UsersAPI(Endpoint):
         return await self._collect('user.getUsersByCountry', {'limit': 100, 'countryId': country_id}, partial=True)
 
     @guarded()
-    async def find_by_name(self, username):
-        """The user (getUserLite) whose username is exactly `username`, or None.
+    async def find_by_name(self, username, full=False):
+        """The user whose username is exactly `username`, or None.
 
         Searches the quoted name first and falls back to the plain name if that finds no exact match.
         A cached id is fetched without re-checking the username.
+
+        Args:
+            username: The exact in-game username.
+            full: Fetch the user with user.getUserById (adds skills, stats) instead of getUserLite.
+                Needed whenever the caller reads skills, since lite lost them in v0.28.1.
         """
         if username in self.username_ids:
-            return await self.get(self.username_ids[username])
+            fetch_one = self.get_full if full else self.get
+            return await fetch_one(self.username_ids[username])
+        fetch_many = self.get_full_many if full else self.get_many
         for search_text in (_quoted(username), username):
             search = await self._get('search.searchAnything', {'searchText': search_text})
             if not search or search.get('hasData') is False:
                 continue
             user_ids = search.get('userIds') or []
-            candidates = await self.get_many(user_ids)
+            candidates = await fetch_many(user_ids)
             for user_id in user_ids:
                 user = candidates.get(user_id)
                 if user is not None and user.get('username') == username:
@@ -84,18 +104,20 @@ class UsersAPI(Endpoint):
         return None
 
     @guarded(dict)
-    async def find_many_by_name(self, usernames):
+    async def find_many_by_name(self, usernames, full=False):
         """Batched find_by_name(): {username: user} for the usernames that resolved.
 
-        Like find_by_name, a cached id is fetched without re-checking the username.
+        Like find_by_name, a cached id is fetched without re-checking the username. `full` fetches the
+        users with user.getUserById (skills included) instead of getUserLite, cached ids too.
         """
         names = list(dict.fromkeys(usernames))
         cached = {name: self.username_ids[name] for name in names if name in self.username_ids}
-        users_by_id = await self.get_many(cached.values())
+        fetch_many = self.get_full_many if full else self.get_many
+        users_by_id = await fetch_many(cached.values())
         found = {name: users_by_id[uid] for name, uid in cached.items() if uid in users_by_id}
         missing = [name for name in names if name not in cached]
         if missing:
-            found.update(await self._search_names(missing))
+            found.update(await self._search_names(missing, full=full))
         return found
 
     @guarded(dict)
@@ -109,12 +131,13 @@ class UsersAPI(Endpoint):
                 found[name] = user.get('_id')
         return found
 
-    async def _search_names(self, usernames):
-        """Resolve usernames with batched search + getUserLite; exact matches go into `username_ids`.
+    async def _search_names(self, usernames, full=False):
+        """Resolve usernames with batched search + user fetch; exact matches go into `username_ids`.
 
         Names are searched quoted first (see _quoted); only the names that found no exact match are
-        searched again plain.
+        searched again plain. The candidates are fetched with getUserById when `full`, else getUserLite.
         """
+        fetch_many = self.get_full_many if full else self.get_many
         names = list(dict.fromkeys(usernames))
         found = {}
         for search_text in (_quoted, lambda name: name):
@@ -128,7 +151,7 @@ class UsersAPI(Endpoint):
                 search = searches.get(name)
                 if search and search.get('hasData') is not False:
                     candidate_ids.extend(search.get('userIds') or [])
-            candidates = await self.get_many(candidate_ids)
+            candidates = await fetch_many(candidate_ids)
             by_username = {user.get('username'): user for user in candidates.values()}
             for name in missing:
                 user = by_username.get(name)

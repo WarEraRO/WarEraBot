@@ -129,8 +129,8 @@ class Pills(commands.Cog):
             await interaction.followup.send(tr("pills.members_unavailable"), ephemeral=True)
             return
 
-        # one batched request for every member
-        users_by_id = await warera.users.get_many([str(member.get("user")) for member in members])
+        # one batched request for every member (getUserById: lite has no skills since v0.28.1)
+        users_by_id = await warera.users.get_full_many([str(member.get("user")) for member in members])
         users = [users_by_id.get(str(member.get("user"))) for member in members]
         now = datetime.now(timezone.utc)
 

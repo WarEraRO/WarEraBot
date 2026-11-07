@@ -227,7 +227,8 @@ class LootAlertJob(commands.Cog):
             return
         waiting = {discord_id for _, round_id, _ in pending for discord_id in api_ids if discord_id not in self._handled.get(round_id, set())}
         # one batched request; a subscriber whose stats could not be fetched is retried on the next run
-        users = await warera.users.get_many([api_ids[discord_id] for discord_id in waiting])
+        # (getUserById: lite has no skills since v0.28.1)
+        users = await warera.users.get_full_many([api_ids[discord_id] for discord_id in waiting])
         eligible = {
             discord_id: user for discord_id in waiting
             if (user := users.get(api_ids[discord_id])) and is_economy_build(user) is False and can_fight(user, now)

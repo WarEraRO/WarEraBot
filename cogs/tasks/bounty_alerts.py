@@ -367,8 +367,9 @@ class BountyAlertsJob(commands.Cog):
         }
         if not pending:
             return {}
-        # a subscriber whose player could not be fetched is not pinged this run
-        users = await warera.users.get_many(pending.values())
+        # a subscriber whose player could not be fetched is not pinged this run; full users because the
+        # build and bars come from skills, which getUserLite stopped returning in v0.28.1
+        users = await warera.users.get_full_many(pending.values())
         unit_threads = {str(unit["id"]): thread_id for thread_id, units in threads.items() for unit in units}
         now = datetime.now(timezone.utc)
         eligible: dict[int, list[str]] = {}
