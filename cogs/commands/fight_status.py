@@ -15,7 +15,10 @@ _INACTIVE_THRESHOLD_SECONDS = 3 * 24 * 3600
 
 
 def fight_status_from_user(userId: str, api_result: dict, member: discord.Member | None = None, eco=True) -> dict | None:
-    """get_fight_status() for a user.getUserLite result that was already fetched (no request).
+    """get_fight_status() for a user.getUserById result that was already fetched (no request).
+
+    The user must carry `skills`, so fetch it with get_full_many / find_many_by_name(full=True):
+    user.getUserLite stopped returning skills in v0.28.1 (2026-11-07).
 
     Returns the same dict, or None for an economy build when `eco` is False or on failure.
     """
@@ -209,7 +212,7 @@ class FightStatus(commands.Cog):
     async def _fetch_infos_for_discord_members(self, members: list[discord.Member]) -> list[dict]:
         infos: list[dict] = []
         # one batched lookup for all members; each status is built from the user already fetched
-        warera_users = await warera.users.find_many_by_name([member.display_name for member in members])
+        warera_users = await warera.users.find_many_by_name([member.display_name for member in members], full=True)
         for member in members:
             warera_user = warera_users.get(member.display_name)
 
@@ -271,8 +274,8 @@ class FightStatus(commands.Cog):
 
         members = chosen.get('members') or []
         infos: list[dict] = []
-        # one batched request for every member
-        users = await warera.users.get_many([str(m) for m in members if m])
+        # one batched request for every member (getUserById: lite has no skills since v0.28.1)
+        users = await warera.users.get_full_many([str(m) for m in members if m])
         for m in members:
             user_id = m
 

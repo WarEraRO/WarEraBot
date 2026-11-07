@@ -61,7 +61,7 @@ found`) is always logged as an error.
 
 | Group | Methods (procedure) |
 |---|---|
-| `users` | `get` (user.getUserLite) · `get_many` (batched) · `get_full_many` (user.getUserById, batched; adds `stats.wealth`) · `get_equipment_many` (inventory.fetchCurrentEquipment) · `get_by_country` (user.getUsersByCountry, all pages) · `find_by_name`, `find_many_by_name`, `ids_by_name` (search.searchAnything + getUserLite; `username_ids` caches name → id) |
+| `users` | `get` (user.getUserLite) · `get_many` (batched) · `get_full` / `get_full_many` (user.getUserById; adds `skills`, which lite lost on 2026-11-07, and `stats.wealth`) · `get_equipment_many` (inventory.fetchCurrentEquipment) · `get_by_country` (user.getUsersByCountry, all pages) · `find_by_name`, `find_many_by_name`, `ids_by_name` (search.searchAnything + getUserLite, or getUserById with `full=True` when skills are needed; `username_ids` caches name → id) |
 | `countries` | `get` · `get_many` (country.getCountryById) · `get_all` (country.getAllCountries) · `get_names` · `get_governments` (government.getByCountryId, batched) · `get_alliance` (alliance.getById 🧭) |
 | `regions` | `get` · `get_many` (region.getById) · `get_all` (region.getRegionsObject, {id: region}) |
 | `mus` | `get` · `get_many` (mu.getById) · `get_all` (mu.getManyPaginated) · `get_members` (muMember.getByMu 🧭) · `get_upgrades` (upgrade.getUpgradeByTypeAndEntity, batched by type) · `get_public_orders` (tradingOrder.getPublicOrdersByOwner 🧭) |
