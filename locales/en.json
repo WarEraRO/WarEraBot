@@ -555,6 +555,10 @@
                 "name": "military_unit_roles — every 3 hours",
                 "desc": "Assigns Military Unit roles to members based on their in-game MU membership and removes conflicting MU roles. Members linked to a player whose server nickname doesn't match that player's in-game username lose all MU roles. Sends a summary to the reports channel when changes occur."
             },
+            "party_roles": {
+                "name": "party_roles — every hour",
+                "desc": "Gives members the role of the in-game political party they belong to (and the party leader role to its leader), and removes the roles of other parties. Players in no configured party lose every party role; members linked to a player whose server nickname doesn't match the in-game username lose them too. A party that fails to load is left unchanged. Sends a summary to the reports channel when changes occur."
+            },
             "commander_roles": {
                 "name": "commander_roles — every 3 hours",
                 "desc": "Syncs the Discord commander role with the commanders configured across all military units."
@@ -1147,6 +1151,16 @@
         "removed": "Removed:",
         "reason_added": "Assigned Military Unit role.",
         "reason_removed": "Removed unused Military Unit roles.",
+        "reason_name_mismatch": "Server nickname does not match the linked in-game username."
+    },
+    "party_roles": {
+        "title": "Party Roles Updated",
+        "description": "Summary of political party role changes:",
+        "role_added": "{role} — Added",
+        "role_removed": "{role} — Removed",
+        "leader_label": "{party} (leader)",
+        "reason_added": "Assigned political party role.",
+        "reason_removed": "Removed roles of parties the player is not in.",
         "reason_name_mismatch": "Server nickname does not match the linked in-game username."
     },
     "unidentified": {

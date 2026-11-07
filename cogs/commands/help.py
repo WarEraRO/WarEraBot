@@ -53,6 +53,7 @@ _JOB_IDS: List[str] = [
     "skill_roles",
     "fight_ready",
     "military_unit_roles",
+    "party_roles",
     "commander_roles",
     "unidentified_members",
     "takeover_countries",
