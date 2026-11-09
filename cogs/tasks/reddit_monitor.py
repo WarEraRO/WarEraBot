@@ -19,6 +19,9 @@ SUBREDDIT = "RomaniaWarEra"
 POST_LIMIT = 100
 NOTIFIED_POST_CACHE_LIMIT = 100
 POST_MAX_AGE = timedelta(days=1)
+# messages read back from the Reddit channel to find the posts this bot already announced
+HISTORY_SCAN_LIMIT = 100
+POST_ID_PATTERN = re.compile(r"/comments/([A-Za-z0-9]+)")
 REDDIT_JSON_URLS = (
     f"https://old.reddit.com/r/{SUBREDDIT}/new.json",
     f"https://www.reddit.com/r/{SUBREDDIT}/new/.json",
@@ -65,6 +68,8 @@ class RedditMonitorJob(commands.Cog):
 
         The first successful fetch after a restart only records the recent posts, so posts
         announced before the restart are not announced (and the social role not pinged) again.
+        Because Reddit's listings can lag (a post missing from that first fetch would otherwise
+        look new later), any post this bot already linked in the channel is skipped too.
         """
         now = datetime.now(timezone.utc)
         cutoff = now - POST_MAX_AGE
@@ -90,6 +95,7 @@ class RedditMonitorJob(commands.Cog):
         if channel is None:
             return
 
+        candidates = []
         for post in reversed(posts):
             post_id = str(post.get("id") or "")
             created_utc = post.get("created_utc")
@@ -101,6 +107,22 @@ class RedditMonitorJob(commands.Cog):
                 continue
 
             if post_id in self.notified_posts:
+                continue
+
+            candidates.append((post_id, created_utc, post))
+
+        if not candidates:
+            return
+
+        announced = await self._announced_post_ids(channel)
+        if announced is None:
+            # without the channel history a repost cannot be ruled out; retry next run
+            return
+
+        for post_id, created_utc, post in candidates:
+            if post_id in announced:
+                self.notified_posts[post_id] = float(created_utc)
+                self._trim_notified_posts()
                 continue
 
             post_link = self._build_post_link(post)
@@ -120,6 +142,33 @@ class RedditMonitorJob(commands.Cog):
 
             self.notified_posts[post_id] = float(created_utc)
             self._trim_notified_posts()
+
+    async def _announced_post_ids(self, channel: discord.abc.Messageable) -> set[str] | None:
+        """Return the IDs of the Reddit posts this bot linked in the channel's recent messages.
+
+        The channel itself is the record that survives restarts, so this catches posts whose
+        announcement the in-memory cache has lost.
+
+        Args:
+            channel: The configured Reddit announcement channel.
+
+        Returns:
+            The post IDs found in the bot's last ``HISTORY_SCAN_LIMIT`` channel messages,
+            or ``None`` when the history cannot be read.
+        """
+        me = self.bot.user
+        if me is None:
+            return None
+
+        announced: set[str] = set()
+        try:
+            async for message in channel.history(limit=HISTORY_SCAN_LIMIT):
+                if message.author.id == me.id:
+                    announced.update(POST_ID_PATTERN.findall(message.content))
+        except discord.DiscordException:
+            logger.exception("Could not read the Reddit channel history")
+            return None
+        return announced
 
     async def _fetch_recent_posts(self) -> list[dict]:
         session = await self._get_session()
