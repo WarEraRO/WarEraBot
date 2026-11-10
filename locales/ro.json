@@ -632,7 +632,7 @@
             },
             "war_priority": {
                 "name": "war_priority — la fiecare 2 minute",
-                "desc": "Pentru fiecare război al României, verifică ce țară are prioritatea de război și când se termină, și postează o alertă în canalul cabinetului de moderare al guvernului cu 3 ore, 1 oră și 10 minute înainte de final, fie că prioritatea e a României, fie a inamicului. Nu postează nimic cât timp România și acel inamic au o bătălie în desfășurare (câștigătorul primește o prioritate nouă). După o repornire, alertele deja scadente nu se repetă."
+                "desc": "Pentru fiecare război al României, verifică ce țară are prioritatea de război și când se termină, și postează o alertă în canalul cabinetului de moderare al guvernului cu 3 ore, 1 oră și 10 minute înainte de final, fie că prioritatea e a României, fie a inamicului, cu tag pe rolurile guvernului (roles.government) și pe rolul cabinetului (roles.cabinets.mod). Nu postează nimic cât timp România și acel inamic au o bătălie în desfășurare (câștigătorul primește o prioritate nouă). După o repornire, alertele deja scadente nu se repetă."
             },
             "newbie_welcome": {
                 "name": "newbie_welcome - la primirea rolului Newbie",
