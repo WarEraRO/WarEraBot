@@ -20,6 +20,25 @@ class BattlesAPI(Endpoint):
         return await self._collect('battle.getBattles', {'isActive': True, 'limit': 100}, partial=True)
 
     @guarded()
+    async def get_active_for_country(self, country_id):
+        """Every active battle with `country_id` as attacker or defender (all pages); None if any page fails.
+
+        Unlike get_active, a partial list is never returned: a missing battle would make a war look idle.
+        """
+        return await self._collect('battle.getBattles', {'isActive': True, 'limit': 100, 'countryId': country_id},
+                                   partial=False)
+
+    @guarded()
+    async def get_ended_for_country_since(self, country_id, created_after):
+        """Ended battles with `country_id` as a side, created at or after `created_after` (ISO), newest first.
+
+        Filtered on createdAt, not endedAt: to get the battles that ended since a moment, ask from far
+        enough back to cover the longest battle. None if any page fails.
+        """
+        return await self._collect_since('battle.getBattles', {'isActive': False, 'limit': 100, 'countryId': country_id},
+                                         created_after)
+
+    @guarded()
     async def get_ended_since(self, created_after):
         """Ended battles created at or after `created_after` (ISO string), newest first; None if any page fails.
 

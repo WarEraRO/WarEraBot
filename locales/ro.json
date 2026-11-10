@@ -630,6 +630,10 @@
                 "name": "gov_monthly_ranking — ultima zi a lunii, cu 12 minute înainte de resetarea lunară",
                 "desc": "Cu puțin înainte de resetarea lunară, postează în threadul de topuri al guvernului articolul lunar al guvernului („TOP LUNA ...”) ca fișier .txt gata de copiat, cu aceleași secțiuni ca gov_weekly_ranking (fără fișier de diaspora), pe toată luna: damage-ul jucătorilor și al unităților militare și bounty-ul sunt adunate din toate bătăliile încheiate în lună (o unitate primește damage-ul făcut de membrii ei cât timp erau în ea), donațiile către România de la precedenta rulare lunară. O rulare forțată postează luna de până acum. gov_battle_tracker (la fiecare 15 minute) citește din timp bătăliile încheiate; după o repornire, raportul citește singur restul, ceea ce poate dura câteva minute."
             },
+            "war_priority": {
+                "name": "war_priority — la fiecare 2 minute",
+                "desc": "Pentru fiecare război al României, verifică ce țară are prioritatea de război și când se termină, și postează o alertă în canalul cabinetului de moderare al guvernului cu 3 ore, 1 oră și 10 minute înainte de final, fie că prioritatea e a României, fie a inamicului. Nu postează nimic cât timp România și acel inamic au o bătălie în desfășurare (câștigătorul primește o prioritate nouă). După o repornire, alertele deja scadente nu se repetă."
+            },
             "newbie_welcome": {
                 "name": "newbie_welcome - la primirea rolului Newbie",
                 "desc": "Când un membru primește rolul Newbie, îl menționează în chatul pentru începători (chats.ro_newbie) cu un mesaj de bun venit: porecla de pe server, primii pași, până la 5 unități militare configurate cu locuri libere (citite live, fără MU-urile \"fight\"), promovarea la Citizen și unde se folosesc comenzile botului (channels.public_commands). Nu postează nimic la repornire sau pentru membrii care aveau deja rolul."
@@ -1779,5 +1783,11 @@
         "compiled": "Top-ul a fost alcătuit pe {date}, pentru luna {month} {year} (perioadă acoperită: {start}–{end}).",
         "incomplete_players": "[ATENȚIE, ștergeți înainte de publicare: {count} jucători nu au putut fi încărcați din API, așa că pot lipsi din topuri. Rulați din nou /run_job gov_monthly_ranking înainte de resetare.]",
         "incomplete_battles": "[ATENȚIE, ștergeți înainte de publicare: damage-ul sau bounty-ul din {count} bătălii nu a putut fi citit complet, așa că topurile de damage, unități militare și bounty pot fi incomplete. Rulați din nou /run_job gov_monthly_ranking înainte de resetare.]"
+    },
+    "war_priority": {
+        "title_ours": "⏳ Prioritatea de război a României se termină",
+        "title_theirs": "⏳ Prioritatea de război a unui inamic se termină",
+        "description": "{holder} are prioritatea de război față de {other}. Se termină în **{remaining}** (la {time}).",
+        "footer": "Alerte cu 3 h, 1 h și 10 min înainte de sfârșitul priorității; niciuna cât timp cele două țări au o bătălie în desfășurare."
     }
 }
