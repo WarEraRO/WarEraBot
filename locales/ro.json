@@ -584,7 +584,7 @@
             },
             "bounty_monitor": {
                 "name": "bounty_monitor — interval configurabil",
-                "desc": "Verifică bătăliile active pentru fonduri/recompense și postează un rezumat când e cazul (intervalul e setat prin `BOUNTY_MONITOR_INTERVAL_MINUTES` în configurare)."
+                "desc": "Postează recompensele noi sau schimbate din bătăliile active pe canalul public de recompense: toate recompensele României, ale partenerilor ei de pact defensiv și ale membrilor alianței ei, indiferent de sumă, și recompensele oricărei alte țări care plătesc cel puțin 0.1 la 1k damage (intervalul e setat prin `BOUNTY_MONITOR_INTERVAL_MINUTES`)."
             },
             "mercenary_contracts": {
                 "name": "mercenary_contracts — la fiecare minut",

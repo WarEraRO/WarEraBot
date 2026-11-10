@@ -581,7 +581,7 @@
             },
             "bounty_monitor": {
                 "name": "bounty_monitor — configurable interval",
-                "desc": "Checks active battles for money pools/bounties and posts a summary to the public channel when relevant (interval set by `BOUNTY_MONITOR_INTERVAL_MINUTES` in config)."
+                "desc": "Posts new or changed bounties of active battles to the public bounties channel: every bounty of Romania, its defensive-pact partners and its alliance's members, whatever the amount, and the bounties of any other country that pay at least 0.1 per 1k damage (interval set by `BOUNTY_MONITOR_INTERVAL_MINUTES`)."
             },
             "mercenary_contracts": {
                 "name": "mercenary_contracts — every 1 minute",

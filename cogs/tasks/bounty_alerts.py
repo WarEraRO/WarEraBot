@@ -5,10 +5,11 @@ in config.json `military_units[].threadIds.bountyId`; MUs without that key get n
 so the MU channels are not flooded). MUs that share a thread share its posts. Every minute the job:
 
 1. Builds the friendly countries: Romania, its defensive-pact partners (`country.defensivePacts`) and the
-   members of its alliance that are not suspended (`alliance.getById`), refreshed every hour.
+   members of its alliance that are not suspended (`alliance.getById`), refreshed every hour
+   (`friendly_countries`, whose cache bounty_monitor shares).
 2. Lists the active battles and keeps the sides of a friendly country with a bounty: `moneyPool` above 0
-   and a `bountyEffectiveAt`. Unlike bounty_monitor there is no minimum rate, because allied bounties
-   usually pay well under 0.1 per 1k damage. One post per battle covers every friendly side.
+   and a `bountyEffectiveAt`, at any rate, because allied bounties usually pay well under 0.1 per 1k
+   damage. One post per battle covers every friendly side.
 3. Posts a new bounty with the eligible subscribers mentioned in the message text, and on later runs only
    edits its embed (rate and pool), which notifies nobody. A subscriber is eligible while they are in an MU
    of that thread, on a fight build (no skill points counts as economy) and can fight (`can_fight`: health
@@ -99,6 +100,57 @@ def friendly_bounty_sides(battle: dict, friendly_ids: set[str]) -> list[str]:
     return sides
 
 
+# (friendly ids, id -> name, time.monotonic() of the load), shared by this job and bounty_monitor
+_friends_cache: tuple[set[str], dict[str, str], float] | None = None
+
+
+async def friendly_countries() -> tuple[set[str], dict[str, str]] | None:
+    """The friendly country ids and every country's id -> name, cached for FRIENDLY_COUNTRIES_TTL_SECONDS.
+
+    The cache is shared by every caller (this job and bounty_monitor). A failed refresh keeps the previous
+    result (and retries on the next call); None when nothing was ever loaded.
+    """
+    global _friends_cache
+    now = time.monotonic()
+    if _friends_cache and now - _friends_cache[2] < FRIENDLY_COUNTRIES_TTL_SECONDS:
+        return _friends_cache[0], _friends_cache[1]
+    loaded = await load_friendly_countries()
+    if loaded is None:
+        return (_friends_cache[0], _friends_cache[1]) if _friends_cache else None
+    _friends_cache = (*loaded, now)
+    return loaded
+
+
+async def load_friendly_countries() -> tuple[set[str], dict[str, str]] | None:
+    """Romania, its defensive-pact partners and its alliance's members that are not suspended.
+
+    Returns the friendly country ids and every country's id -> name. None when the countries or the
+    alliance cannot be fetched, or Romania is missing from the list.
+    """
+    countries = await warera.countries.get_all()
+    if not countries:
+        return None
+    names = {
+        str(country["_id"]): str(country.get("name") or country["_id"]) for country in countries if country.get("_id")
+    }
+    romania = next((country for country in countries if country.get("name") == COUNTRY_NAME), None)
+    if romania is None:
+        logger.warning("%s is missing from the country list", COUNTRY_NAME)
+        return None
+    friendly_ids = {str(romania["_id"])} | {str(partner) for partner in romania.get("defensivePacts") or []}
+    if romania.get("allianceId"):
+        # alliance.getById is not in the official spec (community explorer), see the warera-api skill
+        alliance = await warera.countries.get_alliance(str(romania["allianceId"]))
+        if alliance is None:
+            return None
+        friendly_ids |= {
+            str(member["country"])
+            for member in alliance.get("memberCountries") or []
+            if member.get("country") and not member.get("suspended")
+        }
+    return friendly_ids, names
+
+
 def _country_label(name: str) -> str:
     flag = country_flag(name)
     return f"{flag} **{name}**" if flag else f"**{name}**"
@@ -160,6 +212,8 @@ def _mentions(discord_ids) -> str:
 
 
 class BountyAlertsJob(commands.Cog):
+    """Background job that keeps the allied bounty posts of the MU bounty threads (see the module docstring)."""
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         # thread id -> battle id -> {"message_id", "pinged": discord ids, "replies": message ids, "signature"}
@@ -168,7 +222,6 @@ class BountyAlertsJob(commands.Cog):
         self._recovered: set[int] = set()
         # threads already reported as missing or unreadable, so the warning is logged once
         self._warned: set[int] = set()
-        self._friends: tuple[set[str], dict[str, str], float] | None = None
         self.bounty_alerts.start()
 
     def cog_unload(self):
@@ -189,7 +242,7 @@ class BountyAlertsJob(commands.Cog):
         if not threads:
             return
 
-        friends = await self._friendly_countries()
+        friends = await friendly_countries()
         if friends is None:
             return
         friendly_ids, country_names = friends
@@ -248,45 +301,6 @@ class BountyAlertsJob(commands.Cog):
     @bounty_alerts.before_loop
     async def before_bounty_alerts(self):
         await self.bot.wait_until_ready()
-
-    async def _friendly_countries(self) -> tuple[set[str], dict[str, str]] | None:
-        """The friendly country ids and every country's id -> name, cached for an hour.
-
-        A failed refresh keeps the previous result (and retries next run); None when nothing was ever loaded.
-        """
-        now = time.monotonic()
-        if self._friends and now - self._friends[2] < FRIENDLY_COUNTRIES_TTL_SECONDS:
-            return self._friends[0], self._friends[1]
-        loaded = await self._load_friendly_countries()
-        if loaded is None:
-            return (self._friends[0], self._friends[1]) if self._friends else None
-        self._friends = (*loaded, now)
-        return loaded
-
-    async def _load_friendly_countries(self) -> tuple[set[str], dict[str, str]] | None:
-        """Romania, its defensive-pact partners and its alliance's members that are not suspended.
-
-        None when the countries or the alliance cannot be fetched, or Romania is missing from the list.
-        """
-        countries = await warera.countries.get_all()
-        if not countries:
-            return None
-        names = {str(country["_id"]): str(country.get("name")) for country in countries if country.get("_id")}
-        romania = next((country for country in countries if country.get("name") == COUNTRY_NAME), None)
-        if romania is None:
-            logger.warning("%s is missing from the country list", COUNTRY_NAME)
-            return None
-        friendly_ids = {str(romania["_id"])} | {str(partner) for partner in romania.get("defensivePacts") or []}
-        if romania.get("allianceId"):
-            alliance = await warera.countries.get_alliance(str(romania["allianceId"]))
-            if alliance is None:
-                return None
-            friendly_ids |= {
-                str(member["country"])
-                for member in alliance.get("memberCountries") or []
-                if member.get("country") and not member.get("suspended")
-            }
-        return friendly_ids, names
 
     async def _thread(self, guild: discord.Guild, thread_id: int, units: list[dict]):
         """The bounty thread, or None (logged once per thread) when it does not exist or is not visible."""
