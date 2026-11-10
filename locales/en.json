@@ -629,7 +629,7 @@
             },
             "war_priority": {
                 "name": "war_priority — every 2 minutes",
-                "desc": "For each of Romania's wars, checks which country holds the war priority and when it ends, and posts an alert in the government mod cabinet channel 3 hours, 1 hour and 10 minutes before it ends, whether the priority is Romania's or the enemy's. Nothing is posted while Romania and that enemy fight a battle (the winner gets a new priority). After a restart, alerts that were already due are not repeated."
+                "desc": "For each of Romania's wars, checks which country holds the war priority and when it ends, and posts an alert in the government mod cabinet channel 3 hours, 1 hour and 10 minutes before it ends, whether the priority is Romania's or the enemy's, tagging the government roles (roles.government) and the mod cabinet role (roles.cabinets.mod). Nothing is posted while Romania and that enemy fight a battle (the winner gets a new priority). After a restart, alerts that were already due are not repeated."
             },
             "newbie_welcome": {
                 "name": "newbie_welcome - when the Newbie role is given",

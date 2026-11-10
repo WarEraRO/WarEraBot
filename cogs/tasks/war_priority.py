@@ -5,8 +5,9 @@ country) or its latest ended battle, war or resistance (held by the winner). Eve
 reads, in one batch, Romania's war declarations and peace treaties of the last 24 h, Romania's battles
 that ended in the last 24 h and its active battles, and works out each war's holder and end from them.
 Whichever side holds the priority, Romania or the enemy, it posts to `channels.government_mod_cabinet`
-once when the end is 3 h away, once at 1 h and once at 10 min. Nothing is posted while Romania and that
-enemy fight a battle in the war: the battle's winner gets a fresh priority, which starts a new series.
+once when the end is 3 h away, once at 1 h and once at 10 min, tagging the `roles.government` roles and
+the `roles.cabinets.mod` role. Nothing is posted while Romania and that enemy fight a battle in the war:
+the battle's winner gets a fresh priority, which starts a new series.
 
 Before an alert is posted, the war is read with `war.getById` (one batched request, only when an alert
 is due). The alert shows the API's holder and end; a war that ended, or a mismatch with the derived
@@ -136,6 +137,8 @@ def format_remaining(delta: timedelta) -> str:
 
 
 class WarPriorityJob(commands.Cog):
+    """Background job posting war priority alerts, with role tags, to the government mod cabinet channel."""
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self._country_id: str | None = None
@@ -194,6 +197,17 @@ class WarPriorityJob(commands.Cog):
         )
         embed.set_footer(text=tr("war_priority.footer"))
         return embed
+
+    @staticmethod
+    def _alert_roles(guild: discord.Guild) -> list[discord.Role]:
+        """The roles each alert tags: `roles.government` and `roles.cabinets.mod`, deduplicated.
+
+        Ids missing from the guild are skipped, so a stale config entry never produces a broken mention.
+        """
+        roles_config = config.get("roles", {})
+        role_ids = [*(roles_config.get("government") or []), (roles_config.get("cabinets") or {}).get("mod")]
+        roles = (guild.get_role(int(role_id)) for role_id in dict.fromkeys(role_ids) if role_id)
+        return [role for role in roles if role is not None]
 
     @tasks.loop(minutes=SCAN_MINUTES)
     async def war_priority(self):
@@ -275,6 +289,7 @@ class WarPriorityJob(commands.Cog):
         """
         wars = await warera.countries.get_wars_many([candidate[0] for candidate in candidates])
         tr = None
+        roles = None
         for war_id, info, key, derived_stage in candidates:
             war = wars.get(war_id)
             if war is None:
@@ -295,9 +310,15 @@ class WarPriorityJob(commands.Cog):
                 continue
             if tr is None:
                 tr = await get_translator(guild)
+                roles = self._alert_roles(guild)
             other = info["enemy"] if holder == self._country_id else self._country_id
             try:
-                await channel.send(embed=self._build_embed(tr, holder, other, end, now))
+                # Only the configured roles may ping, whatever the embed or the bot's defaults allow.
+                await channel.send(
+                    content=" ".join(role.mention for role in roles) or None,
+                    embed=self._build_embed(tr, holder, other, end, now),
+                    allowed_mentions=discord.AllowedMentions(everyone=False, users=False, roles=roles),
+                )
             except discord.DiscordException as error:
                 if key not in self._send_failed:
                     logger.warning("war_priority: could not post the alert for war %s: %s", war_id, error)
