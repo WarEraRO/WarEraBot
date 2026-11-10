@@ -1,7 +1,7 @@
 """Government rankings: the Romanian government's weekly and monthly top articles, built from the API.
 
 Shortly before the weekly reset (Sunday) and the monthly reset (the last day of the month), a job posts
-ready-to-paste articles as .txt files in the government rankings thread (config.json channels.government_rankings), in the layout of
+ready-to-paste articles as .html files (utils.htmlify, WarEra's article format) in the government rankings thread (config.json channels.government_rankings), in the layout of
 the government's articles of 2026-10-05 (weekly) and 2026-10-06 ("TOP LUNA SEPTEMBRIE", monthly; the monthly report
 has no diaspora article, user decision 2026-11-04):
 
@@ -34,6 +34,7 @@ from utils.api import warera
 from utils.common import get_government_rankings_channel, to_local
 from utils.computational import fight_percent, is_economy_build
 from utils.db import get_api_ids_by_discord_id
+from utils.htmlify import convert as htmlify
 from utils.i18n import Translator
 
 logger = logging.getLogger(__name__)
@@ -655,9 +656,9 @@ def build_diaspora_article(
 
 
 async def send_message(destination, content: str, filename: str) -> None:
-    """Send `content` to `destination` as a UTF-8 .txt attachment named `filename`."""
+    """Send the article text `content` to `destination` as a UTF-8 HTML attachment (utils.htmlify) named `filename`."""
     file = discord.File(
-        io.BytesIO(content.encode("utf-8")),
+        io.BytesIO(htmlify(content).encode("utf-8")),
         filename=filename,
     )
 
@@ -1000,7 +1001,7 @@ class GovRankingsJob(commands.Cog):
 
     @tasks.loop(time=REPORT_TIME)
     async def gov_weekly_ranking(self):
-        """Build the week's Romania and diaspora articles and post them as .txt files in the government rankings thread."""
+        """Build the week's Romania and diaspora articles and post them as .html files in the government rankings thread."""
         now = datetime.now(timezone.utc)
         # the loop fires daily but only Sunday's run posts; /run_job calls it from another task and always posts
         if now.weekday() != SUNDAY and asyncio.current_task() is self.gov_weekly_ranking.get_task():
@@ -1015,7 +1016,7 @@ class GovRankingsJob(commands.Cog):
 
     @tasks.loop(time=REPORT_TIME)
     async def gov_monthly_ranking(self):
-        """Build the month's Romania article and post it as a .txt file in the government rankings thread (no diaspora)."""
+        """Build the month's Romania article and post it as an .html file in the government rankings thread (no diaspora)."""
         now = datetime.now(timezone.utc)
         # the loop fires daily but only the month's last day posts; /run_job always posts (the month so far)
         if (now + timedelta(days=1)).day != 1 and asyncio.current_task() is self.gov_monthly_ranking.get_task():
@@ -1148,7 +1149,7 @@ class GovRankingsJob(commands.Cog):
         damages, user_mus, all_damages, wealth_ranking, donations, romanians, diaspora, snapshot, bounty_span,
         mu_damage=None,
     ) -> None:
-        """Build and send the Romania article, then the diaspora one, as `filename`.txt and `filename`-diaspora.txt.
+        """Build and send the Romania article, then the diaspora one, as `filename`.html and `filename`-diaspora.html.
 
         `diaspora` (_load_diaspora's result) None skips the diaspora article. `mu_damage` ({MU id: damage} from the
         battles' MU rankings, monthly) ranks the Romanian MUs instead of their members' summed damage.
@@ -1164,7 +1165,7 @@ class GovRankingsJob(commands.Cog):
             snapshot, bounty_span, users, mu_damage,
         )
         try:
-            await send_message(channel, content, f"{filename}.txt")
+            await send_message(channel, content, f"{filename}.html")
         except discord.HTTPException:
             logger.exception("Failed to post the government ranking %s in channel %s", filename, channel.id)
 
@@ -1174,7 +1175,7 @@ class GovRankingsJob(commands.Cog):
             content = await self._diaspora_article(
                 tr, texts, span, now, country_id, all_damages, wealth_ranking, diaspora, snapshot, bounty_span, users,
             )
-            await send_message(channel, content, f"{filename}-diaspora.txt")
+            await send_message(channel, content, f"{filename}-diaspora.html")
         except Exception:
             logger.exception("Failed to build or post the government diaspora ranking %s", filename)
 

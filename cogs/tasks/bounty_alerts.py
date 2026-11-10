@@ -5,15 +5,20 @@ in config.json `military_units[].threadIds.bountyId`; MUs without that key get n
 so the MU channels are not flooded). MUs that share a thread share its posts. Every minute the job:
 
 1. Builds the friendly countries: Romania, its defensive-pact partners (`country.defensivePacts`) and the
-   members of its alliance that are not suspended (`alliance.getById`), refreshed every hour.
+   members of its alliance that are not suspended (`alliance.getById`), refreshed every hour
+   (`friendly_countries`, whose cache bounty_monitor shares).
 2. Lists the active battles and keeps the sides of a friendly country with a bounty: `moneyPool` above 0
-   and a `bountyEffectiveAt`. Unlike bounty_monitor there is no minimum rate, because allied bounties
-   usually pay well under 0.1 per 1k damage. One post per battle covers every friendly side.
+   and a `bountyEffectiveAt`, at any rate, because allied bounties usually pay well under 0.1 per 1k
+   damage. One post per battle covers every friendly side.
 3. Posts a new bounty with the eligible subscribers mentioned in the message text, and on later runs only
    edits its embed (rate and pool), which notifies nobody. A subscriber is eligible while they are in an MU
    of that thread, on a fight build (no skill points counts as economy) and can fight (`can_fight`: health
-   10+ or hunger left, and no debuff). Each subscriber is mentioned at most once per post: those who become
-   eligible later (debuff over, skills reset to fight) are mentioned in a reply to the post.
+   10+ or hunger left, and no debuff). A subscriber whose MU has a won mercenary contract still on in the
+   battle (a battle contract, or a round contract for the current round; `contracted_mus`) is not mentioned
+   for that battle's bounty, since the MU fights for its contract there. Each subscriber is mentioned at most
+   once per post: those who become eligible later (debuff over, skills reset to fight, their MU's round
+   contract over) are mentioned in a reply to the post. When a battle's contracts cannot be fetched, nobody
+   is mentioned for it that run.
 4. Deletes the post and its replies once the battle has no friendly bounty left. A bounty that runs out and
    is replaced by a new one between two runs only updates the post.
 
@@ -33,7 +38,7 @@ import discord
 from discord.ext import commands, tasks
 
 from cogs.commands.mu_order_alignment import BATTLE_LINK, COUNTRY_NAME, SIDES
-from cogs.tasks.military_unit_contract_monitor import SIDE_ICONS, can_fight, format_amount
+from cogs.tasks.military_unit_contract_monitor import SIDE_ICONS, can_fight, contract_still_on, format_amount
 from config import config
 from utils.api import warera
 from utils.common import country_flag, get_mu_destination
@@ -99,6 +104,90 @@ def friendly_bounty_sides(battle: dict, friendly_ids: set[str]) -> list[str]:
     return sides
 
 
+def contracted_mus(auctions_by_battle: dict[str, list[dict]], battles_by_id: dict[str, dict]) -> dict[str, set[str]]:
+    """Battle id -> ids of the MUs with a won contract still on in that battle (see `contract_still_on`).
+
+    `auctions_by_battle` is `warera.contracts.get_won_by_battles` output. A battle whose contracts could not
+    be fetched stays out of the result, so callers can tell "no contract" (empty set) from "unknown".
+    """
+    return {
+        battle_id: {
+            str(auction["currentWinner"])
+            for auction in auctions
+            if auction.get("currentWinner") and contract_still_on(auction, battles_by_id[battle_id])
+        }
+        for battle_id, auctions in auctions_by_battle.items()
+        if battle_id in battles_by_id
+    }
+
+
+def bounty_mentions(subscribers: dict[str, str], contracted: set[str] | None) -> list[str]:
+    """The Discord ids to mention for one battle's bounty out of a thread's eligible subscribers.
+
+    Args:
+        subscribers: Discord id -> MU id of the thread's subscribers able to fight now.
+        contracted: The MUs with a contract still on in the battle, or None when its contracts are unknown.
+
+    Returns:
+        The subscribers whose MU has no contract there; none at all while the contracts are unknown, so
+        nobody is pinged for a battle their MU may owe a contract in (they are mentioned once it is known).
+    """
+    if contracted is None:
+        return []
+    return [discord_id for discord_id, mu_id in subscribers.items() if mu_id not in contracted]
+
+
+# (friendly ids, id -> name, time.monotonic() of the load), shared by this job and bounty_monitor
+_friends_cache: tuple[set[str], dict[str, str], float] | None = None
+
+
+async def friendly_countries() -> tuple[set[str], dict[str, str]] | None:
+    """The friendly country ids and every country's id -> name, cached for FRIENDLY_COUNTRIES_TTL_SECONDS.
+
+    The cache is shared by every caller (this job and bounty_monitor). A failed refresh keeps the previous
+    result (and retries on the next call); None when nothing was ever loaded.
+    """
+    global _friends_cache
+    now = time.monotonic()
+    if _friends_cache and now - _friends_cache[2] < FRIENDLY_COUNTRIES_TTL_SECONDS:
+        return _friends_cache[0], _friends_cache[1]
+    loaded = await load_friendly_countries()
+    if loaded is None:
+        return (_friends_cache[0], _friends_cache[1]) if _friends_cache else None
+    _friends_cache = (*loaded, now)
+    return loaded
+
+
+async def load_friendly_countries() -> tuple[set[str], dict[str, str]] | None:
+    """Romania, its defensive-pact partners and its alliance's members that are not suspended.
+
+    Returns the friendly country ids and every country's id -> name. None when the countries or the
+    alliance cannot be fetched, or Romania is missing from the list.
+    """
+    countries = await warera.countries.get_all()
+    if not countries:
+        return None
+    names = {
+        str(country["_id"]): str(country.get("name") or country["_id"]) for country in countries if country.get("_id")
+    }
+    romania = next((country for country in countries if country.get("name") == COUNTRY_NAME), None)
+    if romania is None:
+        logger.warning("%s is missing from the country list", COUNTRY_NAME)
+        return None
+    friendly_ids = {str(romania["_id"])} | {str(partner) for partner in romania.get("defensivePacts") or []}
+    if romania.get("allianceId"):
+        # alliance.getById is not in the official spec (community explorer), see the warera-api skill
+        alliance = await warera.countries.get_alliance(str(romania["allianceId"]))
+        if alliance is None:
+            return None
+        friendly_ids |= {
+            str(member["country"])
+            for member in alliance.get("memberCountries") or []
+            if member.get("country") and not member.get("suspended")
+        }
+    return friendly_ids, names
+
+
 def _country_label(name: str) -> str:
     flag = country_flag(name)
     return f"{flag} **{name}**" if flag else f"**{name}**"
@@ -160,6 +249,8 @@ def _mentions(discord_ids) -> str:
 
 
 class BountyAlertsJob(commands.Cog):
+    """Background job that keeps the allied bounty posts of the MU bounty threads (see the module docstring)."""
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         # thread id -> battle id -> {"message_id", "pinged": discord ids, "replies": message ids, "signature"}
@@ -168,7 +259,6 @@ class BountyAlertsJob(commands.Cog):
         self._recovered: set[int] = set()
         # threads already reported as missing or unreadable, so the warning is logged once
         self._warned: set[int] = set()
-        self._friends: tuple[set[str], dict[str, str], float] | None = None
         self.bounty_alerts.start()
 
     def cog_unload(self):
@@ -189,7 +279,7 @@ class BountyAlertsJob(commands.Cog):
         if not threads:
             return
 
-        friends = await self._friendly_countries()
+        friends = await friendly_countries()
         if friends is None:
             return
         friendly_ids, country_names = friends
@@ -229,6 +319,11 @@ class BountyAlertsJob(commands.Cog):
             return
 
         eligible = await self._eligible_subscribers(threads, bounties, guild) if bounties else {}
+        # the won contracts are only read when someone may be mentioned; one batched request for every battle
+        contracted = (
+            contracted_mus(await warera.contracts.get_won_by_battles(list(bounties)), by_id)
+            if any(eligible.values()) else {}
+        )
         tr = await get_translator(guild) if bounties else None
         for thread_id, channel in channels.items():
             posts = self._posts.setdefault(thread_id, {})
@@ -239,7 +334,7 @@ class BountyAlertsJob(commands.Cog):
                     await self._delete_post(channel, posts.pop(battle_id))
             for battle_id, sides in bounties.items():
                 embed = build_bounty_embed(by_id[battle_id], sides, country_names, tr)
-                mentions = eligible.get(thread_id, [])
+                mentions = bounty_mentions(eligible.get(thread_id, {}), contracted.get(battle_id))
                 if battle_id in posts:
                     await self._update_post(channel, posts[battle_id], embed, mentions, tr)
                 else:
@@ -248,45 +343,6 @@ class BountyAlertsJob(commands.Cog):
     @bounty_alerts.before_loop
     async def before_bounty_alerts(self):
         await self.bot.wait_until_ready()
-
-    async def _friendly_countries(self) -> tuple[set[str], dict[str, str]] | None:
-        """The friendly country ids and every country's id -> name, cached for an hour.
-
-        A failed refresh keeps the previous result (and retries next run); None when nothing was ever loaded.
-        """
-        now = time.monotonic()
-        if self._friends and now - self._friends[2] < FRIENDLY_COUNTRIES_TTL_SECONDS:
-            return self._friends[0], self._friends[1]
-        loaded = await self._load_friendly_countries()
-        if loaded is None:
-            return (self._friends[0], self._friends[1]) if self._friends else None
-        self._friends = (*loaded, now)
-        return loaded
-
-    async def _load_friendly_countries(self) -> tuple[set[str], dict[str, str]] | None:
-        """Romania, its defensive-pact partners and its alliance's members that are not suspended.
-
-        None when the countries or the alliance cannot be fetched, or Romania is missing from the list.
-        """
-        countries = await warera.countries.get_all()
-        if not countries:
-            return None
-        names = {str(country["_id"]): str(country.get("name")) for country in countries if country.get("_id")}
-        romania = next((country for country in countries if country.get("name") == COUNTRY_NAME), None)
-        if romania is None:
-            logger.warning("%s is missing from the country list", COUNTRY_NAME)
-            return None
-        friendly_ids = {str(romania["_id"])} | {str(partner) for partner in romania.get("defensivePacts") or []}
-        if romania.get("allianceId"):
-            alliance = await warera.countries.get_alliance(str(romania["allianceId"]))
-            if alliance is None:
-                return None
-            friendly_ids |= {
-                str(member["country"])
-                for member in alliance.get("memberCountries") or []
-                if member.get("country") and not member.get("suspended")
-            }
-        return friendly_ids, names
 
     async def _thread(self, guild: discord.Guild, thread_id: int, units: list[dict]):
         """The bounty thread, or None (logged once per thread) when it does not exist or is not visible."""
@@ -344,11 +400,12 @@ class BountyAlertsJob(commands.Cog):
         return True
 
     async def _eligible_subscribers(self, threads: dict[int, list[dict]], bounties: dict[str, list[str]],
-                                    guild: discord.Guild) -> dict[int, list[str]]:
-        """Bounty thread id -> Discord ids of the subscribers able to fight for its bounties now.
+                                    guild: discord.Guild) -> dict[int, dict[str, str]]:
+        """Bounty thread id -> {Discord id: MU id} of the subscribers able to fight for its bounties now.
 
-        Only subscribers not yet mentioned in some current post are fetched (one batched request). Those
-        who left the server are dropped from the database.
+        The MU id lets the caller skip, per battle, the subscribers whose MU has a contract there. Only
+        subscribers not yet mentioned in some current post are fetched (one batched request). Those who left
+        the server are dropped from the database.
         """
         try:
             subscriptions = await asyncio.to_thread(get_job_subscribers, SUBSCRIPTION_JOB, SUBSCRIPTION_TARGET)
@@ -372,14 +429,15 @@ class BountyAlertsJob(commands.Cog):
         users = await warera.users.get_full_many(pending.values())
         unit_threads = {str(unit["id"]): thread_id for thread_id, units in threads.items() for unit in units}
         now = datetime.now(timezone.utc)
-        eligible: dict[int, list[str]] = {}
+        eligible: dict[int, dict[str, str]] = {}
         for discord_id, api_id in pending.items():
             user = users.get(api_id)
             if not user or is_economy_build(user) is not False or not can_fight(user, now):
                 continue
-            thread_id = unit_threads.get(str(user.get("mu") or ""))
+            mu_id = str(user.get("mu") or "")
+            thread_id = unit_threads.get(mu_id)
             if thread_id is not None:
-                eligible.setdefault(thread_id, []).append(discord_id)
+                eligible.setdefault(thread_id, {})[discord_id] = mu_id
         return eligible
 
     async def _drop_departed(self, subscriptions: list[dict], guild: discord.Guild) -> list[dict]:

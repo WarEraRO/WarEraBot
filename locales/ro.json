@@ -462,7 +462,7 @@
             },
             "subscriptions_bounty": {
                 "name": "/subscribe bounty | /unsubscribe bounty",
-                "desc": "Primești mențiune în firul de recompense al unității tale militare (threadIds.bountyId) când România, o țară din alianța ei sau un partener de pact defensiv are o recompensă într-o bătălie. Fiecare postare de recompensă te menționează o singură dată: în postare, dacă poți lupta pentru ea când apare, sau într-un răspuns când poți lupta mai târziu. Poți lupta când ai build de luptă (fără puncte de skill contează ca economie), viață 10+ sau foame rămasă și nu ești în debuff. Contul tău de Discord trebuie să fie legat de jucătorul tău WarEra și trebuie să fii într-o unitate militară cu fir de recompense. Unitatea nu se salvează, deci la schimbarea unității nu trebuie să te abonezi din nou. Dacă părăsești serverul, abonamentul se șterge. Răspunsurile sunt vizibile doar pentru tine."
+                "desc": "Primești mențiune în firul de recompense al unității tale militare (threadIds.bountyId) când România, o țară din alianța ei sau un partener de pact defensiv are o recompensă într-o bătălie. Fiecare postare de recompensă te menționează o singură dată: în postare, dacă poți lupta pentru ea când apare, sau într-un răspuns când poți lupta mai târziu. Poți lupta când ai build de luptă (fără puncte de skill contează ca economie), viață 10+ sau foame rămasă și nu ești în debuff. Nu primești mențiune pentru o bătălie în care unitatea ta are un contract de mercenari încă activ (pentru toată bătălia sau pentru runda ei curentă). Contul tău de Discord trebuie să fie legat de jucătorul tău WarEra și trebuie să fii într-o unitate militară cu fir de recompense. Unitatea nu se salvează, deci la schimbarea unității nu trebuie să te abonezi din nou. Dacă părăsești serverul, abonamentul se șterge. Răspunsurile sunt vizibile doar pentru tine."
             },
             "subscriptions_loot": {
                 "name": "/subscribe loot | /unsubscribe loot",
@@ -580,11 +580,11 @@
             },
             "bounty_alerts": {
                 "name": "bounty_alerts — în fiecare minut",
-                "desc": "Ține câte o postare pe bătălie în firul de recompense al fiecărei unități militare (threadIds.bountyId; unitățile fără fir nu primesc nimic) cât timp România, un partener de pact defensiv sau un membru al alianței ei are o recompensă acolo: cele două țări, linkul bătăliei și, pentru fiecare parte aliată, plata la 1k damage și fondul rămas. Postarea se editează în fiecare minut cu plata și fondul actuale și se șterge când recompensa se termină; o recompensă înlocuită de una nouă între două verificări doar o actualizează. Menționează abonații /subscribe bounty ai unității care au build de luptă, viață 10+ sau foame rămasă și nu sunt în debuff, o singură dată pe postare: în postare sau într-un răspuns când pot lupta mai târziu. Postările făcute înainte de o repornire sunt preluate din nou din fir. Abonații care au părăsit serverul sunt dezabonați."
+                "desc": "Ține câte o postare pe bătălie în firul de recompense al fiecărei unități militare (threadIds.bountyId; unitățile fără fir nu primesc nimic) cât timp România, un partener de pact defensiv sau un membru al alianței ei are o recompensă acolo: cele două țări, linkul bătăliei și, pentru fiecare parte aliată, plata la 1k damage și fondul rămas. Postarea se editează în fiecare minut cu plata și fondul actuale și se șterge când recompensa se termină; o recompensă înlocuită de una nouă între două verificări doar o actualizează. Menționează abonații /subscribe bounty ai unității care au build de luptă, viață 10+ sau foame rămasă și nu sunt în debuff, o singură dată pe postare: în postare sau într-un răspuns când pot lupta mai târziu. Abonații a căror unitate are un contract de mercenari încă activ în bătălie (pentru toată bătălia sau pentru runda ei curentă) nu sunt menționați pentru recompensa ei. Postările făcute înainte de o repornire sunt preluate din nou din fir. Abonații care au părăsit serverul sunt dezabonați."
             },
             "bounty_monitor": {
                 "name": "bounty_monitor — interval configurabil",
-                "desc": "Verifică bătăliile active pentru fonduri/recompense și postează un rezumat când e cazul (intervalul e setat prin `BOUNTY_MONITOR_INTERVAL_MINUTES` în configurare)."
+                "desc": "Postează recompensele noi sau schimbate din bătăliile active pe canalul public de recompense: toate recompensele României, ale partenerilor ei de pact defensiv și ale membrilor alianței ei, indiferent de sumă, și recompensele oricărei alte țări care plătesc cel puțin 0.1 la 1k damage (intervalul e setat prin `BOUNTY_MONITOR_INTERVAL_MINUTES`)."
             },
             "mercenary_contracts": {
                 "name": "mercenary_contracts — la fiecare minut",
@@ -629,6 +629,10 @@
             "gov_monthly_ranking": {
                 "name": "gov_monthly_ranking — ultima zi a lunii, cu 12 minute înainte de resetarea lunară",
                 "desc": "Cu puțin înainte de resetarea lunară, postează în threadul de topuri al guvernului articolul lunar al guvernului („TOP LUNA ...”) ca fișier .txt gata de copiat, cu aceleași secțiuni ca gov_weekly_ranking (fără fișier de diaspora), pe toată luna: damage-ul jucătorilor și al unităților militare și bounty-ul sunt adunate din toate bătăliile încheiate în lună (o unitate primește damage-ul făcut de membrii ei cât timp erau în ea), donațiile către România de la precedenta rulare lunară. O rulare forțată postează luna de până acum. gov_battle_tracker (la fiecare 15 minute) citește din timp bătăliile încheiate; după o repornire, raportul citește singur restul, ceea ce poate dura câteva minute."
+            },
+            "war_priority": {
+                "name": "war_priority — la fiecare 2 minute",
+                "desc": "Pentru fiecare război al României, verifică ce țară are prioritatea de război și când se termină, și postează o alertă în canalul cabinetului de moderare al guvernului cu 3 ore, 1 oră și 10 minute înainte de final, fie că prioritatea e a României, fie a inamicului. Nu postează nimic cât timp România și acel inamic au o bătălie în desfășurare (câștigătorul primește o prioritate nouă). După o repornire, alertele deja scadente nu se repetă."
             },
             "newbie_welcome": {
                 "name": "newbie_welcome - la primirea rolului Newbie",
@@ -1217,7 +1221,7 @@
         "loot_not_subscribed": "Nu ești abonat la alertele de loot.",
         "loot_unsubscribed": "Nu mai primești alerte de loot.",
         "bounty_not_in_unit": "Nu ești în nicio unitate militară care are un fir de recompense pe acest server.",
-        "bounty_subscribed": "Vei primi mențiune în {channel}, firul de recompense al unității **{mu}**, când România, o țară din alianța ei sau un partener de pact defensiv are o recompensă într-o bătălie. Fiecare postare de recompensă te menționează o singură dată: când apare sau mai târziu, când poți lupta pentru ea (build de luptă, viață 10+ sau foame rămasă, fără debuff). Dacă schimbi unitatea, primești mențiune în firul de recompense al noii unități, dacă are unul. Folosește `/unsubscribe bounty` ca să te dezabonezi.",
+        "bounty_subscribed": "Vei primi mențiune în {channel}, firul de recompense al unității **{mu}**, când România, o țară din alianța ei sau un partener de pact defensiv are o recompensă într-o bătălie. Fiecare postare de recompensă te menționează o singură dată: când apare sau mai târziu, când poți lupta pentru ea (build de luptă, viață 10+ sau foame rămasă, fără debuff). Nu primești mențiune pentru o bătălie în care unitatea ta are un contract de mercenari încă activ. Dacă schimbi unitatea, primești mențiune în firul de recompense al noii unități, dacă are unul. Folosește `/unsubscribe bounty` ca să te dezabonezi.",
         "bounty_already_subscribed": "Abonamentul la mențiunile pentru recompense există deja (acum ești în **{mu}**).",
         "bounty_not_subscribed": "Nu ai un abonament la mențiunile pentru recompense.",
         "bounty_unsubscribed": "Nu mai primești mențiuni pentru recompense.",
@@ -1779,5 +1783,11 @@
         "compiled": "Top-ul a fost alcătuit pe {date}, pentru luna {month} {year} (perioadă acoperită: {start}–{end}).",
         "incomplete_players": "[ATENȚIE, ștergeți înainte de publicare: {count} jucători nu au putut fi încărcați din API, așa că pot lipsi din topuri. Rulați din nou /run_job gov_monthly_ranking înainte de resetare.]",
         "incomplete_battles": "[ATENȚIE, ștergeți înainte de publicare: damage-ul sau bounty-ul din {count} bătălii nu a putut fi citit complet, așa că topurile de damage, unități militare și bounty pot fi incomplete. Rulați din nou /run_job gov_monthly_ranking înainte de resetare.]"
+    },
+    "war_priority": {
+        "title_ours": "⏳ Prioritatea de război a României se termină",
+        "title_theirs": "⏳ Prioritatea de război a unui inamic se termină",
+        "description": "{holder} are prioritatea de război față de {other}. Se termină în **{remaining}** (la {time}).",
+        "footer": "Alerte cu 3 h, 1 h și 10 min înainte de sfârșitul priorității; niciuna cât timp cele două țări au o bătălie în desfășurare."
     }
 }

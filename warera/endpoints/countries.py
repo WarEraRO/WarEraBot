@@ -1,9 +1,9 @@
-"""Countries, their governments and alliances, and regions."""
+"""Countries, their governments, alliances and wars, and regions."""
 from warera.endpoints.base import Endpoint, guarded
 
 
 class CountriesAPI(Endpoint):
-    """`country.*`, `government.getByCountryId` and `alliance.getById`."""
+    """`country.*`, `government.getByCountryId`, `alliance.getById`, `war.getById` and war events."""
 
     @guarded()
     async def get(self, country_id):
@@ -41,6 +41,27 @@ class CountriesAPI(Endpoint):
         result carries `memberCountries`, a list of `{"country": <country id>, "suspended": bool, ...}`.
         """
         return await self._get('alliance.getById', {'allianceId': alliance_id})
+
+    @guarded(dict)
+    async def get_wars_many(self, war_ids):
+        """Batched war.getById (explorer-documented): {warId: war} for the ids that resolved.
+
+        A war carries `isActive`, `attacker`/`defender` (`{country, wonBattlesCount, ...}`), `priority`
+        (the id of the country holding the war's priority) and `priorityEndAt` (ISO; kept once it passes).
+        """
+        return await self._get_keyed('war.getById', war_ids, lambda wid: {'warId': wid})
+
+    @guarded()
+    async def get_war_events_since(self, country_id, created_after):
+        """warDeclared and peaceMade events involving `country_id` created at or after `created_after` (ISO), newest first.
+
+        `data` is `{type: "warDeclared", war, attackerCountry, defenderCountry}` or
+        `{type: "peaceMade", wars: [warId], countries}`. None if any page fails.
+        """
+        return await self._collect_since('event.getEventsPaginated',
+                                         {'countryId': country_id, 'eventTypes': ['warDeclared', 'peaceMade'],
+                                          'limit': 100},
+                                         created_after)
 
 
 class RegionsAPI(Endpoint):

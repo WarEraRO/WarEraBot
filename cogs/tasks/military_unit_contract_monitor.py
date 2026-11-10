@@ -108,6 +108,23 @@ def parse_iso(value) -> datetime | None:
         return None
 
 
+def current_round_id(battle: dict) -> str:
+    """The id of the battle's current round; battle.getBattles populates it, battle.getById gives the id."""
+    current = battle.get("currentRound")
+    if isinstance(current, dict):
+        current = current.get("_id")
+    return str(current or "")
+
+
+def contract_still_on(auction: dict, battle: dict) -> bool:
+    """Whether a won contract still binds its MU in `battle`, which the caller knows to be active.
+
+    A contract with a `round` is for that round only, one without is for the whole battle. Whether the MU
+    already dealt the minimum damage is not visible with the bot's API key, so a filled contract counts too.
+    """
+    return not auction.get("round") or str(auction["round"]) == current_round_id(battle)
+
+
 def contract_units() -> dict[str, dict]:
     """MU id -> config entry for the MUs that get contract embeds: those with a channelId or a contracts
     thread (the embed goes to the thread when set)."""

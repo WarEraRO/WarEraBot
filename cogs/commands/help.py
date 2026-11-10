@@ -72,6 +72,7 @@ _JOB_IDS: List[str] = [
     "mu_challenge_tracker",
     "gov_weekly_ranking",
     "gov_monthly_ranking",
+    "war_priority",
 ]
 
 _COMMANDS_PER_PAGE = 3

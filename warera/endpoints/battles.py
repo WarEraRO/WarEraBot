@@ -20,6 +20,25 @@ class BattlesAPI(Endpoint):
         return await self._collect('battle.getBattles', {'isActive': True, 'limit': 100}, partial=True)
 
     @guarded()
+    async def get_active_for_country(self, country_id):
+        """Every active battle with `country_id` as attacker or defender (all pages); None if any page fails.
+
+        Unlike get_active, a partial list is never returned: a missing battle would make a war look idle.
+        """
+        return await self._collect('battle.getBattles', {'isActive': True, 'limit': 100, 'countryId': country_id},
+                                   partial=False)
+
+    @guarded()
+    async def get_ended_for_country_since(self, country_id, created_after):
+        """Ended battles with `country_id` as a side, created at or after `created_after` (ISO), newest first.
+
+        Filtered on createdAt, not endedAt: to get the battles that ended since a moment, ask from far
+        enough back to cover the longest battle. None if any page fails.
+        """
+        return await self._collect_since('battle.getBattles', {'isActive': False, 'limit': 100, 'countryId': country_id},
+                                         created_after)
+
+    @guarded()
     async def get_ended_since(self, created_after):
         """Ended battles created at or after `created_after` (ISO string), newest first; None if any page fails.
 
@@ -160,11 +179,24 @@ class ContractsAPI(Endpoint):
 
     @guarded(dict)
     async def get_won_by_battles(self, battle_ids):
-        """Batched won auctions per battle: {battleId: [auction]}, first page only.
+        """Every won auction per battle, newest first: {battleId: [auction]}.
 
-        One page holds the 50 newest won contracts of a battle [observed 2026-10-14: the battleId filter
-        works]; battles whose call failed are missing from the dict.
+        The first pages (50 newest won contracts each [observed 2026-10-14: the battleId filter works]) are
+        fetched in one batched request; only a battle with a next page is paged further, so an older
+        battle-wide contract is never cut off. Battles whose call or later page failed are missing from the dict.
         """
-        pages = await self._get_keyed('mercenaryContractAuction.getPaginatedAuctions', battle_ids,
+        procedure = 'mercenaryContractAuction.getPaginatedAuctions'
+        pages = await self._get_keyed(procedure, battle_ids,
                                       lambda bid: {'battleId': bid, 'status': 'won', 'limit': 50})
-        return {battle_id: page.get('items') or [] for battle_id, page in pages.items()}
+        result = {battle_id: page.get('items') or [] for battle_id, page in pages.items()}
+        for battle_id, page in pages.items():
+            if not page.get('nextCursor'):
+                continue
+            more, error, _ = await self._pages(
+                procedure, {'battleId': battle_id, 'status': 'won', 'limit': 50, 'cursor': page['nextCursor']})
+            if error is None:
+                result[battle_id] += more
+            else:
+                log_failure(procedure, error)
+                del result[battle_id]
+        return result

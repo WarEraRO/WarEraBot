@@ -459,7 +459,7 @@
             },
             "subscriptions_bounty": {
                 "name": "/subscribe bounty | /unsubscribe bounty",
-                "desc": "Get pinged in your military unit's bounty thread (threadIds.bountyId) when Romania, a country of its alliance or a defensive-pact partner has a bounty in a battle. Each bounty post mentions you once: in the post if you can fight for it when it appears, or in a reply when you become able to later. You can fight when you are on a fight build (no skill points counts as economy), have health 10+ or hunger left and are not in debuff. Your Discord account must be linked to your WarEra player, and you must be in a military unit with a bounty thread. The unit is not stored, so changing unit needs no new subscription. Leaving the server removes your subscription. Replies are only visible to you."
+                "desc": "Get pinged in your military unit's bounty thread (threadIds.bountyId) when Romania, a country of its alliance or a defensive-pact partner has a bounty in a battle. Each bounty post mentions you once: in the post if you can fight for it when it appears, or in a reply when you become able to later. You can fight when you are on a fight build (no skill points counts as economy), have health 10+ or hunger left and are not in debuff. You are not pinged for a battle where your unit has a mercenary contract still on (for the whole battle, or for its current round). Your Discord account must be linked to your WarEra player, and you must be in a military unit with a bounty thread. The unit is not stored, so changing unit needs no new subscription. Leaving the server removes your subscription. Replies are only visible to you."
             },
             "subscriptions_loot": {
                 "name": "/subscribe loot | /unsubscribe loot",
@@ -577,11 +577,11 @@
             },
             "bounty_alerts": {
                 "name": "bounty_alerts — every minute",
-                "desc": "Keeps one post per battle in each military unit's bounty thread (threadIds.bountyId; units without one get nothing) while Romania, a defensive-pact partner or a member of its alliance has a bounty there: both countries, the battle link and each allied side's pay per 1k damage and pool left. The post is edited every minute with the current rate and pool, and deleted when the bounty runs out; a bounty replaced by a new one between two checks only updates it. Mentions the /subscribe bounty subscribers of that unit who are on a fight build, have health 10+ or hunger left and are not in debuff, once per post: in the post, or in a reply when they become able to fight later. Posts made before a restart are picked up again from the thread. Subscribers who left the server are unsubscribed."
+                "desc": "Keeps one post per battle in each military unit's bounty thread (threadIds.bountyId; units without one get nothing) while Romania, a defensive-pact partner or a member of its alliance has a bounty there: both countries, the battle link and each allied side's pay per 1k damage and pool left. The post is edited every minute with the current rate and pool, and deleted when the bounty runs out; a bounty replaced by a new one between two checks only updates it. Mentions the /subscribe bounty subscribers of that unit who are on a fight build, have health 10+ or hunger left and are not in debuff, once per post: in the post, or in a reply when they become able to fight later. Subscribers whose unit has a mercenary contract still on in the battle (for the whole battle, or for its current round) are not mentioned for its bounty. Posts made before a restart are picked up again from the thread. Subscribers who left the server are unsubscribed."
             },
             "bounty_monitor": {
                 "name": "bounty_monitor — configurable interval",
-                "desc": "Checks active battles for money pools/bounties and posts a summary to the public channel when relevant (interval set by `BOUNTY_MONITOR_INTERVAL_MINUTES` in config)."
+                "desc": "Posts new or changed bounties of active battles to the public bounties channel: every bounty of Romania, its defensive-pact partners and its alliance's members, whatever the amount, and the bounties of any other country that pay at least 0.1 per 1k damage (interval set by `BOUNTY_MONITOR_INTERVAL_MINUTES`)."
             },
             "mercenary_contracts": {
                 "name": "mercenary_contracts — every 1 minute",
@@ -626,6 +626,10 @@
             "gov_monthly_ranking": {
                 "name": "gov_monthly_ranking — the last day of the month, 12 minutes before the monthly reset",
                 "desc": "Shortly before the monthly reset, posts the government's monthly top article (\"TOP LUNA ...\") in the government rankings thread as a ready-to-paste .txt file, with the same sections as gov_weekly_ranking (no diaspora file), over the whole month: player and military unit damage and bounty are summed over every battle that ended in the month (a unit gets the damage its members did while in it), donations to Romania since the previous monthly cut-off. A forced run posts the month so far. gov_battle_tracker (every 15 minutes) reads newly ended battles in advance; after a restart the report reads the rest itself, which can take a few minutes."
+            },
+            "war_priority": {
+                "name": "war_priority — every 2 minutes",
+                "desc": "For each of Romania's wars, checks which country holds the war priority and when it ends, and posts an alert in the government mod cabinet channel 3 hours, 1 hour and 10 minutes before it ends, whether the priority is Romania's or the enemy's. Nothing is posted while Romania and that enemy fight a battle (the winner gets a new priority). After a restart, alerts that were already due are not repeated."
             },
             "newbie_welcome": {
                 "name": "newbie_welcome - when the Newbie role is given",
@@ -1207,7 +1211,7 @@
         "loot_not_subscribed": "You are not subscribed to loot alerts.",
         "loot_unsubscribed": "You will no longer get loot alerts.",
         "bounty_not_in_unit": "You are not in any military unit that has a bounty thread on this server.",
-        "bounty_subscribed": "You will be pinged in {channel}, the bounty thread of **{mu}**, when Romania, a country of its alliance or a defensive-pact partner has a bounty in a battle. Each bounty post mentions you once: when it is posted, or later when you become able to fight for it (fight build, health 10+ or hunger left, not in debuff). If you change unit, you are pinged in your new unit's bounty thread, if it has one. Use `/unsubscribe bounty` to stop.",
+        "bounty_subscribed": "You will be pinged in {channel}, the bounty thread of **{mu}**, when Romania, a country of its alliance or a defensive-pact partner has a bounty in a battle. Each bounty post mentions you once: when it is posted, or later when you become able to fight for it (fight build, health 10+ or hunger left, not in debuff). You are not pinged for a battle where your unit has a mercenary contract still on. If you change unit, you are pinged in your new unit's bounty thread, if it has one. Use `/unsubscribe bounty` to stop.",
         "bounty_already_subscribed": "You are already subscribed to bounty pings (you are in **{mu}** now).",
         "bounty_not_subscribed": "You are not subscribed to bounty pings.",
         "bounty_unsubscribed": "You will no longer be pinged for bounties.",
@@ -1525,5 +1529,11 @@
         "compiled": "This top was compiled on {date}, for the month of {month} {year} (period covered: {start}–{end}).",
         "incomplete_players": "[WARNING, delete before publishing: {count} players could not be loaded from the API, so they may be missing from the tops. Run /run_job gov_monthly_ranking again before the reset.]",
         "incomplete_battles": "[WARNING, delete before publishing: the damage or bounty of {count} battles could not be read completely, so the damage, military unit and bounty tops may be incomplete. Run /run_job gov_monthly_ranking again before the reset.]"
+    },
+    "war_priority": {
+        "title_ours": "⏳ Romania's war priority is running out",
+        "title_theirs": "⏳ An enemy's war priority is running out",
+        "description": "{holder} holds the war priority over {other}. It ends in **{remaining}** (at {time}).",
+        "footer": "Alerts 3 h, 1 h and 10 min before the priority ends; none while the two countries fight a battle."
     }
 }
