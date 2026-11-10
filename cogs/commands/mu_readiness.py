@@ -25,7 +25,7 @@ from cogs.commands.fight_wealth import _messages, _pack
 from cogs.commands.mu_order_alignment import BATTLE_LINK, COUNTRY_NAME, TOURNAMENT_BATTLE_TYPE, classify_orders
 from cogs.commands.mu_positions import required_region
 from cogs.commands.pills import _unit_ids
-from cogs.tasks.military_unit_contract_monitor import can_fight, format_amount, format_duration
+from cogs.tasks.military_unit_contract_monitor import can_fight, contract_still_on, format_amount, format_duration
 from cogs.tasks.military_unit_daily_report import _fmt_short, _parse_iso, _pill_settings, pill_state
 from utils.api import warera
 from utils.common import country_with_flag, to_local
@@ -52,14 +52,6 @@ NAMES_SHOWN = 10
 ORDERS_SHOWN = 5
 
 
-def _current_round_id(battle: dict) -> str:
-    """The id of the battle's current round; battle.getBattles populates it, battle.getById gives the id."""
-    current = battle.get("currentRound")
-    if isinstance(current, dict):
-        current = current.get("_id")
-    return str(current or "")
-
-
 def latest_contract(auctions_by_battle: dict[str, list[dict]], battles_by_id: dict[str, dict], mu_id: str) -> dict | None:
     """The MU's most recently won contract that is still on; None when there is none.
 
@@ -74,7 +66,7 @@ def latest_contract(auctions_by_battle: dict[str, list[dict]], battles_by_id: di
         for auction in auctions:
             if str(auction.get("currentWinner") or "") != mu_id:
                 continue
-            if auction.get("round") and str(auction["round"]) != _current_round_id(battle):
+            if not contract_still_on(auction, battle):
                 continue
             candidates.append(auction)
     return max(candidates, key=lambda auction: str(auction.get("createdAt") or ""), default=None)

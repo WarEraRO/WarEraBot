@@ -13,8 +13,12 @@ so the MU channels are not flooded). MUs that share a thread share its posts. Ev
 3. Posts a new bounty with the eligible subscribers mentioned in the message text, and on later runs only
    edits its embed (rate and pool), which notifies nobody. A subscriber is eligible while they are in an MU
    of that thread, on a fight build (no skill points counts as economy) and can fight (`can_fight`: health
-   10+ or hunger left, and no debuff). Each subscriber is mentioned at most once per post: those who become
-   eligible later (debuff over, skills reset to fight) are mentioned in a reply to the post.
+   10+ or hunger left, and no debuff). A subscriber whose MU has a won mercenary contract still on in the
+   battle (a battle contract, or a round contract for the current round; `contracted_mus`) is not mentioned
+   for that battle's bounty, since the MU fights for its contract there. Each subscriber is mentioned at most
+   once per post: those who become eligible later (debuff over, skills reset to fight, their MU's round
+   contract over) are mentioned in a reply to the post. When a battle's contracts cannot be fetched, nobody
+   is mentioned for it that run.
 4. Deletes the post and its replies once the battle has no friendly bounty left. A bounty that runs out and
    is replaced by a new one between two runs only updates the post.
 
@@ -34,7 +38,7 @@ import discord
 from discord.ext import commands, tasks
 
 from cogs.commands.mu_order_alignment import BATTLE_LINK, COUNTRY_NAME, SIDES
-from cogs.tasks.military_unit_contract_monitor import SIDE_ICONS, can_fight, format_amount
+from cogs.tasks.military_unit_contract_monitor import SIDE_ICONS, can_fight, contract_still_on, format_amount
 from config import config
 from utils.api import warera
 from utils.common import country_flag, get_mu_destination
@@ -98,6 +102,39 @@ def friendly_bounty_sides(battle: dict, friendly_ids: set[str]) -> list[str]:
         ):
             sides.append(side)
     return sides
+
+
+def contracted_mus(auctions_by_battle: dict[str, list[dict]], battles_by_id: dict[str, dict]) -> dict[str, set[str]]:
+    """Battle id -> ids of the MUs with a won contract still on in that battle (see `contract_still_on`).
+
+    `auctions_by_battle` is `warera.contracts.get_won_by_battles` output. A battle whose contracts could not
+    be fetched stays out of the result, so callers can tell "no contract" (empty set) from "unknown".
+    """
+    return {
+        battle_id: {
+            str(auction["currentWinner"])
+            for auction in auctions
+            if auction.get("currentWinner") and contract_still_on(auction, battles_by_id[battle_id])
+        }
+        for battle_id, auctions in auctions_by_battle.items()
+        if battle_id in battles_by_id
+    }
+
+
+def bounty_mentions(subscribers: dict[str, str], contracted: set[str] | None) -> list[str]:
+    """The Discord ids to mention for one battle's bounty out of a thread's eligible subscribers.
+
+    Args:
+        subscribers: Discord id -> MU id of the thread's subscribers able to fight now.
+        contracted: The MUs with a contract still on in the battle, or None when its contracts are unknown.
+
+    Returns:
+        The subscribers whose MU has no contract there; none at all while the contracts are unknown, so
+        nobody is pinged for a battle their MU may owe a contract in (they are mentioned once it is known).
+    """
+    if contracted is None:
+        return []
+    return [discord_id for discord_id, mu_id in subscribers.items() if mu_id not in contracted]
 
 
 # (friendly ids, id -> name, time.monotonic() of the load), shared by this job and bounty_monitor
@@ -282,6 +319,11 @@ class BountyAlertsJob(commands.Cog):
             return
 
         eligible = await self._eligible_subscribers(threads, bounties, guild) if bounties else {}
+        # the won contracts are only read when someone may be mentioned; one batched request for every battle
+        contracted = (
+            contracted_mus(await warera.contracts.get_won_by_battles(list(bounties)), by_id)
+            if any(eligible.values()) else {}
+        )
         tr = await get_translator(guild) if bounties else None
         for thread_id, channel in channels.items():
             posts = self._posts.setdefault(thread_id, {})
@@ -292,7 +334,7 @@ class BountyAlertsJob(commands.Cog):
                     await self._delete_post(channel, posts.pop(battle_id))
             for battle_id, sides in bounties.items():
                 embed = build_bounty_embed(by_id[battle_id], sides, country_names, tr)
-                mentions = eligible.get(thread_id, [])
+                mentions = bounty_mentions(eligible.get(thread_id, {}), contracted.get(battle_id))
                 if battle_id in posts:
                     await self._update_post(channel, posts[battle_id], embed, mentions, tr)
                 else:
@@ -358,11 +400,12 @@ class BountyAlertsJob(commands.Cog):
         return True
 
     async def _eligible_subscribers(self, threads: dict[int, list[dict]], bounties: dict[str, list[str]],
-                                    guild: discord.Guild) -> dict[int, list[str]]:
-        """Bounty thread id -> Discord ids of the subscribers able to fight for its bounties now.
+                                    guild: discord.Guild) -> dict[int, dict[str, str]]:
+        """Bounty thread id -> {Discord id: MU id} of the subscribers able to fight for its bounties now.
 
-        Only subscribers not yet mentioned in some current post are fetched (one batched request). Those
-        who left the server are dropped from the database.
+        The MU id lets the caller skip, per battle, the subscribers whose MU has a contract there. Only
+        subscribers not yet mentioned in some current post are fetched (one batched request). Those who left
+        the server are dropped from the database.
         """
         try:
             subscriptions = await asyncio.to_thread(get_job_subscribers, SUBSCRIPTION_JOB, SUBSCRIPTION_TARGET)
@@ -386,14 +429,15 @@ class BountyAlertsJob(commands.Cog):
         users = await warera.users.get_full_many(pending.values())
         unit_threads = {str(unit["id"]): thread_id for thread_id, units in threads.items() for unit in units}
         now = datetime.now(timezone.utc)
-        eligible: dict[int, list[str]] = {}
+        eligible: dict[int, dict[str, str]] = {}
         for discord_id, api_id in pending.items():
             user = users.get(api_id)
             if not user or is_economy_build(user) is not False or not can_fight(user, now):
                 continue
-            thread_id = unit_threads.get(str(user.get("mu") or ""))
+            mu_id = str(user.get("mu") or "")
+            thread_id = unit_threads.get(mu_id)
             if thread_id is not None:
-                eligible.setdefault(thread_id, []).append(discord_id)
+                eligible.setdefault(thread_id, {})[discord_id] = mu_id
         return eligible
 
     async def _drop_departed(self, subscriptions: list[dict], guild: discord.Guild) -> list[dict]:
