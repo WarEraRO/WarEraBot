@@ -1,4 +1,4 @@
-"""bounty_alerts: keep one live post per allied bounty in each military unit's bounty thread.
+"""bounty_alerts: keep one live post per allied or ordered bounty in each military unit's bounty thread.
 
 Members subscribe with `/subscribe bounty` (cogs/commands/subscriptions.py). The posts go to the threads set
 in config.json `military_units[].threadIds.bountyId`; MUs without that key get nothing (no channelId fallback,
@@ -7,9 +7,11 @@ so the MU channels are not flooded). MUs that share a thread share its posts. Ev
 1. Builds the friendly countries: Romania, its defensive-pact partners (`country.defensivePacts`) and the
    members of its alliance that are not suspended (`alliance.getById`), refreshed every hour
    (`friendly_countries`, whose cache bounty_monitor shares).
-2. Lists the active battles and keeps the sides of a friendly country with a bounty: `moneyPool` above 0
-   and a `bountyEffectiveAt`, at any rate, because allied bounties usually pay well under 0.1 per 1k
-   damage. One post per battle covers every friendly side.
+2. Lists the active battles and keeps the sides with a bounty (`moneyPool` above 0 and a
+   `bountyEffectiveAt`, at any rate, because these bounties usually pay well under 0.1 per 1k damage)
+   that are friendly, ordered by Romania (`countryOrders`) or ordered by one of the thread's MUs
+   (`muOrders`), so a bounty of any country counts on a side we are told to fight for. The MU orders
+   only count in the thread of the MU that set them. One post per battle covers every such side.
 3. Posts a new bounty with the eligible subscribers mentioned in the message text, and on later runs only
    edits its embed (rate and pool), which notifies nobody. A subscriber is eligible while they are in an MU
    of that thread, on a fight build (no skill points counts as economy) and can fight (`can_fight`: health
@@ -19,7 +21,7 @@ so the MU channels are not flooded). MUs that share a thread share its posts. Ev
    once per post: those who become eligible later (debuff over, skills reset to fight, their MU's round
    contract over) are mentioned in a reply to the post. When a battle's contracts cannot be fetched, nobody
    is mentioned for it that run.
-4. Deletes the post and its replies once the battle has no friendly bounty left. A bounty that runs out and
+4. Deletes the post and its replies once the battle has no such bounty left (or the order is removed). A bounty that runs out and
    is replaced by a new one between two runs only updates the post.
 
 The posts are tracked in memory. After a restart, the first run reads the last HISTORY_SCAN_LIMIT messages of
@@ -88,17 +90,32 @@ def _amount(value) -> float:
         return 0.0
 
 
-def friendly_bounty_sides(battle: dict, friendly_ids: set[str]) -> list[str]:
-    """The sides of an active battle whose country is friendly and has a bounty left (moneyPool > 0)."""
+def bounty_sides(battle: dict, friendly_ids: set[str], country_id: str | None, mu_ids: set[str]) -> list[str]:
+    """The sides of an active battle with a bounty left (moneyPool > 0) that we fight for.
+
+    Args:
+        battle: A `battle.getBattles` item or `battle.getById` result.
+        friendly_ids: The friendly country ids (see `friendly_countries`); their sides always count.
+        country_id: Romania's id; a side it ordered (`countryOrders`) counts whatever its country. None
+            when unknown, so only the friendly and MU-ordered sides count.
+        mu_ids: The MUs whose orders (`muOrders`) make a side count, those of one bounty thread.
+
+    Returns:
+        The qualifying sides, in SIDES order; none for an ended battle.
+    """
     if battle.get("isActive") is False:
         return []
     sides = []
     for side in SIDES:
         data = battle.get(side) or {}
+        if _amount(data.get("moneyPool")) <= 0 or not data.get("bountyEffectiveAt"):
+            continue
+        country_orders = {str(item) for item in data.get("countryOrders") or []}
+        mu_orders = {str(item) for item in data.get("muOrders") or []}
         if (
             str(data.get("country") or "") in friendly_ids
-            and _amount(data.get("moneyPool")) > 0
-            and data.get("bountyEffectiveAt")
+            or (country_id is not None and country_id in country_orders)
+            or mu_orders & mu_ids
         ):
             sides.append(side)
     return sides
@@ -249,7 +266,7 @@ def _mentions(discord_ids) -> str:
 
 
 class BountyAlertsJob(commands.Cog):
-    """Background job that keeps the allied bounty posts of the MU bounty threads (see the module docstring)."""
+    """Background job that keeps the allied and ordered bounty posts of the MU bounty threads (see the module docstring)."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -283,6 +300,7 @@ class BountyAlertsJob(commands.Cog):
         if friends is None:
             return
         friendly_ids, country_names = friends
+        romania_id = next((cid for cid, name in country_names.items() if name == COUNTRY_NAME), None)
         battles = await warera.battles.get_active()
         if battles is None:
             return
@@ -302,37 +320,43 @@ class BountyAlertsJob(commands.Cog):
                 unchecked.add(battle_id)
             else:
                 by_id[battle_id] = battle
-        bounties = {
-            battle_id: sides
-            for battle_id, battle in by_id.items()
-            if (sides := friendly_bounty_sides(battle, friendly_ids))
-        }
+        # thread id -> battle id -> sides; per thread because the MU orders only count in their MU's thread
+        bounties: dict[int, dict[str, list[str]]] = {}
+        for thread_id, units in threads.items():
+            mu_ids = {str(unit["id"]) for unit in units}
+            bounties[thread_id] = {
+                battle_id: sides
+                for battle_id, battle in by_id.items()
+                if (sides := bounty_sides(battle, friendly_ids, romania_id, mu_ids))
+            }
+        bounty_battles = {battle_id for thread_bounties in bounties.values() for battle_id in thread_bounties}
 
         channels = {}
         for thread_id, units in threads.items():
             # a thread whose history could not be read is skipped, so no post is duplicated
-            if thread_id not in self._recovered or not (bounties or self._posts.get(thread_id)):
+            if thread_id not in self._recovered or not (bounties[thread_id] or self._posts.get(thread_id)):
                 continue
             if channel := await self._thread(guild, thread_id, units):
                 channels[thread_id] = channel
         if not channels:
             return
 
-        eligible = await self._eligible_subscribers(threads, bounties, guild) if bounties else {}
+        eligible = await self._eligible_subscribers(threads, bounties, guild) if bounty_battles else {}
         # the won contracts are only read when someone may be mentioned; one batched request for every battle
         contracted = (
-            contracted_mus(await warera.contracts.get_won_by_battles(list(bounties)), by_id)
+            contracted_mus(await warera.contracts.get_won_by_battles(list(bounty_battles)), by_id)
             if any(eligible.values()) else {}
         )
-        tr = await get_translator(guild) if bounties else None
+        tr = await get_translator(guild) if bounty_battles else None
         for thread_id, channel in channels.items():
             posts = self._posts.setdefault(thread_id, {})
+            thread_bounties = bounties[thread_id]
             if posts:
                 await self._unarchive(channel)
             for battle_id in list(posts):
-                if battle_id not in bounties and battle_id not in unchecked:
+                if battle_id not in thread_bounties and battle_id not in unchecked:
                     await self._delete_post(channel, posts.pop(battle_id))
-            for battle_id, sides in bounties.items():
+            for battle_id, sides in thread_bounties.items():
                 embed = build_bounty_embed(by_id[battle_id], sides, country_names, tr)
                 mentions = bounty_mentions(eligible.get(thread_id, {}), contracted.get(battle_id))
                 if battle_id in posts:
@@ -399,12 +423,13 @@ class BountyAlertsJob(commands.Cog):
             logger.info("Bounty thread %s: adopted %d post(s) made before the restart", thread_id, len(posts))
         return True
 
-    async def _eligible_subscribers(self, threads: dict[int, list[dict]], bounties: dict[str, list[str]],
+    async def _eligible_subscribers(self, threads: dict[int, list[dict]], bounties: dict[int, dict[str, list[str]]],
                                     guild: discord.Guild) -> dict[int, dict[str, str]]:
         """Bounty thread id -> {Discord id: MU id} of the subscribers able to fight for its bounties now.
 
         The MU id lets the caller skip, per battle, the subscribers whose MU has a contract there. Only
-        subscribers not yet mentioned in some current post are fetched (one batched request). Those who left
+        subscribers not yet mentioned in some current post are fetched (one batched request). `bounties` is
+        thread id -> battle id -> sides, as built by `bounty_alerts`. Those who left
         the server are dropped from the database.
         """
         try:
@@ -418,8 +443,8 @@ class BountyAlertsJob(commands.Cog):
             for s in subscriptions
             if s.get("api_id") and any(
                 str(s["discord_id"]) not in (self._posts.get(thread_id, {}).get(battle_id) or {}).get("pinged", ())
-                for thread_id in threads
-                for battle_id in bounties
+                for thread_id, thread_bounties in bounties.items()
+                for battle_id in thread_bounties
             )
         }
         if not pending:
