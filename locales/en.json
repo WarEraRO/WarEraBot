@@ -549,7 +549,7 @@
             },
             "fight_ready": {
                 "name": "fight_ready — every 5 minutes",
-                "desc": "Gives the Fight Ready role to members with the Fighter role whose player is not in a debuff, and removes it from fighters in a debuff and from members without the Fighter role. A fighter whose player can't be loaded keeps their current role. Posts no report. Government members can force it with /run_job."
+                "desc": "Gives the Fight Ready role to members with the Fighter role whose player is in neither a buff nor a debuff, and removes it from fighters in a buff or debuff and from members without the Fighter role. A fighter whose player can't be loaded keeps their current role. Posts no report. Government members can force it with /run_job."
             },
             "military_unit_roles": {
                 "name": "military_unit_roles — every 3 hours",
@@ -1138,7 +1138,8 @@
         "reason_economy_removed": "Economy <= 50, remove economy role"
     },
     "fight_ready": {
-        "reason_ready": "Fighter without a debuff",
+        "reason_ready": "Fighter without a buff or debuff",
+        "reason_buff": "Fighter in a buff",
         "reason_debuff": "Fighter in a debuff",
         "reason_not_fighter": "No Fighter role"
     },

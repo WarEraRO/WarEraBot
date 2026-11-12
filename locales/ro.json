@@ -552,7 +552,7 @@
             },
             "fight_ready": {
                 "name": "fight_ready — la fiecare 5 minute",
-                "desc": "Acordă rolul Fight Ready membrilor cu rolul Fighter al căror jucător nu e în debuff și îl elimină de la luptătorii în debuff și de la membrii fără rolul Fighter. Dacă datele jucătorului nu se pot încărca, rolul rămâne neschimbat. Nu trimite raport. Membrii Guvernului îl pot rula cu /run_job."
+                "desc": "Acordă rolul Fight Ready membrilor cu rolul Fighter al căror jucător nu e nici în buff, nici în debuff și îl elimină de la luptătorii în buff sau debuff și de la membrii fără rolul Fighter. Dacă datele jucătorului nu se pot încărca, rolul rămâne neschimbat. Nu trimite raport. Membrii Guvernului îl pot rula cu /run_job."
             },
             "military_unit_roles": {
                 "name": "military_unit_roles — la fiecare 3 ore",
@@ -1147,7 +1147,8 @@
         "reason_economy_removed": "Economie <= 50, se elimină rolul economic"
     },
     "fight_ready": {
-        "reason_ready": "Luptător fără debuff",
+        "reason_ready": "Luptător fără buff sau debuff",
+        "reason_buff": "Luptător în buff",
         "reason_debuff": "Luptător în debuff",
         "reason_not_fighter": "Fără rolul Fighter"
     },
