@@ -1,9 +1,9 @@
 """Fight Ready role sync: marks the fighters who can fight right now.
 
 Every ``FIGHT_READY_INTERVAL_MINUTES`` the job gives ``roles.fight_ready`` to every member holding the
-Fighter role (``roles.fight``, managed by ``skill_roles``) whose player has no active debuff, and removes
-it from fighters in debuff and from anyone who no longer holds the Fighter role. The Fighter role
-itself is never touched.
+Fighter role (``roles.fight``, managed by ``skill_roles``) whose player has neither an active buff nor
+an active debuff, and removes it from fighters in a buff or debuff and from anyone who no longer holds
+the Fighter role. The Fighter role itself is never touched.
 
 Players are matched by their database link first and by server nickname otherwise. A member whose
 player could not be loaded this run keeps their current role, so an API outage never strips it.
@@ -27,21 +27,44 @@ logger = logging.getLogger(__name__)
 FIGHT_READY_INTERVAL_MINUTES = 5
 
 
-def is_ready(user: dict, now: datetime) -> bool:
-    """True when the player has no active debuff (``buffs.debuffEndAt`` missing or in the past).
+def _active_until(buffs: dict, key: str, now: datetime) -> bool:
+    """True when the timestamp at ``buffs[key]`` is set and still in the future.
+
+    Args:
+        buffs: The ``buffs`` object of a ``user.getUserLite`` payload.
+        key: ``"buffEndAt"`` or ``"debuffEndAt"``.
+        now: Current time, timezone-aware UTC.
+
+    Returns:
+        Whether that buff or debuff is still running.
+    """
+    end = parse_iso(buffs.get(key))
+    if end and end.tzinfo is None:
+        # the API sends "Z" timestamps; a naive one would make the comparison raise and abort the run
+        end = end.replace(tzinfo=timezone.utc)
+    return bool(end and end > now)
+
+
+def ready_state(user: dict, now: datetime) -> str:
+    """Pill phase that decides the Fight Ready role: ``"buff"``, ``"debuff"`` or ``"ready"``.
+
+    A buffed player is not Fight Ready, so the role marks only fighters who are neither in a Pill
+    buff nor in its debuff.
 
     Args:
         user: A ``user.getUserLite`` payload.
         now: Current time, timezone-aware UTC.
 
     Returns:
-        Whether the player can take part in fights without the post-Pill debuff.
+        ``"buff"`` while ``buffs.buffEndAt`` is in the future, else ``"debuff"`` while
+        ``buffs.debuffEndAt`` is, else ``"ready"``.
     """
-    debuff_end = parse_iso((user.get("buffs") or {}).get("debuffEndAt"))
-    if debuff_end and debuff_end.tzinfo is None:
-        # the API sends "Z" timestamps; a naive one would make the comparison raise and abort the run
-        debuff_end = debuff_end.replace(tzinfo=timezone.utc)
-    return not (debuff_end and debuff_end > now)
+    buffs = user.get("buffs") or {}
+    if _active_until(buffs, "buffEndAt", now):
+        return "buff"
+    if _active_until(buffs, "debuffEndAt", now):
+        return "debuff"
+    return "ready"
 
 
 async def _change_role(member, role, add: bool, reason: str) -> bool:
@@ -110,7 +133,7 @@ class FightReadyJob(commands.Cog):
 
     @tasks.loop(minutes=FIGHT_READY_INTERVAL_MINUTES)
     async def fight_ready(self):
-        """Give the Fight Ready role to fighters without a debuff and remove it from everyone else.
+        """Give the Fight Ready role to fighters without a buff or debuff and remove it from everyone else.
 
         Members holding Fight Ready without the Fighter role lose it without any API call. Fighters
         whose player couldn't be resolved or loaded are left as they are for this run.
@@ -140,11 +163,12 @@ class FightReadyJob(commands.Cog):
             if user is None:
                 continue
             has_role = ready_role in member.roles
-            if is_ready(user, now):
+            state = ready_state(user, now)
+            if state == "ready":
                 if not has_role:
                     added += await _change_role(member, ready_role, True, tr("fight_ready.reason_ready"))
             elif has_role:
-                removed += await _change_role(member, ready_role, False, tr("fight_ready.reason_debuff"))
+                removed += await _change_role(member, ready_role, False, tr(f"fight_ready.reason_{state}"))
 
         missing = len(fighters) - len(players)
         if added or removed or missing:
