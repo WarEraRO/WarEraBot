@@ -191,6 +191,12 @@
             "roleId" : 1568714842377027696,
             "leaderId" : 1568714881887248404,
             "friendly_name": "Falanga"
+        },
+        {
+            "id" : "6aecfd63461cee55c3b9f5b5",
+            "roleId" : 1570372474808565912,
+            "leaderId" : 1570372395427041430,
+            "friendly_name": "TPR"
         }
     ],
     "active_countries": [
