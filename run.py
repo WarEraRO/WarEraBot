@@ -79,6 +79,7 @@ class WarEraBot(commands.Bot):
         await self.load_extension("cogs.tasks.mu_challenge")
         await self.load_extension("cogs.tasks.party_roles")
         await self.load_extension("cogs.tasks.war_priority")
+        await self.load_extension("cogs.tasks.mu_help_request")
 
         await self.load_extension("cogs.commands.fight_status")
         await self.load_extension("cogs.commands.diplomacy")
