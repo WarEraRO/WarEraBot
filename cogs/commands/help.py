@@ -60,6 +60,7 @@ _JOB_IDS: List[str] = [
     "buff_monitor",
     "bounty_monitor",
     "bounty_alerts",
+    "mu_help_requests",
     "mercenary_contracts",
     "mu_contract_monitor",
     "loot_alerts",

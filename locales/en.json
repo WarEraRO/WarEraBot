@@ -627,6 +627,10 @@
                 "name": "gov_monthly_ranking — the last day of the month, 12 minutes before the monthly reset",
                 "desc": "Shortly before the monthly reset, posts the government's monthly top article (\"TOP LUNA ...\") in the government rankings thread as a ready-to-paste .txt file, with the same sections as gov_weekly_ranking (no diaspora file), over the whole month: player and military unit damage and bounty are summed over every battle that ended in the month (a unit gets the damage its members did while in it), donations to Romania since the previous monthly cut-off. A forced run posts the month so far. gov_battle_tracker (every 15 minutes) reads newly ended battles in advance; after a restart the report reads the rest itself, which can take a few minutes."
             },
+            "mu_help_requests": {
+                "name": "mu_help_requests — every minute",
+                "desc": "Posts the help requests of the members of the military units that have a help requests thread (threadIds.helpRequestsId) as one short line with a link to the player and the MU. A request is posted only while the player is in a Pill buff; a request made without a buff is checked again every minute and posted once the player takes a Pill, unless they ask again or the help cooldown passes first. Economy builds are always posted and marked as eco. When the MU has several requests open, the line says to press LOAD MORE. When a player asks for help again, the old line is deleted; the line of a player who left the MU is deleted too. The bot can't see when a request got all its helps, so a line stays until it is replaced. After a restart, the bot finds its own lines in the thread and keeps managing them."
+            },
             "war_priority": {
                 "name": "war_priority — every 2 minutes",
                 "desc": "For each of Romania's wars, checks which country holds the war priority and when it ends, and posts an alert in the government mod cabinet channel 3 hours, 1 hour and 10 minutes before it ends, whether the priority is Romania's or the enemy's, tagging the government roles (roles.government) and the mod cabinet role (roles.cabinets.mod). Nothing is posted while Romania and that enemy fight a battle (the winner gets a new priority). After a restart, alerts that were already due are not repeated."
@@ -1536,5 +1540,10 @@
         "title_theirs": "⏳ An enemy's war priority is running out",
         "description": "{holder} holds the war priority over {other}. It ends in **{remaining}** (at {time}).",
         "footer": "Alerts 3 h, 1 h and 10 min before the priority ends; none while the two countries fight a battle."
+    },
+    "mu_help_requests": {
+        "request": "🆘 **[{player}](<{player_url}>)** has requested help {when}, check MU [{mu}](<{mu_url}>)",
+        "eco": " · 🏭 eco player",
+        "load_more": " · several requests open, press **LOAD MORE**"
     }
 }

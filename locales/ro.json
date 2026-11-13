@@ -630,6 +630,10 @@
                 "name": "gov_monthly_ranking — ultima zi a lunii, cu 12 minute înainte de resetarea lunară",
                 "desc": "Cu puțin înainte de resetarea lunară, postează în threadul de topuri al guvernului articolul lunar al guvernului („TOP LUNA ...”) ca fișier .txt gata de copiat, cu aceleași secțiuni ca gov_weekly_ranking (fără fișier de diaspora), pe toată luna: damage-ul jucătorilor și al unităților militare și bounty-ul sunt adunate din toate bătăliile încheiate în lună (o unitate primește damage-ul făcut de membrii ei cât timp erau în ea), donațiile către România de la precedenta rulare lunară. O rulare forțată postează luna de până acum. gov_battle_tracker (la fiecare 15 minute) citește din timp bătăliile încheiate; după o repornire, raportul citește singur restul, ceea ce poate dura câteva minute."
             },
+            "mu_help_requests": {
+                "name": "mu_help_requests — la fiecare minut",
+                "desc": "Postează cererile de ajutor ale membrilor unităților militare care au un thread pentru cereri de ajutor (threadIds.helpRequestsId), ca o linie scurtă cu link la jucător și la UM. O cerere este postată doar cât timp jucătorul e în buff de Pill; o cerere făcută fără buff este verificată din nou în fiecare minut și postată când jucătorul ia un Pill, dacă între timp nu cere din nou ajutor și nu trece perioada de așteptare dintre cereri; build-urile economice sunt postate mereu și marcate ca eco. Când UM-ul are mai multe cereri deschise, linia spune să apeși LOAD MORE. Când un jucător cere din nou ajutor, linia veche este ștearsă; este ștearsă și linia unui jucător care a ieșit din UM. Botul nu vede când o cerere a primit toate ajutoarele, așa că o linie rămâne până este înlocuită. După o repornire, botul își găsește liniile în thread și continuă să le gestioneze."
+            },
             "war_priority": {
                 "name": "war_priority — la fiecare 2 minute",
                 "desc": "Pentru fiecare război al României, verifică ce țară are prioritatea de război și când se termină, și postează o alertă în canalul cabinetului de moderare al guvernului cu 3 ore, 1 oră și 10 minute înainte de final, fie că prioritatea e a României, fie a inamicului, cu tag pe rolurile guvernului (roles.government) și pe rolul cabinetului (roles.cabinets.mod). Nu postează nimic cât timp România și acel inamic au o bătălie în desfășurare (câștigătorul primește o prioritate nouă). După o repornire, alertele deja scadente nu se repetă."
@@ -1790,5 +1794,10 @@
         "title_theirs": "⏳ Prioritatea de război a unui inamic se termină",
         "description": "{holder} are prioritatea de război față de {other}. Se termină în **{remaining}** (la {time}).",
         "footer": "Alerte cu 3 h, 1 h și 10 min înainte de sfârșitul priorității; niciuna cât timp cele două țări au o bătălie în desfășurare."
+    },
+    "mu_help_requests": {
+        "request": "🆘 **[{player}](<{player_url}>)** a cerut ajutor {when}, verifică UM-ul [{mu}](<{mu_url}>)",
+        "eco": " · 🏭 eco",
+        "load_more": " · sunt mai multe cereri deschise, apasă **LOAD MORE**"
     }
 }
