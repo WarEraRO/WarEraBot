@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 from discord.ext import commands, tasks
 from utils.api import warera
 from utils.db import init_db, get_api_ids_by_discord_id
@@ -6,9 +7,20 @@ from utils.i18n import Translator, get_translator
 from config import config
 import discord
 
+# How long a member who moved to another configured MU keeps the old MU's role, so players who switch
+# back and forth between two MUs don't lose and regain it every run. Counted from the run that first
+# saw the move; with the 3-hour loop the role goes on the eighth run after that one. The tolerance
+# absorbs small differences in run start times so a run exactly 24 hours later still removes it.
+MU_ROLE_GRACE = timedelta(hours=24)
+MU_ROLE_GRACE_TOLERANCE = timedelta(minutes=10)
+
+
 class MilitaryUnitRolesJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        # When each kept MU role's grace period started, {discord_id: {role_id: datetime}}.
+        # Memory only: after a restart a grace starts again, so a role can be kept longer, never shorter.
+        self._mu_role_grace: dict = {}
         try:
             init_db()
         except Exception:
@@ -28,7 +40,16 @@ class MilitaryUnitRolesJob(commands.Cog):
            the others; if it doesn't, every MU role is removed. Members without a
            database link are matched by nickname as before. A member whose player
            could not be loaded this run is left untouched.
+
+           A member who now belongs to another configured MU keeps the MU roles
+           they no longer qualify for for MU_ROLE_GRACE (24 hours, so until the
+           eighth run after the move was seen); moving back within that time
+           cancels the removal. Leaving for no MU or an unconfigured MU, and a
+           nickname mismatch, still remove the roles at once. Grace start times
+           are kept in memory only, so after a bot restart each grace period
+           starts again from the first run.
         """
+        run_started = datetime.now(timezone.utc)
         guild = self.bot.get_guild(config['guild'])
         if guild is None:
             return
@@ -81,6 +102,12 @@ class MilitaryUnitRolesJob(commands.Cog):
         # Unlinked members: Discord display name -> API user id (cached names cost no request)
         user_ids = await warera.users.ids_by_name([m.display_name for m in members if m not in linked])
 
+        # Grace periods started by earlier runs since the bot started.
+        old_grace = self._mu_role_grace
+        new_grace: dict = {}
+        managed_role_ids = {str(r.id) for r in managed_roles}
+        configured_role_ids = {str(r.id) for r in configured_roles}
+
         # track player display names added/removed per role
         added_members: dict = {}
         removed_members: dict = {}
@@ -88,6 +115,12 @@ class MilitaryUnitRolesJob(commands.Cog):
         # For each member, determine the desired MU-related roles (their current MU
         # plus any MU(s) they own/manage) then add/remove server roles to match.
         for member in members:
+            member_key = str(member.id)
+            member_old_grace = old_grace.get(member_key) or {}
+            # Skipped members keep their grace periods unchanged (set again below if processed).
+            if member_old_grace:
+                new_grace[member_key] = dict(member_old_grace)
+
             name_matches = True
             if member in linked:
                 api_id = linked[member]
@@ -132,8 +165,27 @@ class MilitaryUnitRolesJob(commands.Cog):
                 except Exception:
                     pass
 
+            # Grace periods of roles of MUs that failed to load are carried over untouched;
+            # roles no longer configured are dropped, and a nickname mismatch removes every
+            # MU role, so it drops them all.
+            member_grace = {}
+            if name_matches:
+                member_grace = {rid: since for rid, since in member_old_grace.items()
+                                if rid in configured_role_ids and rid not in managed_role_ids}
+
             # Remove MU roles that the member should no longer have (managed set minus desired)
             roles_to_remove = [r for r in current_mu_roles if r not in desired_roles]
+
+            # A member now in another configured MU keeps the roles they lost until the grace ends.
+            if name_matches and member_mu.get(api_id) in mu_to_role:
+                still_kept = []
+                for r in roles_to_remove:
+                    since = member_old_grace.get(str(r.id)) or run_started
+                    if run_started - since < MU_ROLE_GRACE - MU_ROLE_GRACE_TOLERANCE:
+                        member_grace[str(r.id)] = since
+                        still_kept.append(r)
+                roles_to_remove = [r for r in roles_to_remove if r not in still_kept]
+
             if roles_to_remove:
                 try:
                     reason = tr("mu_roles.reason_removed") if name_matches else tr("mu_roles.reason_name_mismatch")
@@ -142,7 +194,20 @@ class MilitaryUnitRolesJob(commands.Cog):
                         rname = r.name if r else str(getattr(r, 'id', 'unknown'))
                         removed_members.setdefault(rname, []).append(member.display_name)
                 except Exception:
-                    pass
+                    # Keep an expired grace so the next run retries the removal instead of
+                    # starting a new grace period.
+                    if name_matches:
+                        for r in roles_to_remove:
+                            if str(r.id) in member_old_grace:
+                                member_grace[str(r.id)] = member_old_grace[str(r.id)]
+
+            if member_grace:
+                new_grace[member_key] = member_grace
+            else:
+                new_grace.pop(member_key, None)
+
+        # Members who left the server are not in `members`, so their grace periods are dropped here.
+        self._mu_role_grace = new_grace
 
         # Send a summary embed for military unit role changes — only if there were changes
         channel = guild.get_channel(config["channels"]["reports"]) if guild else None

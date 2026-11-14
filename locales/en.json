@@ -553,7 +553,7 @@
             },
             "military_unit_roles": {
                 "name": "military_unit_roles — every 3 hours",
-                "desc": "Assigns Military Unit roles to members based on their in-game MU membership and removes conflicting MU roles. Members linked to a player whose server nickname doesn't match that player's in-game username lose all MU roles. Sends a summary to the reports channel when changes occur."
+                "desc": "Assigns Military Unit roles to members based on their in-game MU membership and removes conflicting MU roles. A member who moves to another configured MU keeps the old MU's role for 24 hours (removed on the eighth run after the move is seen), so switching back and forth doesn't strip it; leaving for no MU or an unconfigured MU removes it at once. Members linked to a player whose server nickname doesn't match that player's in-game username lose all MU roles. Sends a summary to the reports channel when changes occur."
             },
             "party_roles": {
                 "name": "party_roles — every hour",

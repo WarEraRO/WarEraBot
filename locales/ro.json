@@ -556,7 +556,7 @@
             },
             "military_unit_roles": {
                 "name": "military_unit_roles — la fiecare 3 ore",
-                "desc": "Acordă membrilor rolurile de unitate militară după MU-ul din joc și elimină rolurile de MU care nu se potrivesc. Membrii asociați unui jucător a căror poreclă de pe server diferă de numele din joc pierd toate rolurile de MU. Trimite un rezumat în canalul de rapoarte când apar modificări."
+                "desc": "Acordă membrilor rolurile de unitate militară după MU-ul din joc și elimină rolurile de MU care nu se potrivesc. Cine trece într-un alt MU configurat păstrează rolul vechiului MU timp de 24 de ore (e eliminat la a opta rulare după ce mutarea e observată), ca să nu-l piardă când se mută înainte și înapoi; cine pleacă într-un MU neconfigurat sau în niciunul îl pierde imediat. Membrii asociați unui jucător a căror poreclă de pe server diferă de numele din joc pierd toate rolurile de MU. Trimite un rezumat în canalul de rapoarte când apar modificări."
             },
             "party_roles": {
                 "name": "party_roles — la fiecare oră",
