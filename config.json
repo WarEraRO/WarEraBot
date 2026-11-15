@@ -99,7 +99,8 @@
                 "contractsId": 1550456749692026920
             },
             "designation": "fight",
-            "friendlyName": "IOBAG PRAF"
+            "friendlyName": "IOBAG PRAF",
+            "contractsPingRole": true
         },
         {
             "id" : "6873ed1806cf11a5f9dc3ecf",

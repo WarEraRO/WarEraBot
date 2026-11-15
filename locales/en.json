@@ -553,7 +553,7 @@
             },
             "military_unit_roles": {
                 "name": "military_unit_roles — every 3 hours",
-                "desc": "Assigns Military Unit roles to members based on their in-game MU membership and removes conflicting MU roles. Members linked to a player whose server nickname doesn't match that player's in-game username lose all MU roles. Sends a summary to the reports channel when changes occur."
+                "desc": "Assigns Military Unit roles to members based on their in-game MU membership and removes conflicting MU roles. A member who moves to another configured MU keeps the old MU's role for 24 hours (removed on the eighth run after the move is seen), so switching back and forth doesn't strip it; leaving for no MU or an unconfigured MU removes it at once. Members linked to a player whose server nickname doesn't match that player's in-game username lose all MU roles. Sends a summary to the reports channel when changes occur."
             },
             "party_roles": {
                 "name": "party_roles — every hour",
@@ -589,7 +589,7 @@
             },
             "mu_contract_monitor": {
                 "name": "mu_contract_monitor — every 5 minutes",
-                "desc": "Posts an embed in a military unit's contracts thread (threadIds.contractsId) or channel when that MU wins a mercenary contract: battle, minimum damage, pay per 1k damage, total payout, estimated time left and score. Pings the members subscribed with /subscribe contracts who are in that MU at that moment, are on a fight build, have health 10+ or hunger left and are not in debuff. Subscribers who left the server are unsubscribed."
+                "desc": "Posts an embed in a military unit's contracts thread (threadIds.contractsId) or channel when that MU wins a mercenary contract: battle, minimum damage, pay per 1k damage, total payout, estimated time left and score. Pings the members subscribed with /subscribe contracts who are in that MU at that moment, are on a fight build, have health 10+ or hunger left and are not in debuff. An MU whose config entry sets contractsPingRole: true gets its roleId tagged instead of its subscribers. Subscribers who left the server are unsubscribed."
             },
             "loot_alerts": {
                 "name": "loot_alerts — every 2 minutes",
@@ -1208,6 +1208,7 @@
         "not_in_unit": "You are not in any military unit that gets contract posts on this server.",
         "subscribed": "You will be pinged when your military unit wins a mercenary contract. You are in **{mu}** now, whose contracts are posted in {channel}; if you change unit, you are pinged for your new unit's contracts. You are skipped while you are on an economy build or cannot fight (health under 10 and no hunger left, or in debuff). Use `/unsubscribe contracts` to stop.",
         "already_subscribed": "You are already subscribed to your military unit's contracts (you are in **{mu}** now).",
+        "role_pinged": "No subscription needed: **{mu}** tags its role {role} for every mercenary contract it wins, in {channel}.",
         "not_subscribed": "You are not subscribed to mercenary contracts.",
         "unsubscribed": "You will no longer be pinged for mercenary contracts.",
         "unit_channel": "the military unit's contracts channel",

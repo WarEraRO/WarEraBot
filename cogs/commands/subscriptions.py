@@ -12,7 +12,12 @@ from cogs.tasks.bounty_alerts import THREAD_KEY as BOUNTY_THREAD_KEY
 from cogs.tasks.bounty_alerts import bounty_units
 from cogs.tasks.loot_alerts import SUBSCRIPTION_JOB as LOOT_SUBSCRIPTION_JOB
 from cogs.tasks.loot_alerts import SUBSCRIPTION_TARGET as LOOT_SUBSCRIPTION_TARGET
-from cogs.tasks.military_unit_contract_monitor import SUBSCRIPTION_JOB, SUBSCRIPTION_TARGET, contract_units
+from cogs.tasks.military_unit_contract_monitor import (
+    SUBSCRIPTION_JOB,
+    SUBSCRIPTION_TARGET,
+    contract_ping_role_id,
+    contract_units,
+)
 from config import config
 from utils.api import warera
 from utils.common import get_mu_destination
@@ -77,6 +82,11 @@ class Subscriptions(commands.Cog):
 
     @subscribe.command(name="contracts", description="Get pinged when your military unit wins a mercenary contract.")
     async def subscribe_contracts(self, interaction: discord.Interaction):
+        """Subscribe the caller to the contract pings of whichever configured MU they are in.
+
+        Nothing is saved when the caller's MU tags its role for contracts (``contractsPingRole``);
+        the caller is told the role is pinged instead.
+        """
         await interaction.response.defer(ephemeral=True)
         tr = await get_translator(interaction.guild_id)
 
@@ -98,8 +108,22 @@ class Subscriptions(commands.Cog):
 
         # only members of an MU that gets contract posts may subscribe; the MU itself is not stored
         mu_id = str(user.get("mu") or "")
-        if mu_id not in contract_units():
+        units = contract_units()
+        if mu_id not in units:
             await interaction.followup.send(tr("subscriptions.not_in_unit"), ephemeral=True)
+            return
+
+        # an MU set to tag its role for contracts (contractsPingRole) needs no subscription, so none is saved
+        role_id = contract_ping_role_id(units[mu_id])
+        if role_id:
+            military_unit = await warera.mus.get(mu_id)
+            mu_name = discord.utils.escape_markdown(str((military_unit or {}).get("name") or mu_id))
+            channel = await self._destination_text(interaction.guild, mu_id, tr)
+            await interaction.followup.send(
+                tr("subscriptions.role_pinged", mu=mu_name, role=f"<@&{role_id}>", channel=channel),
+                ephemeral=True,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
             return
 
         try:
