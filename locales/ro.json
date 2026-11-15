@@ -592,7 +592,7 @@
             },
             "mu_contract_monitor": {
                 "name": "mu_contract_monitor — la fiecare 5 minute",
-                "desc": "Postează un embed în firul de contracte al unității militare (threadIds.contractsId) sau în canalul ei când MU-ul câștigă un contract de mercenari: bătălia, damage-ul minim, plata la 1k damage, plata totală, timpul estimat rămas și scorul. Menționează membrii abonați cu /subscribe contracts care sunt în acel MU în acel moment, au build de luptă, au viață 10+ sau foame rămasă și nu sunt în debuff. Abonații care au părăsit serverul sunt dezabonați."
+                "desc": "Postează un embed în firul de contracte al unității militare (threadIds.contractsId) sau în canalul ei când MU-ul câștigă un contract de mercenari: bătălia, damage-ul minim, plata la 1k damage, plata totală, timpul estimat rămas și scorul. Menționează membrii abonați cu /subscribe contracts care sunt în acel MU în acel moment, au build de luptă, au viață 10+ sau foame rămasă și nu sunt în debuff. Un MU care are contractsPingRole: true în config primește mențiune pe roleId în locul abonaților. Abonații care au părăsit serverul sunt dezabonați."
             },
             "loot_alerts": {
                 "name": "loot_alerts — la fiecare 2 minute",
@@ -1218,6 +1218,7 @@
         "not_in_unit": "Nu ești în nicio unitate militară pentru care se postează contracte pe acest server.",
         "subscribed": "Vei primi mențiune când unitatea ta militară câștigă un contract de mercenari. Acum ești în **{mu}**, ale cărei contracte se postează în {channel}; dacă schimbi unitatea, primești mențiune pentru contractele noii unități. Ești sărit cât ai build de economie sau nu poți lupta (viață sub 10 și fără foame, sau în debuff). Folosește `/unsubscribe contracts` ca să te dezabonezi.",
         "already_subscribed": "Ești deja abonat la contractele unității tale militare (acum ești în **{mu}**).",
+        "role_pinged": "Nu e nevoie de abonare: **{mu}** menționează rolul {role} pentru fiecare contract de mercenari câștigat, în {channel}.",
         "not_subscribed": "Nu ești abonat la contractele de mercenari.",
         "unsubscribed": "Nu mai primești mențiuni pentru contractele de mercenari.",
         "unit_channel": "canalul de contracte al unității militare",

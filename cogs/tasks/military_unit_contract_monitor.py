@@ -135,6 +135,27 @@ def contract_units() -> dict[str, dict]:
     }
 
 
+def contract_ping_role_id(unit: dict | None) -> int | None:
+    """The Discord role to tag for the MU's contracts instead of its subscribers, or None to ping subscribers.
+
+    An MU's config entry opts in with ``"contractsPingRole": true``; its ``roleId`` is then tagged for every
+    contract it wins and ``/subscribe contracts`` subscriptions are not used for it (they are kept, and apply
+    again once the option is removed).
+
+    Args:
+        unit: The MU's entry in ``config["military_units"]``.
+
+    Returns:
+        The MU's ``roleId`` when the option is on and the id is valid, otherwise None.
+    """
+    if not unit or unit.get("contractsPingRole") is not True:
+        return None
+    try:
+        return int(unit.get("roleId") or 0) or None
+    except (TypeError, ValueError):
+        return None
+
+
 def _bar_value(skill) -> float:
     try:
         return float((skill or {}).get("currentBarValue") or 0)
@@ -169,7 +190,8 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
         """Post an embed for each mercenary contract a configured MU has newly won.
 
         The embed goes to the MU's contracts thread or channel, in one message whose text mentions
-        the subscribers eligible to fight it (see `_subscriber_mentions`). Contracts already won at
+        the subscribers eligible to fight it (see `_subscriber_mentions`), or the MU's role when its
+        config entry sets ``contractsPingRole`` (see `contract_ping_role_id`). Contracts already won at
         the first run after a restart are only recorded, not posted.
         """
         guild =self.bot.get_guild(config["guild"])
@@ -210,14 +232,19 @@ class MilitaryUnitContractMonitorJob(commands.Cog):
                 logger.warning("Contracts channel/thread for MU %s not found", unit.get("friendlyName"))
                 continue
             embed = await self._build_embed(contract, unit, tr)
-            # an MU has at most 25 members (dormitories level 5), so every mention fits in one message
-            mentions = await self._subscriber_mentions(str(unit["id"]), guild)
+            role_id = contract_ping_role_id(unit)
+            if role_id:
+                # the MU's role replaces the subscriber pings; an unmentionable role also needs the bot
+                # to have the "Mention @everyone, @here, and All Roles" permission in the channel
+                content = f"<@&{role_id}>"
+                allowed_mentions = discord.AllowedMentions(everyone=False, users=False, roles=[discord.Object(role_id)])
+            else:
+                # an MU has at most 25 members (dormitories level 5), so every mention fits in one message
+                mentions = await self._subscriber_mentions(str(unit["id"]), guild)
+                content = " ".join(mentions) or None
+                allowed_mentions = discord.AllowedMentions(everyone=False, roles=False, users=True)
             try:
-                await channel.send(
-                    content=" ".join(mentions) or None,
-                    embed=embed,
-                    allowed_mentions=discord.AllowedMentions(everyone=False, roles=False, users=True),
-                )
+                await channel.send(content=content, embed=embed, allowed_mentions=allowed_mentions)
             except discord.DiscordException:
                 logger.exception("Failed to post contract %s for MU %s", contract_id, unit.get("friendlyName"))
                 continue
