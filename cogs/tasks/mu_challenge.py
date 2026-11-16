@@ -194,7 +194,7 @@ class MuChallengeJob(commands.Cog):
         if mc.has_mission(challenge, "pill_streak"):
             await self._refresh_pills(challenge, units, current, now)
         if weekly_ok and mc.has_mission(challenge, *mc.NEEDS_RANKING):
-            await self._refresh_ranking(challenge, units)
+            self._refresh_ranking(challenge, units, mus)
         ended_ids = None
         if mc.has_mission(challenge, "bounty") or mc.has_mission(challenge, *mc.NEEDS_CONTRACTS):
             ended_ids = await self._refresh_battles(challenge, units, now, final)
@@ -245,14 +245,18 @@ class MuChallengeJob(commands.Cog):
                 if day in days and uid not in pills.setdefault(day, []):
                     pills[day].append(uid)
 
-    async def _refresh_ranking(self, challenge: dict, units: dict) -> None:
-        """The MUs' muWeeklyDamages value and rank; an MU missing from the ranking has 0 damage and no rank."""
-        ranking = await warera.game.get_ranking("muWeeklyDamages")
-        if ranking is None:
-            return
-        entries = {item.get("mu"): item for item in ranking.get("items") or [] if item.get("mu")}
+    def _refresh_ranking(self, challenge: dict, units: dict, mus: dict) -> None:
+        """The MUs' muWeeklyDamages value and rank, from the `rankings` of their loaded mu.getById objects (`mus`).
+
+        ranking.getRanking lists only the top 100 of ~900 MUs since 2026-11-16, so it can't be used. An MU
+        whose object didn't load keeps its stored values; one without a muWeeklyDamages entry has 0 damage and
+        no rank.
+        """
         for mu_id in challenge["mu_ids"]:
-            entry = entries.get(mu_id) or {}
+            mu = mus.get(mu_id)
+            if not isinstance(mu, dict):
+                continue
+            entry = (mu.get("rankings") or {}).get("muWeeklyDamages") or {}
             units[mu_id]["weekly_damage"] = float(entry.get("value") or 0)
             units[mu_id]["weekly_rank"] = entry.get("rank")
 

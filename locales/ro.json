@@ -492,6 +492,10 @@
                 "name": "/mu_order_alignment military_unit",
                 "desc": "Verifică dacă ordinele de luptă active ale unei unități militare configurate (cu sugestii) urmează ordinele de țară ale României. Arată ordinele MU pe tabăra opusă, ordinele MU pe bătălii fără ordin de la România, ordinele României pe care MU nu le-a copiat, ordinele aliniate și cele de turneu, cu nivelul de prioritate al fiecărui ordin și locul bătăliei în `/priority list`. Răspunsul e postat în canal; nimeni nu primește mențiune."
             },
+            "player_alignment": {
+                "name": "/player_alignment [military_unit]",
+                "desc": "Damage-ul fiecărui cetățean român și al fiecărui membru al unităților militare configurate (inclusiv românii din afara țării) de la resetarea zilnică (00:00 UTC), pe jucător: pe tabăra cu ordin de la România, împotriva ordinului României, în bătălii fără ordin de la România și necunoscut. Cu `military_unit` (cu sugestii), doar membrii acelei unități. Ordinele României sunt urmărite la fiecare 5 minute, pentru că bătăliile încheiate nu le mai arată; după o repornire a botului, damage-ul de dinainte în bătălii fără ordin văzut apare ca necunoscut. Damage-ul e plasat după prima și ultima lovitură a jucătorului într-o rundă, așa că o rundă lungă în care România a dat ordin doar o parte din timp contează ca având ordin. Răspunsul e vizibil doar pentru tine."
+            },
             "mu_positions": {
                 "name": "/mu_positions military_unit [battle]",
                 "desc": "Unde se află membrii unei unități militare configurate (cu sugestii). Fără `battle`: membrii grupați pe regiunea curentă, bătăliile active care se pot lupta din fiecare regiune și câți membri sunt în poziție pentru fiecare bătălie cu ordin de la MU sau de la România. Cu `battle` (cu sugestii, întâi ordinele MU și ale României, sau un link de bătălie): cine e în poziție pentru tabăra ordinului MU (altfel a României), cine stă unde se poate lovi doar pentru cealaltă tabără și restul, ordonați după distanță, cu costul drumului în stamina și petrol (10 stamina pe regiune, 2 petrol pe fiecare regiune neacoperită de stamina) și 🏠 când drumul gratuit acasă îi duce acolo. Răspunsul e postat în canal; nimeni nu primește mențiune."
@@ -803,6 +807,26 @@
             "bronze": "BRONZ",
             "iron": "FIER"
         }
+    },
+    "player_alignment": {
+        "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
+        "fetch_failed": "Nu am putut citi bătăliile sau lista țărilor. Încearcă mai târziu.",
+        "players_failed": "Nu am putut citi lista jucătorilor. Încearcă mai târziu.",
+        "title": "🧭 {country} · Alinierea jucătorilor",
+        "title_mu": "🧭 {mu} · Alinierea jucătorilor",
+        "since": "Damage de la resetarea zilnică ({reset}) până la {now}, împărțit după ordinele de luptă ale României.",
+        "total_ordered": "✅ Pe tabăra cu ordin de la România: **{value}** ({percent}%)",
+        "total_against": "❌ Împotriva ordinelor României: **{value}** ({percent}%)",
+        "total_free": "➖ În bătălii fără ordin de la România: **{value}** ({percent}%)",
+        "total_unknown": "❔ Ordine necunoscute (botul nu rula): **{value}** ({percent}%)",
+        "players": "👥 Jucători: **{total}** · cu damage: **{active}** · fără damage: **{idle}**",
+        "warn_tracking": "⚠️ Ordinele României nu au fost urmărite toată ziua (repornirea botului); urmărite din nou de la {time}. Damage-ul din afara acestui interval apare ca ❔.",
+        "warn_baseline": "⚠️ Fără instantaneu de la resetare: **{value}** din rundele care au trecut peste resetare e estimat după timp.",
+        "warn_rankings": "⚠️ Clasamente de rundă necitite complet: {count}; totalurile pot fi mai mici.",
+        "warn_units": "⚠️ Unități militare neîncărcate: {names}",
+        "warn_users": "⚠️ Profiluri neîncărcate: {count} (afișate după id).",
+        "no_damage": "Nimeni nu a făcut damage de la resetare.",
+        "footer": "✅ ordinul României · ❌ împotriva lui · ➖ fără ordin · ❔ necunoscut · pe rundă și tabără"
     },
     "mu_alignment": {
         "unknown_unit": "Unitate militară necunoscută. Alege una din listă.",
@@ -1597,6 +1621,10 @@
         "mu_order_alignment": {
             "description": "Verifică dacă ordinele de luptă ale unei unități militare urmează ordinele de țară ale României.",
             "params": {"military_unit": "Unitatea militară (una dintre cele configurate pe acest server)"}
+        },
+        "player_alignment": {
+            "description": "Damage-ul jucătorilor români de la resetarea zilnică, împărțit după ordinele de luptă ale României.",
+            "params": {"military_unit": "Doar această unitate militară (una dintre cele configurate pe acest server)"}
         },
         "mu_positions": {
             "description": "Arată unde stau membrii unei unități militare, în general sau pentru o bătălie.",

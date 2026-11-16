@@ -34,6 +34,7 @@ _COMMAND_IDS: List[str] = [
     "progression",
     "economy",
     "mu_order_alignment",
+    "player_alignment",
     "mu_positions",
     "mu_readiness",
     "loot_targets",

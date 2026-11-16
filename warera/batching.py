@@ -170,9 +170,10 @@ def _unwrap(envelope, procedure, status=207):
     return result.get('data')
 
 
-# Responses large enough (region map ~0.9 MB, a ranking of ~14k entries) that merging them would make the
-# other calls wait for them and share their timeout; they are always sent on their own.
-SOLO_PROCEDURES = frozenset({'region.getRegionsObject', 'ranking.getRanking'})
+# Responses large enough (region map ~0.9 MB) that merging them would make the other calls wait for them
+# and share their timeout; they are always sent on their own. ranking.getRanking left this list on
+# 2026-11-16, when it stopped listing every entry (top 100 only).
+SOLO_PROCEDURES = frozenset({'region.getRegionsObject'})
 
 
 class Coalescer:
