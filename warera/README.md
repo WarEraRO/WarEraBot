@@ -70,7 +70,7 @@ found`) is always logged as an error.
 | `contracts` | `get_active_auctions` · `get_won_since` · `get_won_by_battles` (mercenaryContractAuction.getPaginatedAuctions) |
 | `companies` | `get_many` (company.getById) · `get_owned_by` · `get_ids_owned_by_many` (company.getCompanies) · `get_production_bonuses` 🧭 · `get_rosters` (employee.getCompanyRoster 🔑) · `get_employee_work_stats` (work.getStatsByEmployee 🔑) |
 | `market` | `get_prices` (itemTrading.getPrices) · `get_user_transactions` · `get_mu_transactions` (transaction.getPaginatedTransactions 🔑) |
-| `game` | `get_config` (gameConfig.getGameConfig, cached 1 h) · `get_pp_money_value` · `get_equipment_averages` (gameStat.*) · `get_ranking` (ranking.getRanking) · `get_articles` (article.getArticlesPaginated) |
+| `game` | `get_config` (gameConfig.getGameConfig, cached 1 h) · `get_pp_money_value` · `get_equipment_averages` (gameStat.*) · `get_ranking` (ranking.getRanking, top 100 only) · `get_ranking_entries` (ranking.getRankingPage, every page, country/MU filter) · `get_ranked_citizen_ids` (a country's players in its userWealth/userLevel/userDamages rankings) · `get_articles` (article.getArticlesPaginated) |
 
 🧭 = not in the official spec (community explorer); 🔑 = needs the API key. The `warera-api` skill
 documents every procedure, input and response shape.
@@ -93,7 +93,7 @@ batch costs **one** rate-limit unit whatever its size. The client batches in two
 
    A lone call is sent as a plain, unbatched GET. A merged call gets its result as soon as it is final,
    without waiting for another call's retries. Procedures with very large responses
-   (`SOLO_PROCEDURES`: `region.getRegionsObject`, `ranking.getRanking`) are always sent on their own, so
+   (`SOLO_PROCEDURES`: `region.getRegionsObject`) are always sent on their own, so
    they don't share a timeout with small calls. Paginated listings are inherently sequential (each page
    needs the previous cursor), so their pages are not merged with each other.
 

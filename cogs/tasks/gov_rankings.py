@@ -12,7 +12,8 @@ has no diaspora article, user decision 2026-11-04):
   members of the configured MUs with another citizenship, with the same sections except donations, the configured
   MUs by their diaspora members' damage, and each player's citizenship next to their name.
 
-Weekly damage comes from the weeklyUserDamages ranking. The API has no monthly damage or bounty ranking, so the
+Weekly damage and wealth come from Romania's pages of the weeklyUserDamages and userWealth rankings
+(ranking.getRankingPage), the diaspora's from their users' `rankings`, read before the battle sync. The API has no monthly damage or bounty ranking, so the
 monthly article sums every battle that ended in the month (battleRanking damage per player, and per MU for the
 MU section, so damage counts for the MU the player was in when fighting; user decisions 2026-11-04), and both
 reports read bounty per ended battle (money ranking, then the earners' loot summaries).
@@ -239,9 +240,17 @@ def country_values(ranking: dict, country_id: str) -> dict[str, float]:
     }
 
 
-def ranking_values(ranking: dict) -> dict[str, float]:
-    """{user id: value} of every item of a user ranking, whatever the country."""
-    return {item["user"]: item.get("value") or 0 for item in ranking.get("items") or [] if item.get("user")}
+def as_ranking(items: list[dict] | None) -> dict | None:
+    """Ranking entries (warera.game.get_ranking_entries) in the {"items": [...]} shape country_values reads."""
+    return {"items": items} if items is not None else None
+
+
+def user_ranking_values(users: dict[str, dict], ranking_type: str) -> dict[str, float]:
+    """{user id: value} of each loaded user's `rankings[ranking_type]` (0 when the user has no such entry)."""
+    return {
+        user_id: ((user.get("rankings") or {}).get(ranking_type) or {}).get("value") or 0
+        for user_id, user in users.items()
+    }
 
 
 def ranking_mus(ranking: dict, country_id: str) -> dict[str, str]:
@@ -672,7 +681,7 @@ class GovRankingsJob(commands.Cog):
         self.bot = bot
         self._country_id: str | None = None
         self._countries: dict[str, dict] = {}
-        # the Romanian ids of the userWealth ranking (it lists every player) and the diaspora candidates, with
+        # Romania's citizens in its userWealth/userLevel/userDamages rankings and the diaspora candidates, with
         # when each was read; -inf, not 0: time.monotonic() counts from boot, so 0 would look fresh at first
         self._romanians: set[str] = set()
         self._romanians_at = float("-inf")
@@ -712,13 +721,16 @@ class GovRankingsJob(commands.Cog):
             self._country_id = country["_id"] if country else None
         return self._country_id
 
-    async def _load_romanians(self, country_id: str, wealth_ranking: dict | None = None) -> set[str]:
-        """Ids of Romania's citizens in the userWealth ranking, refreshed hourly; the last good set on failure."""
-        if wealth_ranking is None and time.monotonic() - self._romanians_at >= PLAYER_SETS_TTL:
-            wealth_ranking = await warera.game.get_ranking("userWealth")
-        if wealth_ranking is not None:
-            self._romanians = set(country_values(wealth_ranking, country_id))
-            self._romanians_at = time.monotonic()
+    async def _load_romanians(self, country_id: str, refresh: bool = False) -> set[str]:
+        """Romania's citizens in its userWealth/userLevel/userDamages rankings, re-read hourly or now with `refresh`.
+
+        The last good set is kept when the read fails.
+        """
+        if refresh or time.monotonic() - self._romanians_at >= PLAYER_SETS_TTL:
+            citizens = await warera.game.get_ranked_citizen_ids(country_id)
+            if citizens is not None:
+                self._romanians = citizens
+                self._romanians_at = time.monotonic()
         return self._romanians
 
     async def _discord_romanians(self) -> tuple[set[str], bool]:
@@ -1075,18 +1087,25 @@ class GovRankingsJob(commands.Cog):
         if country_id is None:
             logger.warning("Country %s not found; weekly ranking not posted", COUNTRY_NAME)
             return
-        damage_ranking, wealth_ranking, transactions, _ = await asyncio.gather(
-            warera.game.get_ranking("weeklyUserDamages"),
-            warera.game.get_ranking("userWealth"),
+        damage_items, wealth_items, transactions, _ = await asyncio.gather(
+            warera.game.get_ranking_entries("weeklyUserDamages", country_id=country_id),
+            warera.game.get_ranking_entries("userWealth", country_id=country_id),
             warera.market.get_country_transactions(country_id, "donation", _iso(week)),
             self._check_reset("weeklyMissionRegenAt", week + timedelta(days=7)),
         )
+        # Romania's entries only (ranking.getRanking lists just the global top 100)
+        damage_ranking, wealth_ranking = as_ranking(damage_items), as_ranking(wealth_items)
         for name, value in (("damage ranking", damage_ranking), ("wealth ranking", wealth_ranking),
                             ("donations", transactions)):
             if value is None:
                 logger.warning("Government ranking: %s unavailable", name)
-        romanians = await self._load_romanians(country_id, wealth_ranking)
+        romanians = await self._load_romanians(country_id, refresh=True)
         diaspora = await self._read_diaspora()
+        # the diaspora's weekly damage and wealth come from their users' `rankings`, so they are read now: the
+        # battle sync below can run past the reset, after which the weekly damage reads 0
+        diaspora_users: dict[str, dict] = {}
+        if diaspora is not None:
+            await self._load_users(list(diaspora[0]), diaspora_users)
 
         # this report counts the battles that ended since the previous report's cut-off, up to its own
         window = week - REPORT_LEAD
@@ -1099,8 +1118,7 @@ class GovRankingsJob(commands.Cog):
             channel, f"{week + timedelta(days=6):%Y-%m-%d}", WEEKLY_TEXTS, _week_span(week), now, country_id,
             damages=country_values(damage_ranking, country_id) if has_damage else None,
             user_mus=ranking_mus(damage_ranking, country_id) if has_damage else {},
-            all_damages=ranking_values(damage_ranking) if has_damage else None,
-            wealth_ranking=wealth_ranking,
+            wealth_ranking=wealth_ranking, diaspora_users=diaspora_users,
             donations=donation_totals(transactions, country_id, week) if transactions is not None else None,
             romanians=romanians, diaspora=diaspora, snapshot=snapshot, bounty_span=(window, bounty_end),
         )
@@ -1122,22 +1140,23 @@ class GovRankingsJob(commands.Cog):
             return
         window = month - REPORT_LEAD
         end = min(now, next_month(month) - REPORT_LEAD)
-        wealth_ranking, transactions, _ = await asyncio.gather(
-            warera.game.get_ranking("userWealth"),
+        wealth_items, transactions, _ = await asyncio.gather(
+            warera.game.get_ranking_entries("userWealth", country_id=country_id),
             warera.market.get_country_transactions(country_id, "donation", _iso(window)),
             self._check_reset("monthlyMissionRegenAt", next_month(month)),
         )
+        wealth_ranking = as_ranking(wealth_items)
         for name, value in (("wealth ranking", wealth_ranking), ("donations", transactions)):
             if value is None:
                 logger.warning("Government ranking: %s unavailable", name)
-        romanians = await self._load_romanians(country_id, wealth_ranking)
+        romanians = await self._load_romanians(country_id, refresh=True)
         snapshot = await self._battle_snapshot(window, end, romanians, True, MONTH_SYNC_TIMEOUT)
         totals = snapshot["damage"] if snapshot is not None else None
         await self._post_articles(
             channel, f"{month:%Y-%m}", MONTHLY_TEXTS, month_span(Translator(ARTICLE_LANGUAGE), month), now,
             country_id,
-            # the totals hold every player; the wealth ranking's Romanians are the citizens to load and check
-            damages=restrict(totals, romanians), user_mus=None, all_damages=totals,
+            # the totals hold every player; Romania's ranked citizens are the ones to load and check
+            damages=restrict(totals, romanians), user_mus=None,
             wealth_ranking=wealth_ranking,
             donations=donation_totals(transactions, country_id, window) if transactions is not None else None,
             romanians=romanians, diaspora=None, snapshot=snapshot, bounty_span=(window, end),
@@ -1146,17 +1165,18 @@ class GovRankingsJob(commands.Cog):
 
     async def _post_articles(
         self, channel, filename: str, texts: str, span: dict, now: datetime, country_id: str, *,
-        damages, user_mus, all_damages, wealth_ranking, donations, romanians, diaspora, snapshot, bounty_span,
-        mu_damage=None,
+        damages, user_mus, wealth_ranking, donations, romanians, diaspora, snapshot, bounty_span,
+        mu_damage=None, diaspora_users=None,
     ) -> None:
         """Build and send the Romania article, then the diaspora one, as `filename`.html and `filename`-diaspora.html.
 
         `diaspora` (_load_diaspora's result) None skips the diaspora article. `mu_damage` ({MU id: damage} from the
         battles' MU rankings, monthly) ranks the Romanian MUs instead of their members' summed damage.
 
-        `damages` are the period's damages of the Romanian candidates and `all_damages` every player's (each None
-        when unavailable); `user_mus` maps a player to the MU their damage counts for (None: their current MU,
-        read from the loaded users). The diaspora article's failure never affects the Romania one.
+        `damages` are the period's damages of the Romanian candidates (None when unavailable); `user_mus` maps a
+        player to the MU their damage counts for (None: their current MU, read from the loaded users).
+        `diaspora_users` are the diaspora candidates loaded before the battle sync, whose `rankings` give their
+        weekly damage and wealth. The diaspora article's failure never affects the Romania one.
         """
         users: dict[str, dict] = {}
         tr = Translator(ARTICLE_LANGUAGE)
@@ -1173,7 +1193,7 @@ class GovRankingsJob(commands.Cog):
             return
         try:
             content = await self._diaspora_article(
-                tr, texts, span, now, country_id, all_damages, wealth_ranking, diaspora, snapshot, bounty_span, users,
+                tr, texts, span, now, country_id, diaspora, diaspora_users or {}, snapshot, bounty_span, users,
             )
             await send_message(channel, content, f"{filename}-diaspora.html")
         except Exception:
@@ -1192,10 +1212,11 @@ class GovRankingsJob(commands.Cog):
         wealth = country_values(wealth_ranking, country_id) if wealth_ranking is not None else None
         bounty, span_note, unread = bounty_data(snapshot, bounty_span, romanians)
 
-        # only players with something to rank can appear, plus every Romanian in the rankings for Top Prestige
+        # only players with something to rank can appear, plus every ranked Romanian citizen for Top Prestige
         await self._load_users([
             *(user_id for values in (damages, donations, bounty) for user_id, value in (values or {}).items() if value > 0),
             *(wealth or {}),
+            *romanians,
         ], users)
         # the Romania top is for Romanian citizens only: donors from other countries are dropped, and so is a
         # ranked player whose citizenship changed after the ranking recorded their country
@@ -1229,7 +1250,7 @@ class GovRankingsJob(commands.Cog):
             | missing_that_matter(bounty, users, ALL_LEVELS, BOUNTY_TOP)
             | missing_that_matter(wealth, users, ALL_LEVELS, WEALTH_TOP)
             # any Romanian who failed to load could be missing from Top Prestige
-            | {user_id for user_id in wealth or {} if user_id not in users}
+            | {user_id for user_id in romanians if user_id not in users}
         )
         data = {
             "damages": damages,
@@ -1237,25 +1258,31 @@ class GovRankingsJob(commands.Cog):
             "wealth": wealth,
             "bounty": bounty,
             "mus": mus,
-            "prestige": prestige_list(users, citizens) if wealth is not None else None,
+            "prestige": prestige_list(users, citizens) if romanians else None,
             "bounty_span": span_note,
         }
         return build_article(tr, texts, span, now, data, users, {"players": len(missing), "battles": unread})
 
     async def _diaspora_article(
-        self, tr, texts, span, now, country_id, all_damages, wealth_ranking, diaspora, snapshot, bounty_span, users,
+        self, tr, texts, span, now, country_id, diaspora, diaspora_users, snapshot, bounty_span, users,
     ) -> str:
-        """The diaspora article: candidates who aren't Romanian citizens, with their citizenship on each line."""
+        """The diaspora article: candidates who aren't Romanian citizens, with their citizenship on each line.
+
+        Weekly damage and wealth are the `rankings` values of `diaspora_users` (the candidates loaded before
+        the battle sync); a candidate missing there has no value and counts as possibly missing.
+        """
         candidates, unit_mus, warnings = diaspora
+        for user_id, user in diaspora_users.items():
+            users.setdefault(user_id, user)
         await self._load_users(list(candidates), users)
         abroad = {
             user_id for user_id in candidates
             if user_id in users and users[user_id].get("country") != country_id
         }
-        # players who failed to load stay in the values for missing_that_matter; they never reach a top
+        # players who failed to load can't be placed or ranked; they count as possibly missing below
         unknown = {user_id for user_id in candidates if user_id not in users}
-        damages = restrict(all_damages, abroad | unknown)
-        wealth = restrict(ranking_values(wealth_ranking), abroad | unknown) if wealth_ranking is not None else None
+        damages = restrict(user_ranking_values(diaspora_users, "weeklyUserDamages"), abroad)
+        wealth = restrict(user_ranking_values(diaspora_users, "userWealth"), abroad)
         bounty, span_note, unread = bounty_data(snapshot, bounty_span, abroad | unknown)
 
         places = {}
@@ -1270,8 +1297,8 @@ class GovRankingsJob(commands.Cog):
             missing_that_matter(damages, users, DAMAGE_BRACKETS, DAMAGE_TOP)
             | missing_that_matter(bounty, users, ALL_LEVELS, BOUNTY_TOP)
             | missing_that_matter(wealth, users, ALL_LEVELS, WEALTH_TOP)
-            # any candidate who failed to load could be missing from Top Prestige
-            | unknown
+            # any candidate without a weekly value (not loaded before the sync) could be missing from a top
+            | {user_id for user_id in candidates if user_id not in diaspora_users}
         )
         data = {
             "damages": damages,

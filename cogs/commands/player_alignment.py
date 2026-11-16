@@ -321,8 +321,9 @@ class PlayerAlignment(commands.Cog):
     async def _load_players(self, mu_id: str | None) -> tuple[set[str], set[str], list[str]] | None:
         """The players to report as (every player id, member ids of configured MUs, names of MUs that failed).
 
-        With `mu_id`, that MU's members only. Otherwise Romania's citizens (userWealth, which lists every
-        player) plus the members of every configured MU. None when the list itself could not be read.
+        With `mu_id`, that MU's members only. Otherwise Romania's citizens (its userWealth, userLevel and
+        userDamages rankings, which leave out only players at 0 in all three) plus the members of every configured MU. None when
+        the citizen list could not be read.
         """
         if mu_id is not None:
             military_unit = await warera.mus.get(mu_id)
@@ -333,15 +334,14 @@ class PlayerAlignment(commands.Cog):
             members = {str(member) for member in military_unit.get("members") or []}
             return members, members, []
         unit_ids = _unit_ids()
-        ranking, military_units = await asyncio.gather(
-            warera.game.get_ranking("userWealth"), warera.mus.get_many(unit_ids)
-        )
-        if not isinstance(ranking, dict) or not ranking.get("items"):
-            return None
-        citizens = {
-            str(item["user"]) for item in ranking["items"]
-            if item.get("user") and str(item.get("country") or "") == self._country_id
-        }
+        if self._country_id is None:
+            citizens, military_units = set(), await warera.mus.get_many(unit_ids)
+        else:
+            citizens, military_units = await asyncio.gather(
+                warera.game.get_ranked_citizen_ids(self._country_id), warera.mus.get_many(unit_ids)
+            )
+            if not citizens:
+                return None
         members: set[str] = set()
         failed = []
         for unit_id in unit_ids:
@@ -391,7 +391,7 @@ class PlayerAlignment(commands.Cog):
 
         report = await self._collect(battles, ended, people, reset)
         users = await warera.users.get_many(list(report["damage"]))
-        # the wealth ranking's citizenship can be stale: drop players who left Romania and are in no configured MU
+        # the rankings' citizenship can be stale: drop players who left Romania and are in no configured MU
         for user_id, user in users.items():
             if user_id not in mu_members and str(user.get("country") or "") != self._country_id:
                 report["damage"].pop(user_id, None)

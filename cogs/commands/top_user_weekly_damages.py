@@ -367,14 +367,20 @@ class TopUserWeeklyDamages(commands.Cog):
             )
             return
 
-        ranking_data = await warera.game.get_ranking("weeklyUserDamages")
-        ranking_data = ranking_data or {}
-        items = ranking_data.get("items") or []
         country_ids = {
             country["_id"]
             for country in selected_countries
             if country.get("_id")
         }
+        # ranking.getRanking holds only the global top 100, so each country's entries are paged separately
+        rankings = await asyncio.gather(*(
+            warera.game.get_ranking_entries("weeklyUserDamages", country_id=country_id)
+            for country_id in country_ids
+        ))
+        failed = sum(1 for entries in rankings if entries is None)
+        if failed:
+            logger.warning("Weekly damage ranking unavailable for %d of %d countries", failed, len(rankings))
+        items = [item for entries in rankings for item in entries or []]
         country_items = _country_items(items, country_ids)
 
         try:
