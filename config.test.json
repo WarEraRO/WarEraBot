@@ -138,7 +138,8 @@
             "leaderId": 711121837274300466,
             "threadIds": {
                 "contractsId": 1465417729812074741,
-                "weeklyReportId": 1465417729812074741
+                "weeklyReportId": 1465417729812074741,
+                "bountyId": 1563863220777787443
             },
             "friendlyName": "Structura"
         },
