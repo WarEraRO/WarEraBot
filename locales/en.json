@@ -635,6 +635,10 @@
                 "name": "mu_help_requests — every minute",
                 "desc": "Posts the help requests of the members of the military units that have a help requests thread (threadIds.helpRequestsId) as one short line with a link to the player and the MU. A request is posted only while the player is in a Pill buff; a request made without a buff is checked again every minute and posted once the player takes a Pill, unless they ask again or the help cooldown passes first. Economy builds are always posted and marked as eco. When the MU has several requests open, the line says to press LOAD MORE. When a player asks for help again, the old line is deleted; the line of a player who left the MU is deleted too. The bot can't see when a request got all its helps, so a line stays until it is replaced. After a restart, the bot finds its own lines in the thread and keeps managing them."
             },
+            "welcome_gifts": {
+                "name": "welcome_gifts — every 1 hour",
+                "desc": "Posts in the recruitment channel the Romanian newcomers who can receive a welcome gift (level 7–10, account under 7 days old), one line each with a 🎁 button, 10 per page (◀ ▶ change the page for everyone), plus a message to copy. Pressing 🎁 marks the player as taken by you (✅, disabled for everyone), so nobody gifts the same player twice; ↩️ frees the players you took. Every hour the old list is deleted and a new one posted, keeping the claims. The bot can't see whether a gift was sent, so a claim only says who will send one. After a restart, the claims are read back from the last list."
+            },
             "war_priority": {
                 "name": "war_priority — every 2 minutes",
                 "desc": "For each of Romania's wars, checks which country holds the war priority and when it ends, and posts an alert in the government mod cabinet channel 3 hours, 1 hour and 10 minutes before it ends, whether the priority is Romania's or the enemy's, tagging the government roles (roles.government) and the mod cabinet role (roles.cabinets.mod). Nothing is posted while Romania and that enemy fight a battle (the winner gets a new priority). After a restart, alerts that were already due are not repeated."
@@ -1570,5 +1574,22 @@
         "request": "🆘 **[{player}](<{player_url}>)** has requested help {when}, check MU [{mu}](<{mu_url}>)",
         "eco": " · 🏭 eco player",
         "load_more": " · several requests open, press **LOAD MORE**"
+    },
+    "welcome_gifts": {
+        "title": "🎁 New players to welcome",
+        "intro": "🎁 = take the player (nobody else gifts them) · ↩️ = release yours",
+        "line": "`{n}.` **[{player}](<{url}>)** · lvl {level} · {joined}",
+        "taken": " · ✅ {member}",
+        "page": "📄 Page {page}/{pages} · {total} players",
+        "other_pages": "✅ On other pages: {list}",
+        "copy_title": "📋 **Message to copy:**",
+        "copy_text": "Salut și bun venit în WarEra! 🇷🇴 Ți-am trimis un mic cadou de bun venit, ca să pornești mai ușor. Nu uita să-l revendici (Claim gift) în 48 de ore. Ca să înveți rapid jocul, citește acest tutorial: {guide} . Dacă ai întrebări, scrie-ne oricând pe chat-ul țării #country-ro. Spor la joc!",
+        "hint": "-# In the game: Chat → Newcomers → Send a welcome gift (level 15+, 3 a day). Level {min}–{max}, account under {days} days · refreshed hourly · the bot can't see whether a gift was sent",
+        "reply_claimed": "You took **{player}**. Send the gift in the game: Chat → Newcomers. Profile: <{url}>",
+        "reply_released": "Released: {players}.",
+        "reply_nothing": "You haven't taken any player.",
+        "reply_taken": "**{player}** was already taken by {member}.",
+        "reply_expired": "This list is no longer current; use the newest one.",
+        "reply_not_ready": "The list is being refreshed; try again in a minute."
     }
 }
