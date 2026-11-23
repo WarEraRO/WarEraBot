@@ -67,6 +67,8 @@ TEXT_LIMIT = 4000
 HISTORY_SCAN_LIMIT = 500
 
 GUIDE_URL = "https://app.warera.io/article/6afc576611793739420ee95c"
+# the game's limit for a welcome-gift message (user, 2026-11-23); the copy text must fit in it
+GIFT_MESSAGE_LIMIT = 280
 USER_URL = "https://app.warera.io/user/{}"
 ACCENT_COLOR = discord.Color.from_rgb(46, 204, 113)
 CUSTOM_ID_PREFIX = "welcome_gift:"
@@ -359,6 +361,10 @@ class WelcomeGiftsJob(commands.Cog):
         self._warned_channel = False
         # serialises the hourly repost and the button presses, which both rewrite the claims and the post
         self._lock = asyncio.Lock()
+        copy_text = Translator("ro")("welcome_gifts.copy_text", guide=GUIDE_URL)
+        if len(copy_text) > GIFT_MESSAGE_LIMIT:
+            logger.warning("Welcome gifts: the message to copy is %d characters; the game accepts %d",
+                           len(copy_text), GIFT_MESSAGE_LIMIT)
         self.welcome_gifts.start()
 
     async def cog_load(self):

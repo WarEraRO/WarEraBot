@@ -1841,7 +1841,7 @@
         "page": "📄 Pagina {page}/{pages} · {total} jucători",
         "other_pages": "✅ Pe alte pagini: {list}",
         "copy_title": "📋 **Mesaj de copiat:**",
-        "copy_text": "Salut și bun venit în WarEra! 🇷🇴 Ți-am trimis un mic cadou de bun venit, ca să pornești mai ușor. Nu uita să-l revendici (Claim gift) în 48 de ore. Ca să înveți rapid jocul, citește acest tutorial: {guide} . Dacă ai întrebări, scrie-ne oricând pe chat-ul țării #country-ro. Spor la joc!",
+        "copy_text": "Salut și bun venit în WarEra! 🇷🇴 Ți-am trimis un mic cadou ca să pornești mai ușor; revendică-l (Claim gift) în 48 de ore. Tutorial rapid: {guide} . Întrebări? Scrie-ne pe chat-ul țării #country-ro. Spor la joc!",
         "hint": "-# În joc: Chat → Newcomers → Send a welcome gift (nivel 15+, 3 pe zi). Nivel {min}–{max}, cont sub {days} zile · actualizat orar · botul nu vede dacă s-a trimis cadoul",
         "reply_claimed": "Ai preluat jucătorul **{player}**. Trimite cadoul în joc: Chat → Newcomers. Profil: <{url}>",
         "reply_released": "Eliberați: {players}.",
