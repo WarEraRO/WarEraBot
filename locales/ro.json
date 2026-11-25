@@ -640,7 +640,7 @@
             },
             "welcome_gifts": {
                 "name": "welcome_gifts — la fiecare oră",
-                "desc": "Postează în canalul de recrutare jucătorii români noi care pot primi un cadou de bun venit (nivel 7–10, cont mai nou de 7 zile), câte o linie cu un buton 🎁, câte 10 pe pagină (◀ ▶ schimbă pagina pentru toți), plus un mesaj de copiat. Apăsarea 🎁 marchează jucătorul ca preluat de tine (✅, dezactivat pentru toți), ca să nu primească nimeni același jucător de două ori; ↩️ eliberează jucătorii preluați de tine. La fiecare oră lista veche este ștearsă și se postează una nouă, cu preluările păstrate. Botul nu vede dacă un cadou a fost trimis, așa că o preluare spune doar cine îl va trimite. După o repornire, preluările sunt citite din ultima listă."
+                "desc": "Postează în canalul de recrutare jucătorii români noi care pot primi un cadou de bun venit (nivel 7–10, cont mai nou de 7 zile), câte o linie cu un buton 🎁, câte 10 pe pagină (◀ ▶ schimbă pagina pentru toți), plus un mesaj de copiat. Până la 3 membri pot prelua același jucător: apăsarea 🎁 te adaugă pe linia jucătorului, iar butonul numără membrii (1/3); când toate cele 3 locuri sunt ocupate, arată ✅ și e dezactivat pentru toți. ↩️ eliberează jucătorii preluați de tine. La fiecare oră lista veche este ștearsă și se postează una nouă, cu preluările păstrate. Botul nu vede dacă un cadou a fost trimis, așa că o preluare spune doar cine îl va trimite. După o repornire, preluările sunt citite din ultima listă."
             },
             "war_priority": {
                 "name": "war_priority — la fiecare 2 minute",
@@ -1835,18 +1835,19 @@
     },
     "welcome_gifts": {
         "title": "🎁 Jucători noi de întâmpinat",
-        "intro": "🎁 = preiei jucătorul (nu-i mai trimite altcineva) · ↩️ = renunți la ale tale",
+        "intro": "🎁 = preiei un loc pentru cadou (cel mult {max} membri per jucător) · ↩️ = renunți la ale tale",
         "line": "`{n}.` **[{player}](<{url}>)** · niv. {level} · {joined}",
-        "taken": " · ✅ {member}",
+        "taken": " · ✅ {members}",
         "page": "📄 Pagina {page}/{pages} · {total} jucători",
         "other_pages": "✅ Pe alte pagini: {list}",
         "copy_title": "📋 **Mesaj de copiat:**",
-        "copy_text": "Salut și bun venit în WarEra! 🇷🇴 Ți-am trimis un mic cadou ca să pornești mai ușor; revendică-l (Claim gift) în 48 de ore. Tutorial rapid: {guide} . Întrebări? Scrie-ne pe chat-ul țării #country-ro. Spor la joc!",
+        "copy_text": "Salut si bun venit in WarEra! 🇷🇴 Ti-am trimis un mic cadou ca sa pornesti mai usor; revendica-l (Claim gift) in 48 de ore. Tutorial rapid: {guide} . Intrebari? Scrie-ne pe chat-ul tarii #country-ro. Spor la joc!",
         "hint": "-# În joc: Chat → Newcomers → Send a welcome gift (nivel 15+, 3 pe zi). Nivel {min}–{max}, cont sub {days} zile · actualizat orar · botul nu vede dacă s-a trimis cadoul",
-        "reply_claimed": "Ai preluat jucătorul **{player}**. Trimite cadoul în joc: Chat → Newcomers. Profil: <{url}>",
+        "reply_claimed": "Ai preluat jucătorul **{player}** ({count}/{max}). Trimite cadoul în joc: Chat → Newcomers. Profil: <{url}>",
         "reply_released": "Eliberați: {players}.",
         "reply_nothing": "Nu ai preluat niciun jucător.",
-        "reply_taken": "**{player}** a fost deja preluat de {member}.",
+        "reply_already": "Ai preluat deja jucătorul **{player}**; ↩️ eliberează jucătorii tăi.",
+        "reply_full": "**{player}** are deja {max} membri: {members}.",
         "reply_expired": "Lista aceasta nu mai e actuală; folosește-o pe cea mai nouă.",
         "reply_not_ready": "Lista se actualizează; încearcă din nou peste un minut."
     }

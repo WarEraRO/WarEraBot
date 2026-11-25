@@ -14,16 +14,17 @@ list of newcomers (``welcomeGift.getNewcomers``) is closed to API keys, so the j
    PAGE_SIZE per page with ◀ / ▶, a Romanian message to copy into the gift, and where the gift button is in
    the game. The previous post is deleted after the new one is sent; the new one opens on the first page.
    The post is public, so turning the page turns it for everyone.
-3. Pressing a newcomer's 🎁 marks them as taken by that member ("✅ @member" on the line) and disables the
-   button (✅) for everyone, so two members don't gift the same player. ↩️ frees the presser's claims. A
-   claim stays while the newcomer is on the list and is carried into the next hourly post. Players taken on
-   other pages are listed under the page.
+3. Up to MAX_CLAIMS members can take the same newcomer. Pressing a newcomer's 🎁 adds the presser to the
+   newcomer's line ("✅ @member @member"), and the button counts the members who took them ("1/3"); once
+   every spot is taken it shows ✅ and is disabled for everyone, so no more members plan a gift for that
+   player. ↩️ frees the presser's claims. A claim stays while the newcomer is on the list and is carried
+   into the next hourly post. Players taken on other pages are listed under the page.
 
 The bot can't see whether a gift was sent or claimed, nor how many gifts a newcomer already has (the
 ``welcomeGift.*`` queries are closed to API keys): a claim only says who intends to send one.
 
 State lives in memory. Every claim is also written in the post (on its line, or in the "on other pages"
-line, as a member mention, which doesn't notify), so after a restart the first run reads them back from the
+line, as member mentions, which don't notify), so after a restart the first run reads them back from the
 bot's latest post in the channel and deletes the old posts. The buttons are ``DynamicItem`` items, matched by
 custom id, so a post made before a restart keeps working once the cog is loaded.
 """
@@ -55,6 +56,8 @@ MIN_LEVEL = 7
 # game rule (v0.28.4): newcomers are level 2-10 and their account is under 7 days old
 MAX_LEVEL = 10
 NEWCOMER_AGE = timedelta(days=7)
+# user choice (2026-11-25): how many members can take the same newcomer
+MAX_CLAIMS = 3
 # slack on the ObjectId pre-filter, in case an account's id was minted a little before its createdAt
 ID_MARGIN = timedelta(days=1)
 # A layout message holds at most 40 components. Each newcomer line is 3 (section, text, button); the rest is
@@ -75,10 +78,13 @@ CUSTOM_ID_PREFIX = "welcome_gift:"
 CLAIM_ID = CUSTOM_ID_PREFIX + "claim:{}"
 RELEASE_ID = CUSTOM_ID_PREFIX + "release"
 PAGE_ID = CUSTOM_ID_PREFIX + "page:{}"
-# a newcomer's text (their line, or an entry of the "on other pages" line): the profile link, then "<@member>"
-# The link is matched with its unescaped "](<" opening and ">)" closing: names are escaped (`_link_text`), so
-# a player name can't imitate a profile link and shift a claim to another id.
-_CLAIM_PATTERN = re.compile(r"(?<!\\)\]\(<https://app\.warera\.io/user/([a-f\d]{24})>\)[^\n,]*?<@!?(\d+)>")
+# a newcomer's text (their line, or an entry of the "on other pages" line): the profile link, then the
+# "<@member>" mentions, up to the end of the line or the comma before the next entry (mentions inside an entry
+# are separated by spaces). The link is matched with its unescaped "](<" opening and ">)" closing: names are
+# escaped (`_link_text`) and come before the link, so a player name can't imitate a profile link or a mention
+# and shift a claim to another id.
+_CLAIM_PATTERN = re.compile(r"(?<!\\)\]\(<https://app\.warera\.io/user/([a-f\d]{24})>\)([^\n,]*)")
+_MENTION_PATTERN = re.compile(r"<@!?(\d+)>")
 
 
 def _id_created_at(object_id: str) -> datetime | None:
@@ -156,6 +162,11 @@ def _link_text(text: str) -> str:
     return discord.utils.escape_markdown(text).replace("[", "\\[").replace("]", "\\]")
 
 
+def _mentions(member_ids: list[int]) -> str:
+    """The members' mentions, separated by spaces (no commas: they separate the "on other pages" entries)."""
+    return " ".join(f"<@{member_id}>" for member_id in member_ids)
+
+
 async def _route(interaction: discord.Interaction, handler: str, *args):
     """Pass a button press to the job's ``handler`` method; just acknowledge it when the job isn't loaded."""
     job = interaction.client.get_cog(WelcomeGiftsJob.__cog_name__)
@@ -166,15 +177,21 @@ async def _route(interaction: discord.Interaction, handler: str, *args):
 
 
 class ClaimButton(discord.ui.DynamicItem[discord.ui.Button], template=r"welcome_gift:claim:(?P<user_id>[a-f\d]{24})"):
-    """A newcomer's button (🎁): takes the newcomer for the member who presses it; ✅ and disabled once taken."""
+    """A newcomer's button: takes one of the newcomer's MAX_CLAIMS spots for the member who presses it.
 
-    def __init__(self, user_id: str, taken: bool = False):
-        """Build the button for ``user_id``; ``taken`` shows ✅ and disables it."""
+    It shows 🎁 and how many members took the newcomer ("1/3"); once every spot is taken it shows ✅ and is
+    disabled.
+    """
+
+    def __init__(self, user_id: str, claimed: int = 0):
+        """Build the button for ``user_id``; ``claimed`` is how many members took the newcomer."""
+        full = claimed >= MAX_CLAIMS
         super().__init__(discord.ui.Button(
             custom_id=CLAIM_ID.format(user_id),
-            emoji="✅" if taken else "🎁",
-            style=discord.ButtonStyle.secondary if taken else discord.ButtonStyle.success,
-            disabled=taken,
+            emoji="✅" if full else "🎁",
+            label=f"{min(claimed, MAX_CLAIMS)}/{MAX_CLAIMS}",
+            style=discord.ButtonStyle.secondary if full else discord.ButtonStyle.success,
+            disabled=full,
         ))
         self.user_id = user_id
 
@@ -225,7 +242,7 @@ class PageButton(discord.ui.DynamicItem[discord.ui.Button], template=r"welcome_g
         await _route(interaction, "handle_page", self.page)
 
 
-def build_layout(tr: Translator, copy_tr: Translator, newcomers: list[dict], claims: dict[str, int],
+def build_layout(tr: Translator, copy_tr: Translator, newcomers: list[dict], claims: dict[str, list[int]],
                  page: int) -> discord.ui.LayoutView:
     """The post for one page: header, a line per newcomer with its button, page row, message to copy and hint.
 
@@ -233,12 +250,13 @@ def build_layout(tr: Translator, copy_tr: Translator, newcomers: list[dict], cla
         tr: Translator of the server language (labels).
         copy_tr: Translator of the message to copy; always Romanian, because the newcomers are Romanian.
         newcomers: Every listed newcomer, in display order.
-        claims: Newcomer id -> Discord id of the member who took them; their buttons are disabled.
+        claims: Newcomer id -> Discord ids of the members who took them, in claim order (at most MAX_CLAIMS);
+            the button of a newcomer with MAX_CLAIMS members is disabled.
         page: The page shown (0-based; clamped to the list).
 
     Returns:
         A LayoutView with no timeout; presses are routed by custom id (ClaimButton / ReleaseButton / PageButton).
-        Every claim is written as a profile link followed by the member's mention (on its line, or in the "on
+        Every claim is written as a profile link followed by the members' mentions (on its line, or in the "on
         other pages" line), which `claims_from_message` reads back after a restart. The ◀ / ▶ buttons appear
         only when there is more than one page; their custom ids hold the target page, so they always differ.
     """
@@ -247,7 +265,7 @@ def build_layout(tr: Translator, copy_tr: Translator, newcomers: list[dict], cla
     on_page = newcomers[start:start + PAGE_SIZE]
     pages = page_count(newcomers)
 
-    header = f"### {tr('welcome_gifts.title')}\n{tr('welcome_gifts.intro')}"
+    header = f"### {tr('welcome_gifts.title')}\n{tr('welcome_gifts.intro', max=MAX_CLAIMS)}"
     rows = []
     for number, newcomer in enumerate(on_page, start=start + 1):
         line = tr(
@@ -258,10 +276,10 @@ def build_layout(tr: Translator, copy_tr: Translator, newcomers: list[dict], cla
             level=newcomer["level"],
             joined=f"<t:{int(newcomer['created'].timestamp())}:R>",
         )
-        member_id = claims.get(newcomer["id"])
-        if member_id is not None:
-            line += tr("welcome_gifts.taken", member=f"<@{member_id}>")
-        rows.append((newcomer["id"], line, member_id is not None))
+        members = claims.get(newcomer["id"]) or []
+        if members:
+            line += tr("welcome_gifts.taken", members=_mentions(members))
+        rows.append((newcomer["id"], line, len(members)))
     bottom = (
         f"{tr('welcome_gifts.copy_title')}\n```\n{copy_tr('welcome_gifts.copy_text', guide=GUIDE_URL)}\n```\n"
         + tr("welcome_gifts.hint", min=MIN_LEVEL, max=MAX_LEVEL, days=NEWCOMER_AGE.days)
@@ -270,9 +288,10 @@ def build_layout(tr: Translator, copy_tr: Translator, newcomers: list[dict], cla
     status = [tr("welcome_gifts.page", page=page + 1, pages=pages, total=len(newcomers))] if pages > 1 else []
     page_ids = {newcomer["id"] for newcomer in on_page}
     elsewhere = [
-        f"{number}. [{_link_text(newcomer['username'])}](<{USER_URL.format(newcomer['id'])}>) <@{claims[newcomer['id']]}>"
+        f"{number}. [{_link_text(newcomer['username'])}](<{USER_URL.format(newcomer['id'])}>) "
+        f"{_mentions(claims[newcomer['id']])}"
         for number, newcomer in enumerate(newcomers, start=1)
-        if newcomer["id"] in claims and newcomer["id"] not in page_ids
+        if claims.get(newcomer["id"]) and newcomer["id"] not in page_ids
     ]
     if elsewhere:
         # keep the whole message under Discord's text limit; claims cut here are still kept in memory
@@ -289,8 +308,8 @@ def build_layout(tr: Translator, copy_tr: Translator, newcomers: list[dict], cla
 
     container = discord.ui.Container(accent_colour=ACCENT_COLOR)
     container.add_item(discord.ui.TextDisplay(header))
-    for user_id, line, taken in rows:
-        container.add_item(discord.ui.Section(discord.ui.TextDisplay(line), accessory=ClaimButton(user_id, taken=taken)))
+    for user_id, line, claimed in rows:
+        container.add_item(discord.ui.Section(discord.ui.TextDisplay(line), accessory=ClaimButton(user_id, claimed=claimed)))
     if status:
         container.add_item(discord.ui.TextDisplay("\n".join(status)))
     controls = discord.ui.ActionRow()
@@ -330,13 +349,21 @@ def is_own_post(message: discord.Message, bot_id: int) -> bool:
     )
 
 
-def claims_from_message(message: discord.Message) -> dict[str, int]:
-    """The claims written in a post (newcomer lines and the "on other pages" line): newcomer id -> Discord id."""
-    return {
-        user_id: int(member_id)
-        for component in _walk(message.components)
-        for user_id, member_id in _CLAIM_PATTERN.findall(getattr(component, "content", None) or "")
-    }
+def claims_from_message(message: discord.Message) -> dict[str, list[int]]:
+    """The claims written in a post (newcomer lines and the "on other pages" line).
+
+    Returns:
+        Newcomer id -> Discord ids of the members who took them, in the order written, without duplicates and
+        at most MAX_CLAIMS each. Newcomers nobody took are left out.
+    """
+    claims: dict[str, list[int]] = {}
+    for component in _walk(message.components):
+        for user_id, tail in _CLAIM_PATTERN.findall(getattr(component, "content", None) or ""):
+            members = claims.setdefault(user_id, [])
+            for member_id in map(int, _MENTION_PATTERN.findall(tail)):
+                if member_id not in members and len(members) < MAX_CLAIMS:
+                    members.append(member_id)
+    return {user_id: members for user_id, members in claims.items() if members}
 
 
 class WelcomeGiftsJob(commands.Cog):
@@ -344,8 +371,8 @@ class WelcomeGiftsJob(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        # newcomer id -> Discord id of the member who took them
-        self._claims: dict[str, int] = {}
+        # newcomer id -> Discord ids of the members who took them, in claim order (at most MAX_CLAIMS, never empty)
+        self._claims: dict[str, list[int]] = {}
         # every listed newcomer, in display order (what the lines and buttons are rebuilt from), and the page shown
         self._newcomers: list[dict] = []
         self._page = 0
@@ -468,7 +495,7 @@ class WelcomeGiftsJob(commands.Cog):
         async with self._lock:
             current = {newcomer["id"] for newcomer in newcomers}
             self._claims = {
-                user_id: member_id for user_id, member_id in self._claims.items() if user_id in current
+                user_id: members for user_id, members in self._claims.items() if user_id in current
             }
             old = set(self._stale)
             if self._message_id is not None:
@@ -506,8 +533,8 @@ class WelcomeGiftsJob(commands.Cog):
             return False
         if posts:
             # history is newest first; the latest post holds the current claims
-            for user_id, member_id in claims_from_message(posts[0]).items():
-                self._claims.setdefault(user_id, member_id)
+            for user_id, members in claims_from_message(posts[0]).items():
+                self._claims.setdefault(user_id, members)
             self._stale.update(message.id for message in posts)
         self._recovered = True
         return True
@@ -543,7 +570,7 @@ class WelcomeGiftsJob(commands.Cog):
         return True
 
     async def handle_claim(self, interaction: discord.Interaction, user_id: str):
-        """A newcomer's 🎁 was pressed: take the newcomer for the presser, unless someone already did."""
+        """A newcomer's 🎁 was pressed: give the presser a spot, unless they hold one or all MAX_CLAIMS are taken."""
         # acknowledge first: the hourly run may hold the lock longer than Discord's 3-second window
         await interaction.response.defer()
         tr = await get_translator(interaction.guild)
@@ -554,33 +581,47 @@ class WelcomeGiftsJob(commands.Cog):
             if newcomer is None:
                 await interaction.followup.send(tr("welcome_gifts.reply_expired"), ephemeral=True)
                 return
-            holder = self._claims.get(user_id)
-            if holder is not None and holder != interaction.user.id:
+            members = self._claims.get(user_id, [])
+            if interaction.user.id in members:
                 await interaction.followup.send(
-                    tr("welcome_gifts.reply_taken", player=newcomer["username"], member=f"<@{holder}>"),
+                    tr("welcome_gifts.reply_already", player=newcomer["username"]), ephemeral=True,
+                )
+                return
+            if len(members) >= MAX_CLAIMS:
+                # the button is disabled once full, but a press can race the redraw
+                await interaction.followup.send(
+                    tr("welcome_gifts.reply_full", player=newcomer["username"], max=MAX_CLAIMS,
+                       members=_mentions(members)),
                     ephemeral=True, allowed_mentions=discord.AllowedMentions.none(),
                 )
                 return
-            self._claims[user_id] = interaction.user.id
+            self._claims[user_id] = members + [interaction.user.id]
+            count = len(self._claims[user_id])
             await self._refresh_post(interaction, tr)
         await interaction.followup.send(
-            tr("welcome_gifts.reply_claimed", player=newcomer["username"], url=USER_URL.format(user_id)),
+            tr("welcome_gifts.reply_claimed", player=newcomer["username"], url=USER_URL.format(user_id),
+               count=count, max=MAX_CLAIMS),
             ephemeral=True,
         )
 
     async def handle_release(self, interaction: discord.Interaction):
-        """↩️ was pressed: free every newcomer the presser took."""
+        """↩️ was pressed: free the presser's spot on every newcomer they took."""
         await interaction.response.defer()
         tr = await get_translator(interaction.guild)
         async with self._lock:
             if not await self._check_current(interaction, tr):
                 return
-            mine = [user_id for user_id, member_id in self._claims.items() if member_id == interaction.user.id]
+            presser = interaction.user.id
+            mine = [user_id for user_id, members in self._claims.items() if presser in members]
             if not mine:
                 await interaction.followup.send(tr("welcome_gifts.reply_nothing"), ephemeral=True)
                 return
             for user_id in mine:
-                del self._claims[user_id]
+                others = [member_id for member_id in self._claims[user_id] if member_id != presser]
+                if others:
+                    self._claims[user_id] = others
+                else:
+                    del self._claims[user_id]
             names = [item["username"] for item in self._newcomers if item["id"] in mine]
             await self._refresh_post(interaction, tr)
         await interaction.followup.send(
