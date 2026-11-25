@@ -16,7 +16,8 @@ class UsersAPI(Endpoint):
     """`user.*`, `search.searchAnything` and `inventory.fetchCurrentEquipment`.
 
     `username_ids` maps every username resolved by an exact match to its user id, for the life of the
-    process; the name lookups trust it without re-checking the username.
+    process. find_by_name and find_many_by_name re-check the fetched username and drop an entry whose
+    player has since renamed; ids_by_name fetches nothing, so it trusts the entry as is.
     """
 
     def __init__(self, client):
@@ -79,7 +80,8 @@ class UsersAPI(Endpoint):
         """The user whose username is exactly `username`, or None.
 
         Searches the quoted name first and falls back to the plain name if that finds no exact match.
-        A cached id is fetched without re-checking the username.
+        A cached id is fetched first; if that player now has another username, the entry is dropped
+        and the name is searched again. A cached id whose fetch fails gives None without a search.
 
         Args:
             username: The exact in-game username.
@@ -88,7 +90,11 @@ class UsersAPI(Endpoint):
         """
         if username in self.username_ids:
             fetch_one = self.get_full if full else self.get
-            return await fetch_one(self.username_ids[username])
+            user = await fetch_one(self.username_ids[username])
+            if user is None or user.get('username') == username:
+                return user
+            # Renamed since it was cached: the old name may now belong to another player or to no one
+            self.username_ids.pop(username, None)
         fetch_many = self.get_full_many if full else self.get_many
         for search_text in (_quoted(username), username):
             search = await self._get('search.searchAnything', {'searchText': search_text})
@@ -107,15 +113,28 @@ class UsersAPI(Endpoint):
     async def find_many_by_name(self, usernames, full=False):
         """Batched find_by_name(): {username: user} for the usernames that resolved.
 
-        Like find_by_name, a cached id is fetched without re-checking the username. `full` fetches the
-        users with user.getUserById (skills included) instead of getUserLite, cached ids too.
+        Like find_by_name, a cached id counts only while its player still has that username; a renamed
+        player's entry is dropped and the name searched again, and a cached id whose fetch fails is
+        left out without a search. `full` fetches the users with user.getUserById (skills included)
+        instead of getUserLite, cached ids too.
         """
         names = list(dict.fromkeys(usernames))
         cached = {name: self.username_ids[name] for name in names if name in self.username_ids}
         fetch_many = self.get_full_many if full else self.get_many
         users_by_id = await fetch_many(cached.values())
-        found = {name: users_by_id[uid] for name, uid in cached.items() if uid in users_by_id}
-        missing = [name for name in names if name not in cached]
+        found = {}
+        stale = set()
+        for name, uid in cached.items():
+            user = users_by_id.get(uid)
+            if user is None:
+                continue
+            if user.get('username') == name:
+                found[name] = user
+            else:
+                # Renamed since it was cached: the old name may now belong to another player or to no one
+                self.username_ids.pop(name, None)
+                stale.add(name)
+        missing = [name for name in names if name not in cached or name in stale]
         if missing:
             found.update(await self._search_names(missing, full=full))
         return found
