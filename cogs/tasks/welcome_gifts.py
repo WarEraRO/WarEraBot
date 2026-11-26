@@ -12,8 +12,10 @@ list of newcomers (``welcomeGift.getNewcomers``) is closed to API keys, so the j
 2. It posts one compact message in ``channels.recruitment`` (Discord's component layout, "Components V2"):
    one line per newcomer (profile link, level, account age) with its button at the end of the line,
    PAGE_SIZE per page with ◀ / ▶, a Romanian message to copy into the gift, and where the gift button is in
-   the game. The previous post is deleted after the new one is sent; the new one opens on the first page.
-   The post is public, so turning the page turns it for everyone.
+   the game. While the post is still the channel's latest message it is edited in place; once anyone
+   (member or bot) has sent a message after it, the run sends a new post and deletes the old one, so the
+   list stays at the bottom of the channel. Either way the refreshed list opens on the first page. The
+   post is public, so turning the page turns it for everyone.
 3. Up to MAX_CLAIMS members can take the same newcomer. Pressing a newcomer's 🎁 adds the presser to the
    newcomer's line ("✅ @member @member"), and the button counts the members who took them ("1/3"); once
    every spot is taken it shows ✅ and is disabled for everyone, so no more members plan a gift for that
@@ -25,7 +27,8 @@ The bot can't see whether a gift was sent or claimed, nor how many gifts a newco
 
 State lives in memory. Every claim is also written in the post (on its line, or in the "on other pages"
 line, as member mentions, which don't notify), so after a restart the first run reads them back from the
-bot's latest post in the channel and deletes the old posts. The buttons are ``DynamicItem`` items, matched by
+bot's latest post in the channel, refreshes that post (edited or replaced, as above) and deletes the older
+ones. The buttons are ``DynamicItem`` items, matched by
 custom id, so a post made before a restart keeps working once the cog is loaded.
 """
 
@@ -465,7 +468,10 @@ class WelcomeGiftsJob(commands.Cog):
         return select_newcomers(users, country_id, now)
 
     async def _run(self, forced: bool = False) -> str | None:
-        """One run: read the newcomers, post the new list, delete the old posts.
+        """One run: read the newcomers, refresh the list, delete the old posts.
+
+        The current post is edited when it is still the channel's latest message (see `_edit_in_place`);
+        otherwise the list is sent as a new post and the old one is deleted.
 
         Args:
             forced: Run from /run_job: repost now even if the last post is less than REPOST_INTERVAL old.
@@ -503,12 +509,17 @@ class WelcomeGiftsJob(commands.Cog):
             if newcomers:
                 tr = await get_translator(guild)
                 view = build_layout(tr, Translator("ro"), newcomers, self._claims, 0)
-                try:
-                    message = await channel.send(view=view, allowed_mentions=discord.AllowedMentions.none())
-                except discord.HTTPException as exc:
-                    logger.exception("Welcome gifts: could not send the newcomer list; the old post is kept")
-                    return f"could not send the newcomer list ({exc}); the old post is kept"
-                self._message_id, self._newcomers, self._page = message.id, newcomers, 0
+                message_id = await self._edit_in_place(channel, view)
+                if message_id is None:
+                    try:
+                        message = await channel.send(view=view, allowed_mentions=discord.AllowedMentions.none())
+                    except discord.HTTPException as exc:
+                        logger.exception("Welcome gifts: could not send the newcomer list; the old post is kept")
+                        return f"could not send the newcomer list ({exc}); the old post is kept"
+                    message_id = message.id
+                # an edited post stays; only the posts it replaces are deleted
+                old.discard(message_id)
+                self._message_id, self._newcomers, self._page = message_id, newcomers, 0
             else:
                 self._message_id, self._newcomers, self._page = None, [], 0
             self._posted_at = now
@@ -518,7 +529,10 @@ class WelcomeGiftsJob(commands.Cog):
         return None
 
     async def _recover(self, channel) -> bool:
-        """After a start, adopt the claims of the bot's latest post and mark every earlier post for deletion.
+        """After a start, adopt the bot's latest post and its claims, and mark every earlier post for deletion.
+
+        The latest post becomes the current one, so the first run can edit it in place; its buttons answer
+        "not ready" until that run has loaded the newcomers (see `_check_current`).
 
         Returns:
             False when the history can't be read; the run is then skipped, so no second list is posted.
@@ -535,9 +549,43 @@ class WelcomeGiftsJob(commands.Cog):
             # history is newest first; the latest post holds the current claims
             for user_id, members in claims_from_message(posts[0]).items():
                 self._claims.setdefault(user_id, members)
-            self._stale.update(message.id for message in posts)
+            self._message_id = posts[0].id
+            self._stale.update(message.id for message in posts[1:])
         self._recovered = True
         return True
+
+    async def _edit_in_place(self, channel, view: discord.ui.LayoutView) -> int | None:
+        """Edit the current post to show ``view`` if no message was sent in the channel after it.
+
+        Any later message that still exists counts (a member's, a bot's or another job's). One deleted since
+        doesn't, since the post is then back at the bottom of the channel.
+
+        Returns:
+            The post's id when it was edited; None when there is no current post, a message follows it, or
+            the history read or the edit failed (the post was deleted, for example). The caller then sends
+            a new post and deletes this one.
+        """
+        if self._message_id is None:
+            return None
+        try:
+            later = [message async for message in channel.history(limit=1, after=discord.Object(self._message_id))]
+        except discord.HTTPException:
+            logger.warning("Welcome gifts: could not check for messages after the post; sending a new one",
+                           exc_info=True)
+            return None
+        if later:
+            return None
+        try:
+            await channel.get_partial_message(self._message_id).edit(
+                view=view, allowed_mentions=discord.AllowedMentions.none(),
+            )
+        except discord.NotFound:
+            return None
+        except discord.HTTPException:
+            logger.warning("Welcome gifts: could not edit post %s; sending a new one", self._message_id,
+                           exc_info=True)
+            return None
+        return self._message_id
 
     async def _delete(self, channel, message_id: int):
         """Delete an old post; one that fails (other than already gone) is retried on the next run."""
@@ -560,8 +608,12 @@ class WelcomeGiftsJob(commands.Cog):
         return True
 
     async def _check_current(self, interaction: discord.Interaction, tr: Translator) -> bool:
-        """Whether the press came from the current post; otherwise tell the member (ephemeral) and return False."""
-        if self._message_id is None or not self._recovered:
+        """Whether the press came from the current post; otherwise tell the member (ephemeral) and return False.
+
+        Until the first run after a start has loaded the newcomers, every press answers "not ready", even on
+        the adopted latest post: redrawing it then would show an empty list.
+        """
+        if self._message_id is None or not self._recovered or self._posted_at is None:
             await interaction.followup.send(tr("welcome_gifts.reply_not_ready"), ephemeral=True)
             return False
         if interaction.message is None or interaction.message.id != self._message_id:
